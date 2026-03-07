@@ -20,27 +20,25 @@ struct LiveView: View {
                 VStack(spacing: 24) {
                     // Current Song / Artist Image
                     VStack(spacing: 16) {
-                        if let imageURL = apiClient.liveMetadata?.artistImageURL[selectedStream.rawValue],
-                           let url = URL(string: imageURL) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 250, height: 250)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .shadow(radius: 5)
-                            } placeholder: {
-                                ProgressView()
-                                    .frame(width: 250, height: 250)
+                        ZStack {
+                            fallbackCoverIcon
+                            
+                            if let imageURL = apiClient.liveMetadata?.artistImageURL[selectedStream.rawValue],
+                               !imageURL.isEmpty,
+                               !imageURL.lowercased().contains("blank.png"),
+                               let url = URL(string: imageURL) {
+                                AsyncImage(url: url) { phase in
+                                    if let image = phase.image {
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 250, height: 250)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                            .shadow(radius: 5)
+                                    }
+                                }
+                                .frame(width: 250, height: 250)
                             }
-                        } else {
-                            Image(systemName: "music.note.list")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 120, height: 120)
-                                .padding(65)
-                                .background(Color.secondary.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         
                         VStack(spacing: 6) {
@@ -130,6 +128,24 @@ struct LiveView: View {
                 .padding(.bottom)
             }
         }
+        .onAppear {
+            apiClient.startLiveMetadataPolling()
+        }
+        .onDisappear {
+            apiClient.stopLiveMetadataPolling()
+        }
+    }
+    
+    private var fallbackCoverIcon: some View {
+        Image(systemName: "music.note.list")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 80, height: 80)
+            .foregroundColor(.secondary)
+            .padding(85)
+            .background(Color.secondary.opacity(0.15))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .frame(width: 250, height: 250)
     }
 }
 

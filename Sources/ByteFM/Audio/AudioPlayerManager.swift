@@ -41,6 +41,11 @@ class AudioPlayerManager: NSObject, ObservableObject {
         setupNowPlaying(item: item)
         updatePlaybackRate(1.0)
         
+        // Mark as played in history
+        Task {
+            await APIClient.shared.markAsPlayed(item: item)
+        }
+        
         // Fetch playlist in background if not provided
         if playlist == nil {
             Task {

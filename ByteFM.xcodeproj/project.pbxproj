@@ -10,6 +10,7 @@
 		08AD9BF757C766BA2820AD26 /* LiveMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF4334D9F6C0E163A8B1AEE /* LiveMetadata.swift */; };
 		0A31FEB25E691D69C1B7BFC4 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C925BDB0B715EC214EA9AB /* KeychainHelper.swift */; };
 		0F4B592D524844BF9D7B50F8 /* BroadcastDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091D56FC8971AF3A728F67AA /* BroadcastDetail.swift */; };
+		0FFBF1A1ACE800C4B7ACDA9E /* StoredArchiveItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2800A1043C6EB72089620F /* StoredArchiveItem.swift */; };
 		1F0CB47930C14D70BBE76C42 /* BroadcastDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81EB167E4E8B6FA0EC2B3EF /* BroadcastDetailView.swift */; };
 		649806401C3D41026EF13A84 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8FF802153125AE94D315E8 /* ContentView.swift */; };
 		71F159AD39A60216256FC75A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 78603908935FA62AF66EC9E0 /* Assets.xcassets */; };
@@ -19,6 +20,10 @@
 		9136A63FC8CF62321F988FFC /* LiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501C143E5762AA37D8A993C0 /* LiveView.swift */; };
 		92FEBB412E9F775E16510962 /* ArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F577C9CEC405A1737BD42A43 /* ArchiveView.swift */; };
 		99EA5F2ECAE676483571DD78 /* PlayerBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BADA6EE0E09B2F2C8BD3F131 /* PlayerBarView.swift */; };
+		A1B2C3D4E5F6012345678902 /* FavoriteBroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6012345678901 /* FavoriteBroadcast.swift */; };
+		A1B2C3D4E5F6012345678904 /* StoredFavoriteBroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6012345678903 /* StoredFavoriteBroadcast.swift */; };
+		B1B2C3D4E5F6012345678902 /* ListeningHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B2C3D4E5F6012345678901 /* ListeningHistory.swift */; };
+		B1B2C3D4E5F6012345678904 /* StoredListeningHistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B2C3D4E5F6012345678903 /* StoredListeningHistoryEntry.swift */; };
 		B28AC0D185E2446B146EDF55 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50CBAFB24E7268909FF48465 /* String+Extensions.swift */; };
 		BA78F4D71DFB63BA61E69EC7 /* ByteFMApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC9E39EC2DAD0F68467A3A2 /* ByteFMApp.swift */; };
 		FE9EDEF8F1DA7002466EE2A0 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE2C85FAE414FD1EA9573763 /* LoginView.swift */; };
@@ -33,8 +38,13 @@
 		4C83E80D48A791E1C933664D /* ByteFM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ByteFM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		501C143E5762AA37D8A993C0 /* LiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveView.swift; sourceTree = "<group>"; };
 		50CBAFB24E7268909FF48465 /* String+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extensions.swift"; sourceTree = "<group>"; };
+		5E2800A1043C6EB72089620F /* StoredArchiveItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredArchiveItem.swift; sourceTree = "<group>"; };
 		78603908935FA62AF66EC9E0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8DC9E39EC2DAD0F68467A3A2 /* ByteFMApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ByteFMApp.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6012345678901 /* FavoriteBroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteBroadcast.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6012345678903 /* StoredFavoriteBroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredFavoriteBroadcast.swift; sourceTree = "<group>"; };
+		B1B2C3D4E5F6012345678901 /* ListeningHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningHistory.swift; sourceTree = "<group>"; };
+		B1B2C3D4E5F6012345678903 /* StoredListeningHistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredListeningHistoryEntry.swift; sourceTree = "<group>"; };
 		B81EB167E4E8B6FA0EC2B3EF /* BroadcastDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailView.swift; sourceTree = "<group>"; };
 		BADA6EE0E09B2F2C8BD3F131 /* PlayerBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBarView.swift; sourceTree = "<group>"; };
 		DFF4334D9F6C0E163A8B1AEE /* LiveMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMetadata.swift; sourceTree = "<group>"; };
@@ -66,6 +76,11 @@
 				437E14AC8346187477B3BF5F /* ArchiveItem.swift */,
 				091D56FC8971AF3A728F67AA /* BroadcastDetail.swift */,
 				DFF4334D9F6C0E163A8B1AEE /* LiveMetadata.swift */,
+				5E2800A1043C6EB72089620F /* StoredArchiveItem.swift */,
+				A1B2C3D4E5F6012345678901 /* FavoriteBroadcast.swift */,
+				A1B2C3D4E5F6012345678903 /* StoredFavoriteBroadcast.swift */,
+				B1B2C3D4E5F6012345678901 /* ListeningHistory.swift */,
+				B1B2C3D4E5F6012345678903 /* StoredListeningHistoryEntry.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -151,9 +166,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
+				LastUpgradeCheck = 2630;
 			};
 			buildConfigurationList = 3D236DBE6DD788803C9137BD /* Build configuration list for PBXProject "ByteFM" */;
 			developmentRegion = en;
@@ -203,6 +216,11 @@
 				9136A63FC8CF62321F988FFC /* LiveView.swift in Sources */,
 				FE9EDEF8F1DA7002466EE2A0 /* LoginView.swift in Sources */,
 				99EA5F2ECAE676483571DD78 /* PlayerBarView.swift in Sources */,
+				0FFBF1A1ACE800C4B7ACDA9E /* StoredArchiveItem.swift in Sources */,
+				A1B2C3D4E5F6012345678902 /* FavoriteBroadcast.swift in Sources */,
+				A1B2C3D4E5F6012345678904 /* StoredFavoriteBroadcast.swift in Sources */,
+				B1B2C3D4E5F6012345678902 /* ListeningHistory.swift in Sources */,
+				B1B2C3D4E5F6012345678904 /* StoredListeningHistoryEntry.swift in Sources */,
 				B28AC0D185E2446B146EDF55 /* String+Extensions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -214,6 +232,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -244,9 +263,11 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -259,6 +280,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -269,6 +291,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -299,10 +322,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -322,6 +347,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -333,6 +359,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -349,6 +376,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_DEBUG_DYLIB = NO;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

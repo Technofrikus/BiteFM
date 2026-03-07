@@ -1,19 +1,40 @@
 import SwiftUI
+import SwiftData
 
 struct ArchiveView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @Environment(\.modelContext) private var modelContext
+    
+    @Query(sort: [
+        SortDescriptor(\StoredArchiveItem.datum, order: .reverse),
+        SortDescriptor(\StoredArchiveItem.startTime, order: .reverse)
+    ]) 
+    private var storedItems: [StoredArchiveItem]
     
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
     
     var body: some View {
-        List(apiClient.archiveItems) { item in
+        List(storedItems) { storedItem in
+            let item = storedItem.toArchiveItem()
             HStack(spacing: 0) {
                 // Playback Area (Left)
                 VStack(alignment: .leading) {
-                    Text(item.sendungTitel)
-                        .font(.headline)
+                    HStack(spacing: 4) {
+                        if apiClient.isFavorite(item: item) {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                        if apiClient.isPlayed(item: item) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.caption2)
+                        }
+                        Text(item.sendungTitel)
+                            .font(.headline)
+                    }
                     Text(item.subtitle)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -23,6 +44,7 @@ struct ArchiveView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
+                .opacity(apiClient.isPlayed(item: item) ? 0.65 : 1.0)
                 .onTapGesture {
                     playerManager.play(item: item)
                 }
@@ -74,11 +96,10 @@ struct ArchiveView: View {
             }
         }
         .task {
-            if apiClient.archiveItems.isEmpty {
-                await apiClient.fetchArchive()
-            }
+            // Initial fetch or manually triggered fetch from view
+            await apiClient.fetchArchive(modelContext: modelContext)
         }
-        .onChange(of: isInspectorPresented) { newValue in
+        .onChange(of: isInspectorPresented) { oldValue, newValue in
             if newValue {
                 // Ensure window is wide enough for inspector
                 // Ideal width of list (~400) + Sidebar (~200) + Inspector (400)

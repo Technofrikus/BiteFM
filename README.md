@@ -1,0 +1,46 @@
+# ByteFM macOS Client
+
+Ein nativer macOS-Client für den Radiosender [ByteFM](https://www.byte.fm), optimiert für eine nahtlose Integration in das Betriebssystem und ein flüssiges Nutzererlebnis beim Durchstöbern des Archivs und beim Hören der Livestreams.
+
+## Hauptmerkmale
+
+### 🎙 Live-Streaming
+- **Drei Stream-Varianten**: Direkter Zugriff auf die Streams "Web", "Hamburg" und "Nur Musik".
+- **Echtzeit-Metadaten**: Anzeige des aktuellen Titels, Künstlers und der Sendungsinformationen.
+- **Titel-Historie**: Übersicht der zuletzt gespielten Songs für alle Livestreams.
+- **Visuelle Details**: Anzeige von Künstlerbildern (sofern verfügbar) direkt in der Live-Ansicht.
+
+### 📚 Umfangreiches Archiv ("Neu im Archiv")
+- **Lokale Datenbank (SwiftData)**: Alle Archiv-Sendungen werden lokal in einer SwiftData-Datenbank gespeichert, was schnelles Scrollen und Offline-Einsicht ermöglicht.
+- **Automatischer Abgleich**: Die App sucht alle 30 Minuten im Hintergrund nach neuen Sendungen.
+- **Intelligente Bereinigung**: Automatische Löschung von Sendungen, die älter als 4 Wochen sind, um die Datenbank kompakt zu halten.
+- **Show-Details im Inspector**: Detaillierte Informationen zur Sendung (Playlist, Beschreibung) werden in einem nativen macOS-Seitenteil (Inspector) angezeigt.
+
+### 🎵 Player & Bedienung
+- **Vollständige Medientasten-Unterstützung**: Steuerung von Play/Pause sowie das Springen zwischen Songs (im Archiv) über die macOS-Medientasten (F7-F9 / Touch Bar).
+- **Interaktive Playlisten**: Ein Klick auf einen Song in der Playlist springt direkt zum entsprechenden Zeitstempel in der Archiv-Aufnahme.
+- **Song-zu-Song Navigation**: Unterstützung für "Nächster Titel" und "Vorheriger Titel" innerhalb von Archiv-Sendungen.
+- **Now-Playing Anzeige**: Integration in das macOS Kontrollzentrum und den Sperrbildschirm mit detaillierten Song-Informationen ("Interpret — Titel" und "Sendung — Ausgabe").
+- **Visuelles Feedback**: Anzeige des Ladestatus (Buffering) und Hervorhebung des aktuell spielenden Songs in der Playlist.
+
+### 🔐 Sicherheit & Komfort
+- **Sicherer Login**: Verschlüsselte Speicherung der ByteFM-Zugangsdaten im macOS Schlüsselbund (Keychain).
+- **Auto-Login**: Automatisches Anmelden beim App-Start für direkten Zugriff auf den Mitgliederbereich.
+- **Fenster-Management**: Intelligente Anpassung der Fensterbreite beim Öffnen des Detail-Bereichs für optimale Lesbarkeit.
+
+## Technische Basis
+- **SwiftUI**: Moderne, deklarative UI-Entwicklung für macOS.
+- **SwiftData**: Persistente Speicherung und Abfrage von Archiv-Daten.
+- **AVFoundation (AVPlayer)**: Hochwertige Audio-Wiedergabe und Streaming-Management.
+- **MediaPlayer Framework**: Systemweite Integration der Wiedergabesteuerung.
+- **xcodegen**: Projektverwaltung über eine `project.yml` für konsistente Build-Konfigurationen.
+
+## Installation & Entwicklung
+Das Projekt nutzt `xcodegen` zur Generierung der Xcode-Projektdatei.
+
+1. Installiere `xcodegen` (falls nicht vorhanden): `brew install xcodegen`
+2. Generiere das Projekt: `xcodegen generate`
+3. Öffne `ByteFM.xcodeproj` in Xcode.
+
+---
+*Hinweis: Dies ist ein inoffizieller Client und steht in keiner direkten Verbindung zur ByteFM GmbH.*
