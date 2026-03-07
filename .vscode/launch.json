@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:ByteFMWrapper}",
+            "name": "Debug ByteFM",
+            "program": "${workspaceFolder:ByteFMWrapper}/.build/debug/ByteFM",
+            "preLaunchTask": "swift: Build Debug ByteFM"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:ByteFMWrapper}",
+            "name": "Release ByteFM",
+            "program": "${workspaceFolder:ByteFMWrapper}/.build/release/ByteFM",
+            "preLaunchTask": "swift: Build Release ByteFM"
+        }
+    ]
+}

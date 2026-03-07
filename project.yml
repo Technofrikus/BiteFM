@@ -1,0 +1,19 @@
+name: ByteFM
+options:
+  bundleIdPrefix: com.technofrikus
+targets:
+  ByteFM:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    settings:
+      configs:
+        Debug:
+          ENABLE_DEBUG_DYLIB: NO
+    sources: [Sources/ByteFM]
+    info:
+      path: Info.plist
+      properties:
+        LSMinimumSystemVersion: 14.0
+        NSHighResolutionCapable: true
+        NSPrincipalClass: NSApplication
