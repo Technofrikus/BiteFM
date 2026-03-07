@@ -39,4 +39,8 @@ struct ArchiveItem: Codable, Identifiable {
         }
         return untertitelSendung
     }
+    
+    var detailURL: URL? {
+        URL(string: "https://www.byte.fm/api/v1/broadcasts/\(sendungSlug)/\(datumDe)/\(terminSlug)/")
+    }
 }

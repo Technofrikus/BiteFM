@@ -3,8 +3,15 @@ import Security
 
 enum KeychainHelper {
     private static let service = "com.technofrikus.ByteFM"
+    
+    // Toggle this to false for production
+    private static let useKeychain = false
 
     static func savePassword(_ password: String, account: String) {
+        if !useKeychain {
+            UserDefaults.standard.set(password, forKey: "debug_pwd_\(account)")
+            return
+        }
         guard let data = password.data(using: .utf8) else { return }
 
         let query: [String: Any] = [
@@ -26,6 +33,9 @@ enum KeychainHelper {
     }
 
     static func readPassword(account: String) -> String? {
+        if !useKeychain {
+            return UserDefaults.standard.string(forKey: "debug_pwd_\(account)")
+        }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -46,6 +56,10 @@ enum KeychainHelper {
     }
 
     static func deletePassword(account: String) {
+        if !useKeychain {
+            UserDefaults.standard.removeObject(forKey: "debug_pwd_\(account)")
+            return
+        }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

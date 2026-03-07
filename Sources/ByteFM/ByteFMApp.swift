@@ -8,6 +8,7 @@ struct ByteFMApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .frame(minWidth: 400, idealWidth: 500, minHeight: 700, idealHeight: 900)
                 .environmentObject(apiClient)
                 .environmentObject(audioPlayerManager)
         }

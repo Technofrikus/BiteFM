@@ -1,6 +1,25 @@
 name: ByteFM
 options:
   bundleIdPrefix: com.technofrikus
+settings:
+  configs:
+    Debug:
+      ENABLE_DEBUG_DYLIB: NO
+schemes:
+  ByteFM:
+    build:
+      targets:
+        ByteFM: [run, test, profile, analyze, archive]
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
 targets:
   ByteFM:
     type: application
@@ -14,6 +33,6 @@ targets:
     info:
       path: Info.plist
       properties:
-        LSMinimumSystemVersion: 14.0
+        LSMinimumSystemVersion: "14.0"
         NSHighResolutionCapable: true
         NSPrincipalClass: NSApplication

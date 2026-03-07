@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var apiClient: APIClient
+    @EnvironmentObject private var playerManager: AudioPlayerManager
     @State private var selection: String? = "Live"
 
     var body: some View {
@@ -23,14 +24,8 @@ struct ContentView: View {
                         ArchiveView()
                             .navigationTitle("Neu im Archiv")
                     } else {
-                        VStack(spacing: 10) {
-                            Text("Live")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                            Text("Live-Stream ist in dieser Version noch nicht aktiv.")
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        LiveView()
+                            .navigationTitle("Live")
                     }
                 }
 
@@ -38,6 +33,9 @@ struct ContentView: View {
             }
         } else {
             LoginView()
+                .task {
+                    await apiClient.autoLogin()
+                }
         }
     }
 }
