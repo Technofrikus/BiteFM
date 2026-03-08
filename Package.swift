@@ -2,19 +2,19 @@
 import PackageDescription
 
 let package = Package(
-    name: "ByteFM",
+    name: "HoersaalB",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "ByteFM", targets: ["ByteFM"])
+        .executable(name: "HoersaalB", targets: ["HoersaalB"])
     ],
     dependencies: [],
     targets: [
         .executableTarget(
-            name: "ByteFM",
+            name: "HoersaalB",
             dependencies: [],
-            path: "Sources/ByteFM"
+            path: "Sources/HoersaalB"
         )
     ]
 )

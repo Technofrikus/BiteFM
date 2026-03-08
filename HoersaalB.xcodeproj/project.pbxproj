@@ -1,0 +1,436 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B7730881ABB1CF9CD5FC507 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7017BFA7FC2D92CAA6C23665 /* String+Extensions.swift */; };
+		128BE6D0C3774C0213E89A56 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7039786636145AB9BE3F0267 /* APIClient.swift */; };
+		18611C4B1D997B5E72FF9233 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4E8B04A651BE0345CA4CA2 /* KeychainHelper.swift */; };
+		1C2CC365B8E57191B720173F /* PlayerBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DE330CEA6A093F0D4FF216 /* PlayerBarView.swift */; };
+		221690ECB0A8E62109CDCE28 /* AudioPlayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A4880A16AC2BF1D403C327 /* AudioPlayerManager.swift */; };
+		285EF13B00B93124995C6B6F /* StoredFavoriteBroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0A6B70B2C4D1137564CD66 /* StoredFavoriteBroadcast.swift */; };
+		2C2660A70C229B8B046DE9B4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43D0024341D004436A942321 /* Assets.xcassets */; };
+		38D86C0D314B896018457A4A /* StoredArchiveItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55BDA09CFC2727B94586F2B /* StoredArchiveItem.swift */; };
+		44029193194624EF0666DFFC /* LiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E5FEBC238C3AC8D31E6DBA /* LiveView.swift */; };
+		4CE765D6D251CEE7C48D1F26 /* ArchiveNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD8F1AAB004A2645DB81CC5 /* ArchiveNew.swift */; };
+		4FB9C58F2597AB2266B2645B /* ArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9EA9E3A17BB2FDA0F05F1F /* ArchiveView.swift */; };
+		5B173E14305DDDE2FE0ADB49 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B3F6B607F38FB9CEF4517A /* ContentView.swift */; };
+		6DABB3855092DD29A73C5905 /* FavoriteBroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0956007691C9AD889F60DB1D /* FavoriteBroadcast.swift */; };
+		6DE789ADE87029D5150A80E1 /* BroadcastDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8FB19B43C5C3EB693A1BD4 /* BroadcastDetail.swift */; };
+		6E04A4047F5D6A0C15AF45AB /* BroadcastDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C92281B0DE6C94EF0CE8AAA /* BroadcastDetailView.swift */; };
+		935B2013E76FDBE214C436FF /* ArchiveItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D49FD4793C9F8AFC139DCA0 /* ArchiveItem.swift */; };
+		96DDDE770E0376B801F920A0 /* StoredShow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4510A8F61606F636AE7A18C /* StoredShow.swift */; };
+		D61CFCDC1A7E94B1A4E9D18E /* BroadcastListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9F633D19FBEC6595485C51 /* BroadcastListView.swift */; };
+		D7D64384229EED1E107A957A /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365C9790E6F36CA402C5FB0B /* LoginView.swift */; };
+		DF730108AC4775DC8F28EEFE /* ListeningHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BABE67A976E027005CE2176E /* ListeningHistory.swift */; };
+		E30F63D07628ADCDFF49B9B3 /* LiveMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74CE807DAD7A47B58D8654F1 /* LiveMetadata.swift */; };
+		E823E0A973D16EF19C5FD5B2 /* Show.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9837D58F6F0240AA7833AFB7 /* Show.swift */; };
+		F1DC48AC28C58A16D66616A4 /* BroadcastRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55560775D7F83B060F6C57C7 /* BroadcastRow.swift */; };
+		FB940DA08CFC0FDCA3201FA6 /* StoredListeningHistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865C201DAB842CC4CC576A90 /* StoredListeningHistoryEntry.swift */; };
+		FBD1FFE7E0BB7EDEC93F6B6F /* HoersaalBApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89129A414DE968C925E0B4E /* HoersaalBApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0956007691C9AD889F60DB1D /* FavoriteBroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteBroadcast.swift; sourceTree = "<group>"; };
+		1D49FD4793C9F8AFC139DCA0 /* ArchiveItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveItem.swift; sourceTree = "<group>"; };
+		1D4E8B04A651BE0345CA4CA2 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		2C92281B0DE6C94EF0CE8AAA /* BroadcastDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailView.swift; sourceTree = "<group>"; };
+		365C9790E6F36CA402C5FB0B /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		43D0024341D004436A942321 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		55560775D7F83B060F6C57C7 /* BroadcastRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastRow.swift; sourceTree = "<group>"; };
+		6B8FB19B43C5C3EB693A1BD4 /* BroadcastDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetail.swift; sourceTree = "<group>"; };
+		6C4285F515BE89421A51D815 /* HoersaalB.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HoersaalB.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7017BFA7FC2D92CAA6C23665 /* String+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extensions.swift"; sourceTree = "<group>"; };
+		7039786636145AB9BE3F0267 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		74CE807DAD7A47B58D8654F1 /* LiveMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMetadata.swift; sourceTree = "<group>"; };
+		865C201DAB842CC4CC576A90 /* StoredListeningHistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredListeningHistoryEntry.swift; sourceTree = "<group>"; };
+		9837D58F6F0240AA7833AFB7 /* Show.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Show.swift; sourceTree = "<group>"; };
+		A5B3F6B607F38FB9CEF4517A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AD0A6B70B2C4D1137564CD66 /* StoredFavoriteBroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredFavoriteBroadcast.swift; sourceTree = "<group>"; };
+		B89129A414DE968C925E0B4E /* HoersaalBApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoersaalBApp.swift; sourceTree = "<group>"; };
+		BABE67A976E027005CE2176E /* ListeningHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningHistory.swift; sourceTree = "<group>"; };
+		C0A4880A16AC2BF1D403C327 /* AudioPlayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerManager.swift; sourceTree = "<group>"; };
+		D4510A8F61606F636AE7A18C /* StoredShow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredShow.swift; sourceTree = "<group>"; };
+		D55BDA09CFC2727B94586F2B /* StoredArchiveItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredArchiveItem.swift; sourceTree = "<group>"; };
+		D6E5FEBC238C3AC8D31E6DBA /* LiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveView.swift; sourceTree = "<group>"; };
+		DF9F633D19FBEC6595485C51 /* BroadcastListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastListView.swift; sourceTree = "<group>"; };
+		E6DE330CEA6A093F0D4FF216 /* PlayerBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBarView.swift; sourceTree = "<group>"; };
+		EA9EA9E3A17BB2FDA0F05F1F /* ArchiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveView.swift; sourceTree = "<group>"; };
+		FDD8F1AAB004A2645DB81CC5 /* ArchiveNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveNew.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		1EAB83F6F3D2139387241DE8 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				1D49FD4793C9F8AFC139DCA0 /* ArchiveItem.swift */,
+				6B8FB19B43C5C3EB693A1BD4 /* BroadcastDetail.swift */,
+				0956007691C9AD889F60DB1D /* FavoriteBroadcast.swift */,
+				BABE67A976E027005CE2176E /* ListeningHistory.swift */,
+				74CE807DAD7A47B58D8654F1 /* LiveMetadata.swift */,
+				9837D58F6F0240AA7833AFB7 /* Show.swift */,
+				D55BDA09CFC2727B94586F2B /* StoredArchiveItem.swift */,
+				AD0A6B70B2C4D1137564CD66 /* StoredFavoriteBroadcast.swift */,
+				865C201DAB842CC4CC576A90 /* StoredListeningHistoryEntry.swift */,
+				D4510A8F61606F636AE7A18C /* StoredShow.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		22B0357AFEEA1F4E392FAB04 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				C0A4880A16AC2BF1D403C327 /* AudioPlayerManager.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		3168B4E6F0B2779E448BB8EE /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				7017BFA7FC2D92CAA6C23665 /* String+Extensions.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		3D7070D9DB4F79F470057189 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				7039786636145AB9BE3F0267 /* APIClient.swift */,
+				1D4E8B04A651BE0345CA4CA2 /* KeychainHelper.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		6E3F09D2679FD9C036579EB4 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				FDD8F1AAB004A2645DB81CC5 /* ArchiveNew.swift */,
+				EA9EA9E3A17BB2FDA0F05F1F /* ArchiveView.swift */,
+				2C92281B0DE6C94EF0CE8AAA /* BroadcastDetailView.swift */,
+				DF9F633D19FBEC6595485C51 /* BroadcastListView.swift */,
+				55560775D7F83B060F6C57C7 /* BroadcastRow.swift */,
+				A5B3F6B607F38FB9CEF4517A /* ContentView.swift */,
+				D6E5FEBC238C3AC8D31E6DBA /* LiveView.swift */,
+				365C9790E6F36CA402C5FB0B /* LoginView.swift */,
+				E6DE330CEA6A093F0D4FF216 /* PlayerBarView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A1DA2E838DC37852CA2A217F = {
+			isa = PBXGroup;
+			children = (
+				C8DB2C40F03177BA06CE217F /* HoersaalB */,
+				CC43CFF2B37258DC97FEFFD3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C8DB2C40F03177BA06CE217F /* HoersaalB */ = {
+			isa = PBXGroup;
+			children = (
+				43D0024341D004436A942321 /* Assets.xcassets */,
+				B89129A414DE968C925E0B4E /* HoersaalBApp.swift */,
+				22B0357AFEEA1F4E392FAB04 /* Audio */,
+				1EAB83F6F3D2139387241DE8 /* Models */,
+				3D7070D9DB4F79F470057189 /* Networking */,
+				3168B4E6F0B2779E448BB8EE /* Utils */,
+				6E3F09D2679FD9C036579EB4 /* Views */,
+			);
+			name = HoersaalB;
+			path = Sources/HoersaalB;
+			sourceTree = "<group>";
+		};
+		CC43CFF2B37258DC97FEFFD3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6C4285F515BE89421A51D815 /* HoersaalB.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8DD8C300426847D1F6343269 /* HoersaalB */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C753CC3BC909DB3FC9EA4F76 /* Build configuration list for PBXNativeTarget "HoersaalB" */;
+			buildPhases = (
+				AC88C5C4B25485FBC09BD9E9 /* Sources */,
+				3F394C83C3E16926C38C7CB4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HoersaalB;
+			packageProductDependencies = (
+			);
+			productName = HoersaalB;
+			productReference = 6C4285F515BE89421A51D815 /* HoersaalB.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7A7A9F68A233C40EF5812659 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2630;
+			};
+			buildConfigurationList = 4700470355A1CB82B45E1B4C /* Build configuration list for PBXProject "HoersaalB" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A1DA2E838DC37852CA2A217F;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = CC43CFF2B37258DC97FEFFD3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8DD8C300426847D1F6343269 /* HoersaalB */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3F394C83C3E16926C38C7CB4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2C2660A70C229B8B046DE9B4 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AC88C5C4B25485FBC09BD9E9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				128BE6D0C3774C0213E89A56 /* APIClient.swift in Sources */,
+				935B2013E76FDBE214C436FF /* ArchiveItem.swift in Sources */,
+				4CE765D6D251CEE7C48D1F26 /* ArchiveNew.swift in Sources */,
+				4FB9C58F2597AB2266B2645B /* ArchiveView.swift in Sources */,
+				221690ECB0A8E62109CDCE28 /* AudioPlayerManager.swift in Sources */,
+				6DE789ADE87029D5150A80E1 /* BroadcastDetail.swift in Sources */,
+				6E04A4047F5D6A0C15AF45AB /* BroadcastDetailView.swift in Sources */,
+				D61CFCDC1A7E94B1A4E9D18E /* BroadcastListView.swift in Sources */,
+				F1DC48AC28C58A16D66616A4 /* BroadcastRow.swift in Sources */,
+				5B173E14305DDDE2FE0ADB49 /* ContentView.swift in Sources */,
+				6DABB3855092DD29A73C5905 /* FavoriteBroadcast.swift in Sources */,
+				FBD1FFE7E0BB7EDEC93F6B6F /* HoersaalBApp.swift in Sources */,
+				18611C4B1D997B5E72FF9233 /* KeychainHelper.swift in Sources */,
+				DF730108AC4775DC8F28EEFE /* ListeningHistory.swift in Sources */,
+				E30F63D07628ADCDFF49B9B3 /* LiveMetadata.swift in Sources */,
+				44029193194624EF0666DFFC /* LiveView.swift in Sources */,
+				D7D64384229EED1E107A957A /* LoginView.swift in Sources */,
+				1C2CC365B8E57191B720173F /* PlayerBarView.swift in Sources */,
+				E823E0A973D16EF19C5FD5B2 /* Show.swift in Sources */,
+				38D86C0D314B896018457A4A /* StoredArchiveItem.swift in Sources */,
+				285EF13B00B93124995C6B6F /* StoredFavoriteBroadcast.swift in Sources */,
+				FB940DA08CFC0FDCA3201FA6 /* StoredListeningHistoryEntry.swift in Sources */,
+				96DDDE770E0376B801F920A0 /* StoredShow.swift in Sources */,
+				0B7730881ABB1CF9CD5FC507 /* String+Extensions.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		6026605FA8AEDE714F5B4F08 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		90403318E1F014629D3F4AA5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_DEBUG_DYLIB = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.HoersaalB;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		D1E876AA02884C6B7577B737 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.HoersaalB;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		D27406DD12D26E94A4A08B4F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4700470355A1CB82B45E1B4C /* Build configuration list for PBXProject "HoersaalB" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6026605FA8AEDE714F5B4F08 /* Debug */,
+				D27406DD12D26E94A4A08B4F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C753CC3BC909DB3FC9EA4F76 /* Build configuration list for PBXNativeTarget "HoersaalB" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90403318E1F014629D3F4AA5 /* Debug */,
+				D1E876AA02884C6B7577B737 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7A7A9F68A233C40EF5812659 /* Project object */;
+}
