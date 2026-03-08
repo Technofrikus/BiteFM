@@ -125,7 +125,6 @@ struct BroadcastListView: View {
     private func loadMoreUntilVisible() async {
         // Load initial or more items until we have enough to show or no more pages exist
         while hasMorePages && !isLoading {
-            let previousCount = filteredBroadcasts.count
             await loadMore()
             
             // If we are filtering and didn't gain enough visible items, keep loading

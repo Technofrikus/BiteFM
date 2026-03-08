@@ -10,11 +10,15 @@ class AudioPlayerManager: NSObject, ObservableObject {
     private var didSetupRemoteTransportControls = false
     private var playCommandToken: Any?
     private var pauseCommandToken: Any?
+    private var togglePlayPauseCommandToken: Any?
+    private var nextTrackCommandToken: Any?
+    private var previousTrackCommandToken: Any?
     @Published var isPlaying = false
     @Published var isStalled = false
     @Published var currentItem: ArchiveItem?
     @Published var currentPlaylist: [PlaylistItem]?
     @Published var currentTime: Double = 0
+    @Published var duration: Double = 0
     @Published var isLive = false
     @Published var currentStreamType: StreamType?
     
@@ -138,8 +142,10 @@ class AudioPlayerManager: NSObject, ObservableObject {
                 self.isStalled = (player.timeControlStatus == .waitingToPlayAtSpecifiedRate)
                 if player.timeControlStatus == .playing {
                     self.isPlaying = true
+                    self.updatePlaybackRate(1.0)
                 } else if player.timeControlStatus == .paused {
                     self.isPlaying = false
+                    self.updatePlaybackRate(0.0)
                 }
             }
         } else if keyPath == "status" {
@@ -150,6 +156,13 @@ class AudioPlayerManager: NSObject, ObservableObject {
             } else if let item = object as? AVPlayerItem {
                 if item.status == .failed {
                     print("AVPlayerItem failed with error: \(String(describing: item.error))")
+                }
+            }
+        } else if keyPath == "duration", let item = object as? AVPlayerItem {
+            DispatchQueue.main.async {
+                let durationSeconds = item.duration.seconds
+                if durationSeconds.isFinite {
+                    self.duration = durationSeconds
                 }
             }
         }
@@ -232,6 +245,8 @@ class AudioPlayerManager: NSObject, ObservableObject {
         isLive = true
         currentItem = nil
         currentPlaylist = nil
+        duration = 0
+        currentTime = 0
         currentStreamType = streamType
         guard let url = streamType.streamURL else { return }
         
@@ -262,8 +277,12 @@ class AudioPlayerManager: NSObject, ObservableObject {
             oldPlayer.removeObserver(self, forKeyPath: "timeControlStatus")
             oldPlayer.removeObserver(self, forKeyPath: "status")
             oldPlayer.currentItem?.removeObserver(self, forKeyPath: "status")
+            oldPlayer.currentItem?.removeObserver(self, forKeyPath: "duration")
             NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: oldPlayer.currentItem)
         }
+        
+        duration = 0 // Reset duration for new item
+        currentTime = 0 // Reset current time for new item
         
         let playerItem = AVPlayerItem(url: url)
         if player == nil {
@@ -275,6 +294,7 @@ class AudioPlayerManager: NSObject, ObservableObject {
         player?.addObserver(self, forKeyPath: "timeControlStatus", options: [.new], context: nil)
         player?.addObserver(self, forKeyPath: "status", options: [.new], context: nil)
         playerItem.addObserver(self, forKeyPath: "status", options: [.new], context: nil)
+        playerItem.addObserver(self, forKeyPath: "duration", options: [.new], context: nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(handlePlaybackError), name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
         
@@ -318,41 +338,31 @@ class AudioPlayerManager: NSObject, ObservableObject {
         
         playCommandToken = commandCenter.playCommand.addTarget { [weak self] _ in
             guard let self else { return .commandFailed }
-            if !self.isPlaying {
-                self.player?.play()
-                self.isPlaying = true
-                self.updatePlaybackRate(1.0)
-                return .success
-            }
-            return .commandFailed
+            self.player?.play()
+            return .success
         }
         
         pauseCommandToken = commandCenter.pauseCommand.addTarget { [weak self] _ in
             guard let self else { return .commandFailed }
-            if self.isPlaying {
-                self.player?.pause()
-                self.isPlaying = false
-                self.updatePlaybackRate(0.0)
-                return .success
-            }
-            return .commandFailed
+            self.player?.pause()
+            return .success
         }
 
-        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+        togglePlayPauseCommandToken = commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
             guard let self else { return .commandFailed }
             self.togglePlayPause()
             return .success
         }
 
         commandCenter.nextTrackCommand.isEnabled = true
-        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+        nextTrackCommandToken = commandCenter.nextTrackCommand.addTarget { [weak self] _ in
             guard let self else { return .commandFailed }
             self.skipNext()
             return .success
         }
 
         commandCenter.previousTrackCommand.isEnabled = true
-        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+        previousTrackCommandToken = commandCenter.previousTrackCommand.addTarget { [weak self] _ in
             guard let self else { return .commandFailed }
             self.skipPrevious()
             return .success
@@ -376,7 +386,13 @@ class AudioPlayerManager: NSObject, ObservableObject {
     }
 
     private func updatePlaybackRate(_ rate: Float) {
-        guard var nowPlayingInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+        guard var nowPlayingInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo else { 
+            var newInfo = [String: Any]()
+            newInfo[MPNowPlayingInfoPropertyPlaybackRate] = rate
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = newInfo
+            MPNowPlayingInfoCenter.default().playbackState = rate > 0 ? .playing : .paused
+            return 
+        }
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = rate
         if let player {
             nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime().seconds
