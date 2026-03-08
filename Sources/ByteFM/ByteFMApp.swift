@@ -10,7 +10,7 @@ struct ByteFMApp: App {
     
     init() {
         do {
-            container = try ModelContainer(for: StoredArchiveItem.self, StoredFavoriteBroadcast.self, StoredListeningHistoryEntry.self)
+            container = try ModelContainer(for: StoredArchiveItem.self, StoredFavoriteBroadcast.self, StoredListeningHistoryEntry.self, StoredShow.self)
             // Setup APIClient with container
             APIClient.shared.setup(modelContainer: container)
         } catch {

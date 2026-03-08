@@ -27,6 +27,11 @@
 		B28AC0D185E2446B146EDF55 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50CBAFB24E7268909FF48465 /* String+Extensions.swift */; };
 		BA78F4D71DFB63BA61E69EC7 /* ByteFMApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC9E39EC2DAD0F68467A3A2 /* ByteFMApp.swift */; };
 		FE9EDEF8F1DA7002466EE2A0 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE2C85FAE414FD1EA9573763 /* LoginView.swift */; };
+		C1B2C3D400010101 /* ArchiveNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B2C3D400010001 /* ArchiveNew.swift */; };
+		C1B2C3D400010102 /* BroadcastRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B2C3D400010002 /* BroadcastRow.swift */; };
+		C1B2C3D400010103 /* BroadcastListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B2C3D400010003 /* BroadcastListView.swift */; };
+		C1B2C3D400020101 /* Show.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B2C3D400020001 /* Show.swift */; };
+		C1B2C3D400020102 /* StoredShow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B2C3D400020002 /* StoredShow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +56,11 @@
 		F577C9CEC405A1737BD42A43 /* ArchiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveView.swift; sourceTree = "<group>"; };
 		F8D6529AA6EF817BF57BEB5A /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		FE2C85FAE414FD1EA9573763 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		C1B2C3D400010001 /* ArchiveNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveNew.swift; sourceTree = "<group>"; };
+		C1B2C3D400010002 /* BroadcastRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastRow.swift; sourceTree = "<group>"; };
+		C1B2C3D400010003 /* BroadcastListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastListView.swift; sourceTree = "<group>"; };
+		C1B2C3D400020001 /* Show.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Show.swift; sourceTree = "<group>"; };
+		C1B2C3D400020002 /* StoredShow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredShow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -81,6 +91,8 @@
 				A1B2C3D4E5F6012345678903 /* StoredFavoriteBroadcast.swift */,
 				B1B2C3D4E5F6012345678901 /* ListeningHistory.swift */,
 				B1B2C3D4E5F6012345678903 /* StoredListeningHistoryEntry.swift */,
+				C1B2C3D400020001 /* Show.swift */,
+				C1B2C3D400020002 /* StoredShow.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -129,6 +141,9 @@
 			isa = PBXGroup;
 			children = (
 				F577C9CEC405A1737BD42A43 /* ArchiveView.swift */,
+				C1B2C3D400010001 /* ArchiveNew.swift */,
+				C1B2C3D400010002 /* BroadcastRow.swift */,
+				C1B2C3D400010003 /* BroadcastListView.swift */,
 				B81EB167E4E8B6FA0EC2B3EF /* BroadcastDetailView.swift */,
 				3B8FF802153125AE94D315E8 /* ContentView.swift */,
 				501C143E5762AA37D8A993C0 /* LiveView.swift */,
@@ -222,6 +237,11 @@
 				B1B2C3D4E5F6012345678902 /* ListeningHistory.swift in Sources */,
 				B1B2C3D4E5F6012345678904 /* StoredListeningHistoryEntry.swift in Sources */,
 				B28AC0D185E2446B146EDF55 /* String+Extensions.swift in Sources */,
+				C1B2C3D400010101 /* ArchiveNew.swift in Sources */,
+				C1B2C3D400010102 /* BroadcastRow.swift in Sources */,
+				C1B2C3D400010103 /* BroadcastListView.swift in Sources */,
+				C1B2C3D400020101 /* Show.swift in Sources */,
+				C1B2C3D400020102 /* StoredShow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

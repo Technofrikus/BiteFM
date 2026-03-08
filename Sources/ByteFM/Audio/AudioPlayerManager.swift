@@ -31,6 +31,39 @@ class AudioPlayerManager: NSObject, ObservableObject {
         isLive = false
         currentStreamType = nil
         lastUpdatedSongId = nil
+        
+        // If we don't have an audio file, we MUST fetch detail first
+        if item.audioFile1.isEmpty {
+            Task {
+                if let detail = await APIClient.shared.fetchBroadcastDetail(for: item) {
+                    // detail.recordings.first?.recordingUrl is the audio file
+                    if let firstRecording = detail.recordings.first {
+                        let recordingUrl = firstRecording.recordingUrl
+                        // The recordingUrl might be full or partial
+                        let fullUrl: URL? = {
+                            if recordingUrl.hasPrefix("http") {
+                                return URL(string: recordingUrl)
+                            } else {
+                                return URL(string: "https://archiv.bytefm.com/" + recordingUrl)
+                            }
+                        }()
+                        
+                        if let url = fullUrl {
+                            self.play(url: url)
+                            self.currentItem = item
+                            self.currentPlaylist = firstRecording.playlist
+                            self.setupNowPlaying(item: item)
+                            self.updatePlaybackRate(1.0)
+                            
+                            // Mark as played
+                            await APIClient.shared.markAsPlayed(item: item)
+                        }
+                    }
+                }
+            }
+            return
+        }
+        
         let baseUrlString = "https://archiv.bytefm.com/" 
         guard let url = URL(string: baseUrlString + item.audioFile1) else { return }
         

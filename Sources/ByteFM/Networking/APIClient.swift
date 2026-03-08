@@ -8,6 +8,7 @@ class APIClient: ObservableObject {
     
     @Published var isLoggedIn = false
     @Published var archiveItems: [ArchiveItem] = []
+    @Published var shows: [Show] = []
     @Published var favoriteSlugs: Set<String> = []
     @Published var listenedShowIDs: Set<Int> = []
     @Published var liveMetadata: LiveMetadataResponse?
@@ -40,7 +41,7 @@ class APIClient: ObservableObject {
         
         // Initial load of favorites and history from disk
         Task {
-            let context = ModelContext(modelContainer)
+            let context = modelContainer.mainContext
             
             // Load Favorites
             let favoritesDescriptor = FetchDescriptor<StoredFavoriteBroadcast>()
@@ -54,6 +55,13 @@ class APIClient: ObservableObject {
             if let storedHistory = try? context.fetch(historyDescriptor) {
                 self.listenedShowIDs = Set(storedHistory.map { $0.showID })
                 print("Loaded \(self.listenedShowIDs.count) listening history entries from disk")
+            }
+            
+            // Load Shows
+            let showsDescriptor = FetchDescriptor<StoredShow>(sortBy: [SortDescriptor(\.titel)])
+            if let storedShows = try? context.fetch(showsDescriptor) {
+                self.shows = storedShows.map { $0.toShow() }
+                print("Loaded \(self.shows.count) shows from disk")
             }
             
             // If we are logged in, refresh favorites and history immediately in background
@@ -76,7 +84,7 @@ class APIClient: ObservableObject {
         favoritesPollingTask = Task {
             while !Task.isCancelled {
                 if isLoggedIn {
-                    let context = modelContainer.map { ModelContext($0) }
+                    let context = modelContainer?.mainContext
                     await fetchFavorites(modelContext: context)
                 }
                 try? await Task.sleep(nanoseconds: 60 * 60 * 1_000_000_000) // 1 hour
@@ -89,28 +97,53 @@ class APIClient: ObservableObject {
         historyPollingTask = Task {
             while !Task.isCancelled {
                 if isLoggedIn {
-                    let context = modelContainer.map { ModelContext($0) }
-                    await fetchListeningHistory(modelContext: context)
+                    let context = modelContainer?.mainContext
+                    await fetchHistory(modelContext: context)
                 }
                 try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000) // 30 minutes
             }
         }
     }
     
+    // Helper to call fetchListeningHistory with correct naming
+    private func fetchHistory(modelContext: ModelContext? = nil) async {
+        await fetchListeningHistory(modelContext: modelContext)
+    }
+    
     func isFavorite(item: ArchiveItem) -> Bool {
-        let slug = item.sendungSlug.lowercased()
+        let showSlug = item.sendungSlug.lowercased()
+        let terminSlug = item.terminSlug.lowercased()
         let title = item.sendungTitel
-        let isFav = favoriteSlugs.contains(slug) || favoriteSlugs.contains(title)
+        
+        return isFavorite(slug: showSlug, title: title) || isFavorite(slug: terminSlug, title: "")
+    }
+    
+    func isFavorite(show: Show) -> Bool {
+        return isFavorite(slug: show.slug, title: show.titel)
+    }
+    
+    func isFavorite(slug: String, title: String) -> Bool {
+        let lSlug = slug.lowercased()
+        let isFav = favoriteSlugs.contains(lSlug) || favoriteSlugs.contains(title)
         
         // Only log a few to avoid spamming
         if isFav {
-            print("Found favorite: \(title) (slug: \(slug))")
+            print("Found favorite: \(title) (slug: \(lSlug))")
         }
         return isFav
     }
     
+    func isEpisodeFavorite(item: ArchiveItem) -> Bool {
+        let lSlug = item.terminSlug.lowercased()
+        return favoriteSlugs.contains(lSlug)
+    }
+    
     func isPlayed(item: ArchiveItem) -> Bool {
         return listenedShowIDs.contains(item.terminID)
+    }
+    
+    func isPlayed(broadcastID: Int) -> Bool {
+        return listenedShowIDs.contains(broadcastID)
     }
     
     func markAsPlayed(item: ArchiveItem) async {
@@ -313,7 +346,7 @@ class APIClient: ObservableObject {
         archivePollingTask = Task {
             while !Task.isCancelled {
                 if isLoggedIn {
-                    let context = modelContainer.map { ModelContext($0) }
+                    let context = modelContainer?.mainContext
                     await fetchArchive(modelContext: context)
                 }
                 try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000) // 30 minutes
@@ -371,7 +404,7 @@ class APIClient: ObservableObject {
                 
                 // 1. Fetch favorites and history FIRST so they are ready when we switch view
                 if let container = modelContainer {
-                    let context = ModelContext(container)
+                    let context = container.mainContext
                     await fetchFavorites(modelContext: context)
                     await fetchListeningHistory(modelContext: context)
                 } else {
@@ -386,6 +419,15 @@ class APIClient: ObservableObject {
                 startArchivePolling()
                 startFavoritesPolling()
                 startHistoryPolling()
+                
+                // Fetch shows if empty
+                if shows.isEmpty {
+                    if let container = modelContainer {
+                        await fetchShows(modelContext: container.mainContext)
+                    } else {
+                        await fetchShows()
+                    }
+                }
             } else {
                 isLoggedIn = false
                 if !isAutoLogin {
@@ -472,6 +514,61 @@ class APIClient: ObservableObject {
         }
         
         try context.save()
+    }
+    
+    func fetchShows(modelContext: ModelContext? = nil) async {
+        guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/archiveSendungen.php") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("ByteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
+        
+        do {
+            let (data, _) = try await session.data(for: request)
+            let decodedShows = try JSONDecoder().decode([Show].self, from: data)
+            self.shows = decodedShows
+            
+            if let context = modelContext {
+                try await syncShowsWithDatabase(items: decodedShows, context: context)
+            }
+        } catch {
+            print("Failed to fetch shows: \(error.localizedDescription)")
+        }
+    }
+    
+    private func syncShowsWithDatabase(items: [Show], context: ModelContext) async throws {
+        // Clear old shows and add new ones (simple sync)
+        let descriptor = FetchDescriptor<StoredShow>()
+        let oldShows = try context.fetch(descriptor)
+        for oldShow in oldShows {
+            context.delete(oldShow)
+        }
+        
+        for item in items {
+            let storedItem = StoredShow(from: item)
+            context.insert(storedItem)
+        }
+        
+        try context.save()
+    }
+    
+    func fetchBroadcasts(showSlug: String, page: Int = 1) async -> PaginatedBroadcasts? {
+        guard let url = URL(string: "https://www.byte.fm/api/v1/broadcasts/\(showSlug)/?page=\(page)") else { return nil }
+        
+        print("Fetching broadcasts for \(showSlug) from \(url.absoluteString)...")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("ByteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
+        
+        do {
+            let (data, _) = try await session.data(for: request)
+            let result = try JSONDecoder().decode(PaginatedBroadcasts.self, from: data)
+            return result
+        } catch {
+            print("Failed to fetch broadcasts for \(showSlug): \(error)")
+            return nil
+        }
     }
     
     func fetchBroadcastDetail(for item: ArchiveItem) async -> BroadcastDetail? {

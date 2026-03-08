@@ -13,16 +13,22 @@ struct ContentView: View {
                         NavigationLink(value: "Live") {
                             Label("Live", systemImage: "radio")
                         }
-                        NavigationLink(value: "Archiv") {
+                        NavigationLink(value: "ArchivNeu") {
                             Label("Neu im Archiv", systemImage: "clock")
+                        }
+                        NavigationLink(value: "Archiv") {
+                            Label("Archiv", systemImage: "archivebox")
                         }
                     }
                     .navigationTitle("ByteFM")
                     .listStyle(.sidebar)
                 } detail: {
-                    if selection == "Archiv" {
-                        ArchiveView()
+                    if selection == "ArchivNeu" {
+                        ArchiveNew()
                             .navigationTitle("Neu im Archiv")
+                    } else if selection == "Archiv" {
+                        ArchiveView()
+                            .navigationTitle("Archiv")
                     } else {
                         LiveView()
                             .navigationTitle("Live")
