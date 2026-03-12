@@ -10,9 +10,10 @@ struct HoersaalBApp: App {
     
     init() {
         do {
-            container = try ModelContainer(for: StoredArchiveItem.self, StoredFavoriteBroadcast.self, StoredListeningHistoryEntry.self, StoredShow.self)
-            // Setup APIClient with container
+            container = try ModelContainer(for: StoredArchiveItem.self, StoredFavoriteBroadcast.self, StoredListeningHistoryEntry.self, StoredShow.self, StoredPlaybackPosition.self)
+            // Setup APIClient and AudioPlayerManager with container
             APIClient.shared.setup(modelContainer: container)
+            AudioPlayerManager.shared.setup(modelContainer: container)
         } catch {
             fatalError("Could not initialize ModelContainer")
         }

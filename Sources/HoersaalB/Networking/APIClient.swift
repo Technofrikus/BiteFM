@@ -236,6 +236,34 @@ class APIClient: ObservableObject {
         }
     }
     
+    private func syncListeningHistoryWithDatabase(items: [ListeningHistoryEntry], context: ModelContext) async throws {
+        // Use a more stable update pattern to avoid SwiftData fatal errors (like "remapped to a temporary identifier")
+        let descriptor = FetchDescriptor<StoredListeningHistoryEntry>()
+        let existingEntries = try context.fetch(descriptor)
+        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.showID, $0) })
+        
+        let newItemIDs = Set(items.map { $0.showID })
+        
+        // 1. Delete entries that are no longer present
+        for (id, entry) in existingMap {
+            if !newItemIDs.contains(id) {
+                context.delete(entry)
+            }
+        }
+        
+        // 2. Update existing or insert new entries
+        for item in items {
+            if let existing = existingMap[item.showID] {
+                existing.dateString = item.date
+            } else {
+                let newEntry = StoredListeningHistoryEntry(showID: item.showID, dateString: item.date)
+                context.insert(newEntry)
+            }
+        }
+        
+        try context.save()
+    }
+    
     func fetchFavorites(modelContext: ModelContext? = nil) async {
         guard let url = URL(string: "https://www.byte.fm/api/v1/friends/get_favorites/") else { return }
         

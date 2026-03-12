@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import MediaPlayer
+import SwiftData
 
 @MainActor
 class AudioPlayerManager: NSObject, ObservableObject {
@@ -22,14 +23,93 @@ class AudioPlayerManager: NSObject, ObservableObject {
     @Published var isLive = false
     @Published var currentStreamType: StreamType?
     
+    var modelContainer: ModelContainer?
+    
     private var timeObserver: Any?
     private var lastUpdatedSongId: String?
+    private var lastSavedPosition: Double = 0
     
     override init() {
         super.init()
         setupAudioSession()
         MPNowPlayingInfoCenter.default().playbackState = .stopped
         setupRemoteTransportControls()
+    }
+    
+    func setup(modelContainer: ModelContainer) {
+        self.modelContainer = modelContainer
+        
+        // Initial cleanup of old playback positions
+        Task {
+            await cleanupOldPlaybackPositions()
+        }
+    }
+    
+    private func cleanupOldPlaybackPositions() async {
+        guard let container = modelContainer else { return }
+        let context = ModelContext(container)
+        
+        let fourWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -4, to: Date()) ?? Date()
+        let descriptor = FetchDescriptor<StoredPlaybackPosition>()
+        
+        do {
+            let positions = try context.fetch(descriptor)
+            let oldPositions = positions.filter { $0.lastPlayed < fourWeeksAgo }
+            
+            if !oldPositions.isEmpty {
+                LogManager.shared.log("Cleaning up \(oldPositions.count) old playback positions", type: .info)
+                for pos in oldPositions {
+                    context.delete(pos)
+                }
+                try context.save()
+            }
+        } catch {
+            LogManager.shared.log("Failed to cleanup old playback positions: \(error)", type: .error)
+        }
+    }
+    
+    private func savePlaybackPosition() {
+        guard let item = currentItem, !isLive, let container = modelContainer else { return }
+        let currentPos = currentTime
+        
+        // Only save if position changed significantly (more than 1 second)
+        guard abs(currentPos - lastSavedPosition) > 1.0 else { return }
+        
+        let terminID = item.terminID
+        let context = ModelContext(container)
+        
+        Task {
+            do {
+                let descriptor = FetchDescriptor<StoredPlaybackPosition>(predicate: #Predicate<StoredPlaybackPosition> { $0.terminID == terminID })
+                let existing = try context.fetch(descriptor).first
+                
+                if let existing = existing {
+                    existing.position = currentPos
+                    existing.lastPlayed = Date()
+                } else {
+                    let newPos = StoredPlaybackPosition(terminID: terminID, position: currentPos)
+                    context.insert(newPos)
+                }
+                
+                try context.save()
+                lastSavedPosition = currentPos
+            } catch {
+                // Silently fail or log to LogManager
+            }
+        }
+    }
+    
+    private func loadPlaybackPosition(for terminID: Int) async -> Double? {
+        guard let container = modelContainer else { return nil }
+        let context = ModelContext(container)
+        
+        do {
+            let descriptor = FetchDescriptor<StoredPlaybackPosition>(predicate: #Predicate<StoredPlaybackPosition> { $0.terminID == terminID })
+            let existing = try context.fetch(descriptor).first
+            return existing?.position
+        } catch {
+            return nil
+        }
     }
     
     private func setupAudioSession() {
@@ -50,6 +130,11 @@ class AudioPlayerManager: NSObject, ObservableObject {
         currentStreamType = nil
         lastUpdatedSongId = nil
         
+        // Save previous item's position if any
+        if let _ = currentItem {
+            savePlaybackPosition()
+        }
+        
         // If we don't have an audio file, we MUST fetch detail first
         if item.audioFile1.isEmpty {
             Task {
@@ -67,9 +152,13 @@ class AudioPlayerManager: NSObject, ObservableObject {
                         }()
                         
                         if let url = fullUrl {
-                            self.play(url: url)
                             self.currentItem = item
                             self.currentPlaylist = firstRecording.playlist
+                            
+                            // Load saved position
+                            let savedPos = await self.loadPlaybackPosition(for: item.terminID)
+                            self.play(url: url, startAt: savedPos ?? 0)
+                            
                             self.setupNowPlaying(item: item)
                             self.updatePlaybackRate(1.0)
                             
@@ -85,21 +174,21 @@ class AudioPlayerManager: NSObject, ObservableObject {
         let baseUrlString = "https://archiv.bytefm.com/" 
         guard let url = URL(string: baseUrlString + item.audioFile1) else { return }
         
-        play(url: url)
-        currentItem = item
-        currentPlaylist = playlist
+        self.currentItem = item
+        self.currentPlaylist = playlist
 
-        setupNowPlaying(item: item)
-        updatePlaybackRate(1.0)
-        
-        // Mark as played in history
         Task {
+            let savedPos = await self.loadPlaybackPosition(for: item.terminID)
+            self.play(url: url, startAt: savedPos ?? 0)
+            
+            setupNowPlaying(item: item)
+            updatePlaybackRate(1.0)
+            
+            // Mark as played in history
             await APIClient.shared.markAsPlayed(item: item)
-        }
-        
-        // Fetch playlist in background if not provided
-        if playlist == nil {
-            Task {
+            
+            // Fetch playlist in background if not provided
+            if playlist == nil {
                 if let detail = await APIClient.shared.fetchBroadcastDetail(for: item) {
                     // Only update if we're still playing the same item
                     if self.currentItem?.id == item.id {
@@ -131,6 +220,11 @@ class AudioPlayerManager: NSObject, ObservableObject {
                     if currentSong?.id != self.lastUpdatedSongId {
                         self.updateNowPlayingForArchive()
                     }
+                }
+                
+                // Save position periodically (every 10 seconds or so)
+                if !self.isLive && self.currentItem != nil && abs(self.currentTime - self.lastSavedPosition) > 10.0 {
+                    self.savePlaybackPosition()
                 }
             }
         }
@@ -250,7 +344,7 @@ class AudioPlayerManager: NSObject, ObservableObject {
         currentStreamType = streamType
         guard let url = streamType.streamURL else { return }
         
-        play(url: url)
+        play(url: url, startAt: 0)
         
         // Initial setup for now playing, will be updated by metadata poll
         setupNowPlayingLive()
@@ -272,7 +366,7 @@ class AudioPlayerManager: NSObject, ObservableObject {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
     
-    private func play(url: URL) {
+    private func play(url: URL, startAt: Double = 0) {
         if let oldPlayer = player {
             oldPlayer.removeObserver(self, forKeyPath: "timeControlStatus")
             oldPlayer.removeObserver(self, forKeyPath: "status")
@@ -282,7 +376,8 @@ class AudioPlayerManager: NSObject, ObservableObject {
         }
         
         duration = 0 // Reset duration for new item
-        currentTime = 0 // Reset current time for new item
+        currentTime = startAt // Reset current time to startAt for new item
+        lastSavedPosition = startAt
         
         let playerItem = AVPlayerItem(url: url)
         if player == nil {
@@ -291,12 +386,18 @@ class AudioPlayerManager: NSObject, ObservableObject {
             player?.replaceCurrentItem(with: playerItem)
         }
         
+        // Seek to start position if needed
+        if startAt > 0 {
+            player?.seek(to: CMTime(seconds: startAt, preferredTimescale: 1))
+        }
+        
         player?.addObserver(self, forKeyPath: "timeControlStatus", options: [.new], context: nil)
         player?.addObserver(self, forKeyPath: "status", options: [.new], context: nil)
         playerItem.addObserver(self, forKeyPath: "status", options: [.new], context: nil)
         playerItem.addObserver(self, forKeyPath: "duration", options: [.new], context: nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(handlePlaybackError), name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePlaybackEnded), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
         
         setupTimeObserver()
         player?.play()
@@ -306,8 +407,27 @@ class AudioPlayerManager: NSObject, ObservableObject {
     
     @objc private func handlePlaybackError(notification: Notification) {
         if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-            print("Playback failed with error: \(error.localizedDescription)")
-            // Optionally update UI to show error
+            LogManager.shared.log("Playback failed with error: \(error.localizedDescription)", type: .error)
+        }
+    }
+    
+    @objc private func handlePlaybackEnded(notification: Notification) {
+        // Clear saved position when finished
+        guard let item = currentItem, !isLive, let container = modelContainer else { return }
+        let terminID = item.terminID
+        let context = ModelContext(container)
+        
+        Task {
+            do {
+                let descriptor = FetchDescriptor<StoredPlaybackPosition>(predicate: #Predicate<StoredPlaybackPosition> { $0.terminID == terminID })
+                if let existing = try context.fetch(descriptor).first {
+                    context.delete(existing)
+                    try context.save()
+                    lastSavedPosition = 0
+                }
+            } catch {
+                // Silently fail
+            }
         }
     }
     
@@ -315,6 +435,7 @@ class AudioPlayerManager: NSObject, ObservableObject {
         player?.pause()
         isPlaying = false
         updatePlaybackRate(0.0)
+        savePlaybackPosition()
     }
     
     func togglePlayPause() {

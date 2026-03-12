@@ -1,5 +1,6 @@
 import Foundation
 import os
+import AppKit
 
 class LogManager {
     static let shared = LogManager()
@@ -36,7 +37,7 @@ class LogManager {
         case .info: logger.info("\(message, privacy: .public)")
         case .error: logger.error("\(message, privacy: .public)")
         case .fault: logger.fault("\(message, privacy: .public)")
-        default: logger.default("\(message, privacy: .public)")
+        default: logger.log(level: .default, "\(message, privacy: .public)")
         }
         
         // 2. File-Log - easy to find and send
@@ -87,7 +88,7 @@ class LogManager {
     }
 }
 
-extension OSLogType: CustomStringConvertible {
+extension OSLogType: @retroactive CustomStringConvertible {
     public var description: String {
         switch self {
         case .debug: return "DEBUG"
