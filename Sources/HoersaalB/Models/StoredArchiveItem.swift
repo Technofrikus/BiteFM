@@ -35,10 +35,15 @@ final class StoredArchiveItem {
         self.untertitelTermin = item.untertitelTermin
         self.createdAt = Date()
         
-        // Parse datum (YYYY-MM-DD)
+        self.broadcastDate = Self.parseDate(item.datum)
+    }
+
+    static func parseDate(_ dateString: String) -> Date {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        self.broadcastDate = formatter.date(from: item.datum) ?? Date()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter.date(from: dateString) ?? Date()
     }
     
     // Helper to convert back to ArchiveItem if needed

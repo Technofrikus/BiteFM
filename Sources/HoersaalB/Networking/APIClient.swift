@@ -48,21 +48,21 @@ class APIClient: ObservableObject {
             let favoritesDescriptor = FetchDescriptor<StoredFavoriteBroadcast>()
             if let storedFavorites = try? context.fetch(favoritesDescriptor) {
                 self.favoriteSlugs = Set(storedFavorites.map { $0.sendungSlug })
-                print("Loaded \(self.favoriteSlugs.count) favorite slugs from disk")
+                LogManager.shared.log("Loaded \(self.favoriteSlugs.count) favorite slugs from disk", type: .info)
             }
             
             // Load History
             let historyDescriptor = FetchDescriptor<StoredListeningHistoryEntry>()
             if let storedHistory = try? context.fetch(historyDescriptor) {
                 self.listenedShowIDs = Set(storedHistory.map { $0.showID })
-                print("Loaded \(self.listenedShowIDs.count) listening history entries from disk")
+                LogManager.shared.log("Loaded \(self.listenedShowIDs.count) listening history entries from disk", type: .info)
             }
             
             // Load Shows
             let showsDescriptor = FetchDescriptor<StoredShow>(sortBy: [SortDescriptor(\.titel)])
             if let storedShows = try? context.fetch(showsDescriptor) {
                 self.shows = storedShows.map { $0.toShow() }
-                print("Loaded \(self.shows.count) shows from disk")
+                LogManager.shared.log("Loaded \(self.shows.count) shows from disk", type: .info)
             }
             
             // If we are logged in, refresh favorites and history immediately in background
@@ -129,7 +129,7 @@ class APIClient: ObservableObject {
         
         // Only log a few to avoid spamming
         if isFav {
-            print("Found favorite: \(title) (slug: \(lSlug))")
+            LogManager.shared.log("Found favorite: \(title) (slug: \(lSlug))", type: .debug)
         }
         return isFav
     }
@@ -151,7 +151,7 @@ class APIClient: ObservableObject {
         // Here we could potentially call an API to mark it as played
         // For now, we update local history and re-fetch from server to be in sync
         // if the server actually records history upon playback starting.
-        print("Marking as played: \(item.sendungTitel) (ID: \(item.terminID))")
+        LogManager.shared.log("Marking as played: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
         
         if let context = modelContainer.map({ ModelContext($0) }) {
             await fetchListeningHistory(modelContext: context)
@@ -160,6 +160,35 @@ class APIClient: ObservableObject {
         }
     }
     
+    private func performRequest(for request: URLRequest, retryOnAuthFailure: Bool = true) async throws -> (Data, URLResponse) {
+        let (data, response) = try await session.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse, 
+           (httpResponse.statusCode == 401 || httpResponse.statusCode == 403),
+           retryOnAuthFailure {
+            LogManager.shared.log("Session expired or unauthorized (Code: \(httpResponse.statusCode)). Attempting silent re-login...", type: .error)
+            
+            if let username = UserDefaults.standard.string(forKey: "savedUsername"),
+               let password = KeychainHelper.readPassword(account: username) {
+                
+                let success = await login(username: username, password: password, isAutoLogin: true)
+                if success {
+                    LogManager.shared.log("Silent re-login successful. Retrying original request...", type: .info)
+                    // Retry once WITHOUT further retries on auth failure to avoid infinite loop
+                    return try await performRequest(for: request, retryOnAuthFailure: false)
+                } else {
+                    LogManager.shared.log("Silent re-login FAILED. User must login manually.", type: .error)
+                    isLoggedIn = false
+                }
+            } else {
+                LogManager.shared.log("No credentials found for silent re-login.", type: .error)
+                isLoggedIn = false
+            }
+        }
+        
+        return (data, response)
+    }
+
     func fetchListeningHistory(modelContext: ModelContext? = nil) async {
         guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/listeningHistoryEntries.php") else { return }
         
@@ -177,19 +206,19 @@ class APIClient: ObservableObject {
             }
         }
         
-        print("Fetching listening history from \(url.absoluteString)...")
+        LogManager.shared.log("Fetching listening history from \(url.absoluteString)...", type: .info)
         
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await performRequest(for: request)
             
             if let httpResponse = response as? HTTPURLResponse {
-                print("History response status code: \(httpResponse.statusCode)")
+                LogManager.shared.log("History response status code: \(httpResponse.statusCode)", type: .debug)
                 
                 if httpResponse.statusCode == 200 {
                     let decoder = JSONDecoder()
                     do {
                         let historyResponse = try decoder.decode(ListeningHistoryResponse.self, from: data)
-                        print("Successfully decoded history: \(historyResponse.data.count) entries")
+                        LogManager.shared.log("Successfully decoded history: \(historyResponse.data.count) entries", type: .info)
                         
                         let ids = Set(historyResponse.data.map { $0.showID })
                         self.listenedShowIDs = ids
@@ -198,44 +227,13 @@ class APIClient: ObservableObject {
                             try await syncListeningHistoryWithDatabase(items: historyResponse.data, context: context)
                         }
                     } catch {
-                        print("FAILED to decode listening history: \(error)")
-                        if let jsonString = String(data: data, encoding: .utf8) {
-                            print("Raw JSON response: \(jsonString)")
-                        }
+                        LogManager.shared.log("FAILED to decode listening history: \(error)", type: .error)
                     }
                 }
             }
         } catch {
-            print("Failed to fetch listening history: \(error.localizedDescription)")
+            LogManager.shared.log("Failed to fetch listening history: \(error.localizedDescription)", type: .error)
         }
-    }
-    
-    private func syncListeningHistoryWithDatabase(items: [ListeningHistoryEntry], context: ModelContext) async throws {
-        // Use a more stable update pattern to avoid SwiftData fatal errors (like "remapped to a temporary identifier")
-        let descriptor = FetchDescriptor<StoredListeningHistoryEntry>()
-        let existingEntries = try context.fetch(descriptor)
-        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.showID, $0) })
-        
-        let newItemIDs = Set(items.map { $0.showID })
-        
-        // 1. Delete entries that are no longer present
-        for (id, entry) in existingMap {
-            if !newItemIDs.contains(id) {
-                context.delete(entry)
-            }
-        }
-        
-        // 2. Update existing or insert new entries
-        for item in items {
-            if let existing = existingMap[item.showID] {
-                existing.dateString = item.date
-            } else {
-                let newEntry = StoredListeningHistoryEntry(showID: item.showID, dateString: item.date)
-                context.insert(newEntry)
-            }
-        }
-        
-        try context.save()
     }
     
     func fetchFavorites(modelContext: ModelContext? = nil) async {
@@ -245,7 +243,7 @@ class APIClient: ObservableObject {
         request.httpMethod = "GET"
         request.setValue("ByteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
         
-        // Add Basic Auth if we have credentials (as per the curl provided)
+        // Add Basic Auth if we have credentials
         if let username = UserDefaults.standard.string(forKey: "savedUsername"),
            let password = KeychainHelper.readPassword(account: username) {
             let authString = "\(username):\(password)"
@@ -255,26 +253,25 @@ class APIClient: ObservableObject {
             }
         }
         
-        print("Fetching favorites from \(url.absoluteString)...")
+        LogManager.shared.log("Fetching favorites from \(url.absoluteString)...", type: .info)
         
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await performRequest(for: request)
             
             if let httpResponse = response as? HTTPURLResponse {
-                print("Favorites response status code: \(httpResponse.statusCode)")
+                LogManager.shared.log("Favorites response status code: \(httpResponse.statusCode)", type: .debug)
                 
                 if httpResponse.statusCode == 200 {
                     let decoder = JSONDecoder()
                     
                     do {
                         let favoritesResponse = try decoder.decode(FavoritesResponse.self, from: data)
-                        print("Successfully decoded FavoritesResponse. Shows: \(favoritesResponse.shows.count), Tracks: \(favoritesResponse.tracks.count), Broadcasts: \(favoritesResponse.broadcasts.count)")
+                        LogManager.shared.log("Successfully decoded FavoritesResponse. Shows: \(favoritesResponse.shows.count)", type: .info)
                         
-                        // Extract all broadcast slugs and titles from shows, tracks, and broadcasts sections
+                        // Extract all broadcast slugs and titles
                         var slugs = Set<String>()
                         var syncItems: [FavoriteBroadcast] = []
                         
-                        // Helper to add broadcast info
                         let addBroadcast = { (info: BroadcastInfo) in
                             let slug = info.slug.lowercased()
                             slugs.insert(slug)
@@ -285,41 +282,24 @@ class APIClient: ObservableObject {
                             }
                         }
                         
-                        // 1. From "broadcasts" section (The primary source)
-                        for item in favoritesResponse.broadcasts {
-                            addBroadcast(item.broadcast)
-                        }
-                        
-                        // 2. From "shows" section (Favorites of specific episodes also count for the broadcast)
-                        for item in favoritesResponse.shows {
-                            addBroadcast(item.broadcast)
-                        }
-                        
-                        // 3. From "tracks" section
-                        for item in favoritesResponse.tracks {
-                            if let broadcastInfo = item.broadcast {
-                                addBroadcast(broadcastInfo)
-                            }
+                        for item in favoritesResponse.broadcasts { addBroadcast(item.broadcast) }
+                        for item in favoritesResponse.shows { addBroadcast(item.broadcast) }
+                        for item in favoritesResponse.tracks { 
+                            if let broadcastInfo = item.broadcast { addBroadcast(broadcastInfo) }
                         }
                         
                         self.favoriteSlugs = slugs
-                        print("Updated favorite slugs/titles: \(self.favoriteSlugs.count) items")
                         
                         if let context = modelContext {
                             try await syncFavoritesWithDatabase(items: syncItems, context: context)
                         }
                     } catch {
                         print("FAILED to decode FavoritesResponse: \(error)")
-                        if let jsonString = String(data: data, encoding: .utf8) {
-                            print("Raw JSON response: \(jsonString)")
-                        }
                     }
-                } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                    print("Unauthorized fetch favorites. Possible cookie/session issue.")
                 }
             }
         } catch {
-            print("Failed to fetch favorites with error: \(error.localizedDescription)")
+            print("Failed to fetch favorites: \(error.localizedDescription)")
         }
     }
     
@@ -397,7 +377,7 @@ class APIClient: ObservableObject {
                 AudioPlayerManager.shared.updateNowPlayingWithMetadata(metadata)
             }
         } catch {
-            print("Failed to fetch live metadata: \(error)")
+            LogManager.shared.log("Failed to fetch live metadata: \(error)", type: .error)
         }
     }
     
@@ -409,8 +389,9 @@ class APIClient: ObservableObject {
         await login(username: username, password: password, isAutoLogin: true)
     }
     
-    func login(username: String, password: String, isAutoLogin: Bool = false) async {
-        guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/verifyUsernamePassword.php") else { return }
+    @discardableResult
+    func login(username: String, password: String, isAutoLogin: Bool = false) async -> Bool {
+        guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/verifyUsernamePassword.php") else { return false }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -453,17 +434,20 @@ class APIClient: ObservableObject {
                         await fetchShows()
                     }
                 }
+                return true
             } else {
                 isLoggedIn = false
                 if !isAutoLogin {
                     errorMessage = "Login fehlgeschlagen"
                 }
+                return false
             }
         } catch {
             isLoggedIn = false
             if !isAutoLogin {
                 errorMessage = error.localizedDescription
             }
+            return false
         }
     }
     
@@ -511,13 +495,15 @@ class APIClient: ObservableObject {
         request.setValue("ByteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
         
         do {
-            let (data, _) = try await session.data(for: request)
-            let items = try JSONDecoder().decode([ArchiveItem].self, from: data)
+            let (data, response) = try await performRequest(for: request)
             
-            archiveItems = items
-            
-            if let context = modelContext {
-                try await syncWithDatabase(items: items, context: context)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                let items = try JSONDecoder().decode([ArchiveItem].self, from: data)
+                archiveItems = items
+                
+                if let context = modelContext {
+                    try await syncWithDatabase(items: items, context: context)
+                }
             }
         } catch {
             errorMessage = "Failed to fetch archive: \(error.localizedDescription)"
@@ -530,11 +516,12 @@ class APIClient: ObservableObject {
         let existingEntries = try context.fetch(descriptor)
         let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.terminID, $0) })
         
+        LogManager.shared.log("Syncing with database: \(items.count) items from server, \(existingEntries.count) currently in database.", type: .info)
+        
         // 1. Update existing or insert new items
         for item in items {
             if let existing = existingMap[item.terminID] {
-                // Update properties if needed, but for archive items they are usually static
-                // Let's just update common things to ensure they're in sync
+                // Update properties to ensure they're in sync
                 existing.audioFile1 = item.audioFile1
                 existing.audioFile2 = item.audioFile2
                 existing.audioFile3 = item.audioFile3
@@ -547,6 +534,8 @@ class APIClient: ObservableObject {
                 existing.startTime = item.startTime
                 existing.endTime = item.endTime
                 existing.untertitelTermin = item.untertitelTermin
+                // CRITICAL: Update broadcastDate so old items don't get deleted if their date was updated
+                existing.broadcastDate = StoredArchiveItem.parseDate(item.datum)
             } else {
                 let storedItem = StoredArchiveItem(from: item)
                 context.insert(storedItem)
@@ -556,10 +545,15 @@ class APIClient: ObservableObject {
         // 2. Cleanup items older than 4 weeks (based on broadcast date)
         let fourWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -4, to: Date()) ?? Date()
         
-        // Only cleanup older items
-        let oldItems = existingEntries.filter { $0.broadcastDate < fourWeeksAgo }
-        for oldItem in oldItems {
-            context.delete(oldItem)
+        // Only cleanup older items that are NOT in the current fetch (to be safe)
+        let newItemIDs = Set(items.map { $0.terminID })
+        let oldItems = existingEntries.filter { $0.broadcastDate < fourWeeksAgo && !newItemIDs.contains($0.terminID) }
+        
+        if !oldItems.isEmpty {
+            LogManager.shared.log("Cleaning up \(oldItems.count) archive items older than 4 weeks (before \(fourWeeksAgo))", type: .info)
+            for oldItem in oldItems {
+                context.delete(oldItem)
+            }
         }
         
         try context.save()
@@ -573,15 +567,18 @@ class APIClient: ObservableObject {
         request.setValue("ByteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
         
         do {
-            let (data, _) = try await session.data(for: request)
-            let decodedShows = try JSONDecoder().decode([Show].self, from: data)
-            self.shows = decodedShows
+            let (data, response) = try await performRequest(for: request)
             
-            if let context = modelContext {
-                try await syncShowsWithDatabase(items: decodedShows, context: context)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                let decodedShows = try JSONDecoder().decode([Show].self, from: data)
+                self.shows = decodedShows
+                
+                if let context = modelContext {
+                    try await syncShowsWithDatabase(items: decodedShows, context: context)
+                }
             }
         } catch {
-            print("Failed to fetch shows: \(error.localizedDescription)")
+            LogManager.shared.log("Failed to fetch shows: \(error.localizedDescription)", type: .error)
         }
     }
     
@@ -618,7 +615,7 @@ class APIClient: ObservableObject {
     func fetchBroadcasts(showSlug: String, page: Int = 1) async -> PaginatedBroadcasts? {
         guard let url = URL(string: "https://www.byte.fm/api/v1/broadcasts/\(showSlug)/?page=\(page)") else { return nil }
         
-        print("Fetching broadcasts for \(showSlug) from \(url.absoluteString)...")
+        LogManager.shared.log("Fetching broadcasts for \(showSlug) from \(url.absoluteString)...", type: .info)
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -629,7 +626,7 @@ class APIClient: ObservableObject {
             let result = try JSONDecoder().decode(PaginatedBroadcasts.self, from: data)
             return result
         } catch {
-            print("Failed to fetch broadcasts for \(showSlug): \(error)")
+            LogManager.shared.log("Failed to fetch broadcasts for \(showSlug): \(error)", type: .error)
             return nil
         }
     }
@@ -661,7 +658,7 @@ class APIClient: ObservableObject {
             broadcastDetailsCache[item.id] = detail
             return detail
         } catch {
-            print("Failed to fetch broadcast detail: \(error)")
+            LogManager.shared.log("Failed to fetch broadcast detail: \(error)", type: .error)
             return nil
         }
     }

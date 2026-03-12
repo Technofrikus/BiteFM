@@ -40,6 +40,12 @@ struct HoersaalBApp: App {
                 Button("Abmelden (App)") {
                     apiClient.showLogoutConfirmation = true
                 }
+                
+                Divider()
+                
+                Button("Log-Datei anzeigen") {
+                    LogManager.shared.openLogFolder()
+                }
             }
         }
     }
