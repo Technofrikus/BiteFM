@@ -74,6 +74,7 @@ struct ArchiveNew: View {
         }
         .task {
             // Initial fetch or manually triggered fetch from view
+            LogManager.shared.log("ArchiveNew view appeared, fetching archive...", type: .info)
             await apiClient.fetchArchive(modelContext: modelContext)
         }
         .onChange(of: isInspectorPresented) { oldValue, newValue in

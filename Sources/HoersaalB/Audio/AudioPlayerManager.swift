@@ -118,9 +118,9 @@ class AudioPlayerManager: NSObject, ObservableObject {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [])
             try session.setActive(true)
-            print("AudioSession configured successfully")
+            LogManager.shared.log("AudioSession configured successfully", type: .info)
         } catch {
-            print("Failed to setup AVAudioSession: \(error)")
+            LogManager.shared.log("Failed to setup AVAudioSession: \(error)", type: .error)
         }
         #endif
     }
@@ -245,11 +245,11 @@ class AudioPlayerManager: NSObject, ObservableObject {
         } else if keyPath == "status" {
             if let player = object as? AVPlayer {
                 if player.status == .failed {
-                    print("AVPlayer failed with error: \(String(describing: player.error))")
+                    LogManager.shared.log("AVPlayer failed with error: \(String(describing: player.error))", type: .error)
                 }
             } else if let item = object as? AVPlayerItem {
                 if item.status == .failed {
-                    print("AVPlayerItem failed with error: \(String(describing: item.error))")
+                    LogManager.shared.log("AVPlayerItem failed with error: \(String(describing: item.error))", type: .error)
                 }
             }
         } else if keyPath == "duration", let item = object as? AVPlayerItem {

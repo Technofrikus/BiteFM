@@ -58,20 +58,35 @@ class LogManager {
         
         guard let data = logLine.data(using: .utf8) else { return }
         
+        // Ensure parent directory exists
+        let parentDir = url.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: parentDir.path) {
+            try? FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+        }
+        
         if FileManager.default.fileExists(atPath: url.path) {
             // Check size and rotate if necessary
             if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
                let size = attributes[.size] as? Int, size > maxLogSize {
                 rotateLogFile()
             }
-            
+        }
+        
+        // Re-check existence as it might have been deleted/rotated
+        if FileManager.default.fileExists(atPath: url.path) {
             if let fileHandle = try? FileHandle(forWritingTo: url) {
                 fileHandle.seekToEndOfFile()
                 fileHandle.write(data)
                 fileHandle.closeFile()
             }
         } else {
-            try? data.write(to: url)
+            do {
+                try data.write(to: url)
+            } catch {
+                #if DEBUG
+                print("FAILED to write log to file: \(error)")
+                #endif
+            }
         }
     }
     

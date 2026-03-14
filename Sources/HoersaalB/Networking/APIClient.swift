@@ -39,6 +39,7 @@ class APIClient: ObservableObject {
     
     func setup(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
+        LogManager.shared.log("APIClient setup with ModelContainer", type: .info)
         
         // Initial load of favorites and history from disk
         Task {
@@ -127,10 +128,6 @@ class APIClient: ObservableObject {
         let lSlug = slug.lowercased()
         let isFav = favoriteSlugs.contains(lSlug) || favoriteSlugs.contains(title)
         
-        // Only log a few to avoid spamming
-        if isFav {
-            LogManager.shared.log("Found favorite: \(title) (slug: \(lSlug))", type: .debug)
-        }
         return isFav
     }
     
@@ -161,32 +158,37 @@ class APIClient: ObservableObject {
     }
     
     private func performRequest(for request: URLRequest, retryOnAuthFailure: Bool = true) async throws -> (Data, URLResponse) {
-        let (data, response) = try await session.data(for: request)
-        
-        if let httpResponse = response as? HTTPURLResponse, 
-           (httpResponse.statusCode == 401 || httpResponse.statusCode == 403),
-           retryOnAuthFailure {
-            LogManager.shared.log("Session expired or unauthorized (Code: \(httpResponse.statusCode)). Attempting silent re-login...", type: .error)
+        do {
+            let (data, response) = try await session.data(for: request)
             
-            if let username = UserDefaults.standard.string(forKey: "savedUsername"),
-               let password = KeychainHelper.readPassword(account: username) {
+            if let httpResponse = response as? HTTPURLResponse, 
+               (httpResponse.statusCode == 401 || httpResponse.statusCode == 403),
+               retryOnAuthFailure {
+                LogManager.shared.log("Session expired or unauthorized (Code: \(httpResponse.statusCode)). Attempting silent re-login...", type: .error)
                 
-                let success = await login(username: username, password: password, isAutoLogin: true)
-                if success {
-                    LogManager.shared.log("Silent re-login successful. Retrying original request...", type: .info)
-                    // Retry once WITHOUT further retries on auth failure to avoid infinite loop
-                    return try await performRequest(for: request, retryOnAuthFailure: false)
+                if let username = UserDefaults.standard.string(forKey: "savedUsername"),
+                   let password = KeychainHelper.readPassword(account: username) {
+                    
+                    let success = await login(username: username, password: password, isAutoLogin: true)
+                    if success {
+                        LogManager.shared.log("Silent re-login successful. Retrying original request...", type: .info)
+                        // Retry once WITHOUT further retries on auth failure to avoid infinite loop
+                        return try await performRequest(for: request, retryOnAuthFailure: false)
+                    } else {
+                        LogManager.shared.log("Silent re-login FAILED. User must login manually.", type: .error)
+                        isLoggedIn = false
+                    }
                 } else {
-                    LogManager.shared.log("Silent re-login FAILED. User must login manually.", type: .error)
+                    LogManager.shared.log("No credentials found for silent re-login.", type: .error)
                     isLoggedIn = false
                 }
-            } else {
-                LogManager.shared.log("No credentials found for silent re-login.", type: .error)
-                isLoggedIn = false
             }
+            
+            return (data, response)
+        } catch {
+            LogManager.shared.log("Network error in performRequest: \(error.localizedDescription)", type: .error)
+            throw error
         }
-        
-        return (data, response)
     }
 
     func fetchListeningHistory(modelContext: ModelContext? = nil) async {
@@ -322,12 +324,12 @@ class APIClient: ObservableObject {
                             try await syncFavoritesWithDatabase(items: syncItems, context: context)
                         }
                     } catch {
-                        print("FAILED to decode FavoritesResponse: \(error)")
+                        LogManager.shared.log("FAILED to decode FavoritesResponse: \(error)", type: .error)
                     }
                 }
             }
         } catch {
-            print("Failed to fetch favorites: \(error.localizedDescription)")
+            LogManager.shared.log("Failed to fetch favorites: \(error.localizedDescription)", type: .error)
         }
     }
     
@@ -516,7 +518,12 @@ class APIClient: ObservableObject {
     }
     
     func fetchArchive(modelContext: ModelContext? = nil) async {
-        guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/archiveSendungenNew.php") else { return }
+        guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/archiveSendungenNew.php") else { 
+            LogManager.shared.log("Invalid Archive URL", type: .error)
+            return 
+        }
+        
+        LogManager.shared.log("Fetching archive (Neu im Archiv) from \(url.absoluteString)...", type: .info)
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -525,15 +532,26 @@ class APIClient: ObservableObject {
         do {
             let (data, response) = try await performRequest(for: request)
             
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                let items = try JSONDecoder().decode([ArchiveItem].self, from: data)
-                archiveItems = items
-                
-                if let context = modelContext {
-                    try await syncWithDatabase(items: items, context: context)
+            if let httpResponse = response as? HTTPURLResponse {
+                LogManager.shared.log("Archive response status: \(httpResponse.statusCode)", type: .debug)
+                if httpResponse.statusCode == 200 {
+                    do {
+                        let items = try JSONDecoder().decode([ArchiveItem].self, from: data)
+                        LogManager.shared.log("Successfully fetched \(items.count) archive items.", type: .info)
+                        archiveItems = items
+                        
+                        if let context = modelContext {
+                            try await syncWithDatabase(items: items, context: context)
+                        }
+                    } catch {
+                        LogManager.shared.log("FAILED to decode archive: \(error)", type: .error)
+                    }
+                } else {
+                    LogManager.shared.log("Archive request failed with status code: \(httpResponse.statusCode)", type: .error)
                 }
             }
         } catch {
+            LogManager.shared.log("FAILED to fetch archive: \(error.localizedDescription)", type: .error)
             errorMessage = "Failed to fetch archive: \(error.localizedDescription)"
         }
     }

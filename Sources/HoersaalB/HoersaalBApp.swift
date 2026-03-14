@@ -10,11 +10,35 @@ struct HoersaalBApp: App {
     
     init() {
         do {
-            container = try ModelContainer(for: StoredArchiveItem.self, StoredFavoriteBroadcast.self, StoredListeningHistoryEntry.self, StoredShow.self, StoredPlaybackPosition.self)
+            let schema = Schema([
+                StoredArchiveItem.self,
+                StoredFavoriteBroadcast.self,
+                StoredListeningHistoryEntry.self,
+                StoredShow.self,
+                StoredPlaybackPosition.self
+            ])
+            
+            let fileManager = FileManager.default
+            let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let appDirectory = appSupportURL.appendingPathComponent("HoersaalB")
+            
+            // Ensure directory exists
+            if !fileManager.fileExists(atPath: appDirectory.path) {
+                try? fileManager.createDirectory(at: appDirectory, withIntermediateDirectories: true)
+            }
+            
+            let storeURL = appDirectory.appendingPathComponent("HoersaalB.store")
+            let config = ModelConfiguration(url: storeURL)
+            
+            container = try ModelContainer(for: schema, configurations: [config])
+            
             // Setup APIClient and AudioPlayerManager with container
             APIClient.shared.setup(modelContainer: container)
             AudioPlayerManager.shared.setup(modelContainer: container)
+            
+            LogManager.shared.log("ModelContainer initialized at: \(storeURL.path)", type: .info)
         } catch {
+            LogManager.shared.log("CRITICAL ERROR: Could not initialize ModelContainer: \(error)", type: .error)
             fatalError("Could not initialize ModelContainer")
         }
     }
