@@ -5,18 +5,18 @@
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:ByteFMWrapper}",
-            "name": "Debug HoersaalB",
-            "program": "${workspaceFolder:ByteFMWrapper}/.build/debug/HoersaalB",
-            "preLaunchTask": "swift: Build Debug HoersaalB"
+            "name": "Debug BiteFM",
+            "program": "${workspaceFolder:ByteFMWrapper}/.build/debug/BiteFM",
+            "preLaunchTask": "swift: Build Debug BiteFM"
         },
         {
             "type": "lldb",
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:ByteFMWrapper}",
-            "name": "Release HoersaalB",
-            "program": "${workspaceFolder:ByteFMWrapper}/.build/release/HoersaalB",
-            "preLaunchTask": "swift: Build Release HoersaalB"
+            "name": "Release BiteFM",
+            "program": "${workspaceFolder:ByteFMWrapper}/.build/release/BiteFM",
+            "preLaunchTask": "swift: Build Release BiteFM"
         }
     ]
 }

@@ -2,19 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "HoersaalB",
+    name: "BiteFM",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "HoersaalB", targets: ["HoersaalB"])
+        .executable(name: "BiteFM", targets: ["BiteFM"])
     ],
     dependencies: [],
     targets: [
         .executableTarget(
-            name: "HoersaalB",
+            name: "BiteFM",
             dependencies: [],
-            path: "Sources/HoersaalB"
+            path: "Sources/BiteFM",
+            resources: [.process("Assets.xcassets")]
         )
     ]
 )

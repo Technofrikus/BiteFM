@@ -1,4 +1,4 @@
-# Hörsaal B macOS Client
+# BiteFM macOS Client
 
 Ein nativer macOS-Client für den Radiosender [ByteFM](https://www.byte.fm), optimiert für eine nahtlose Integration in das Betriebssystem und ein flüssiges Nutzererlebnis beim Durchstöbern des Archivs und beim Hören der Livestreams.
 
@@ -40,7 +40,7 @@ Das Projekt nutzt `xcodegen` zur Generierung der Xcode-Projektdatei.
 
 1. Installiere `xcodegen` (falls nicht vorhanden): `brew install xcodegen`
 2. Generiere das Projekt: `xcodegen generate`
-3. Öffne `HoersaalB.xcodeproj` in Xcode.
+3. Öffne `BiteFM.xcodeproj` in Xcode.
 
 ---
 *Hinweis: Dies ist ein inoffizieller Client und steht in keiner direkten Verbindung zur ByteFM GmbH.*

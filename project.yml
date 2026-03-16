@@ -1,4 +1,4 @@
-name: HoersaalB
+name: BiteFM
 options:
   bundleIdPrefix: com.technofrikus
 settings:
@@ -6,10 +6,10 @@ settings:
     Debug:
       ENABLE_DEBUG_DYLIB: NO
 schemes:
-  HoersaalB:
+  BiteFM:
     build:
       targets:
-        HoersaalB: [run, test, profile, analyze, archive]
+        BiteFM: [run, test, profile, analyze, archive]
     run:
       config: Debug
     test:
@@ -21,7 +21,7 @@ schemes:
     archive:
       config: Release
 targets:
-  HoersaalB:
+  BiteFM:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
@@ -29,12 +29,12 @@ targets:
       configs:
         Debug:
           ENABLE_DEBUG_DYLIB: NO
-      PRODUCT_NAME: "Hörsaal B"
-    sources: [Sources/HoersaalB]
+      PRODUCT_NAME: "BiteFM"
+    sources: [Sources/BiteFM]
     info:
       path: Info.plist
       properties:
         LSMinimumSystemVersion: "14.0"
         NSHighResolutionCapable: true
         NSPrincipalClass: NSApplication
-        CFBundleDisplayName: "Hörsaal B"
+        CFBundleDisplayName: "BiteFM"
