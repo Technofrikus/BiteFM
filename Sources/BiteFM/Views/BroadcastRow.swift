@@ -4,6 +4,8 @@ struct BroadcastRow: View {
     let item: ArchiveItem
     var showShowTitle: Bool = true
     var showHeart: Bool = true
+    /// When set, the heart is tappable; otherwise read-only indicator.
+    var onFavoriteTap: (() -> Void)? = nil
     
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
@@ -22,7 +24,15 @@ struct BroadcastRow: View {
                 HStack(spacing: 4) {
                     if showHeart {
                         let isFav = showShowTitle ? apiClient.isFavorite(item: item) : apiClient.isEpisodeFavorite(item: item)
-                        if isFav {
+                        if let onFavoriteTap {
+                            Button(action: onFavoriteTap) {
+                                Image(systemName: isFav ? "heart.fill" : "heart")
+                                    .foregroundColor(isFav ? .red : .secondary)
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .help(isFav ? "Favorit entfernen" : "Als Favorit speichern")
+                        } else if isFav {
                             Image(systemName: "heart.fill")
                                 .foregroundColor(.red)
                                 .font(.caption)

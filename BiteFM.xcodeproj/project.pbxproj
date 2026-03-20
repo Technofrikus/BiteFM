@@ -34,6 +34,9 @@
 		C3D4E5F60718293A4B5C6D7E /* MacAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6D7D /* MacAppDelegate.swift */; };
 		D4E5F60718293A4B5C6D7E8F /* MacPlaybackGlobalHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8E /* MacPlaybackGlobalHotkey.swift */; };
 		BDC9E980FF984EECD35B02F6 /* StoredFavoriteBroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = C896E1AAA1846FC38FDFB903 /* StoredFavoriteBroadcast.swift */; };
+		A1F0E1D2C3B4A5968778695A0 /* StoredFavoriteShow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F0E1D2C3B4A5968778695A1 /* StoredFavoriteShow.swift */; };
+		B1F0E1D2C3B4A5968778695A0 /* FavoriteEpisodesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F0E1D2C3B4A5968778695A1 /* FavoriteEpisodesView.swift */; };
+		C1F0E1D2C3B4A5968778695A0 /* FavoriteTracksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F0E1D2C3B4A5968778695A1 /* FavoriteTracksView.swift */; };
 		C6B3E06AE5AC1C82C06B5E9F /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63B28DEEAA2489AC8EC700D2 /* LoginView.swift */; };
 		C7B2D56A7A4870AAF67333B2 /* ListeningHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C5D74314945ED3093270A8 /* ListeningHistory.swift */; };
 		DABE31160A6200151D49D983 /* LiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A1F6AB4C85DD4FB9803AEC7 /* LiveView.swift */; };
@@ -66,6 +69,9 @@
 		A4D74328FF192C360D3DECCF /* BroadcastListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastListView.swift; sourceTree = "<group>"; };
 		C7C5D74314945ED3093270A8 /* ListeningHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningHistory.swift; sourceTree = "<group>"; };
 		C896E1AAA1846FC38FDFB903 /* StoredFavoriteBroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredFavoriteBroadcast.swift; sourceTree = "<group>"; };
+		A1F0E1D2C3B4A5968778695A1 /* StoredFavoriteShow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredFavoriteShow.swift; sourceTree = "<group>"; };
+		B1F0E1D2C3B4A5968778695A1 /* FavoriteEpisodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteEpisodesView.swift; sourceTree = "<group>"; };
+		C1F0E1D2C3B4A5968778695A1 /* FavoriteTracksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTracksView.swift; sourceTree = "<group>"; };
 		D9538C505149AFD10ED778FC /* StoredShow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredShow.swift; sourceTree = "<group>"; };
 		E0E4E1B277E221051054138D /* ArchiveNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveNew.swift; sourceTree = "<group>"; };
 		E6A2AA19D015260A75E02B82 /* StoredPlaybackPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredPlaybackPosition.swift; sourceTree = "<group>"; };
@@ -109,6 +115,8 @@
 				A4D74328FF192C360D3DECCF /* BroadcastListView.swift */,
 				979A52BD6C878098008F370A /* BroadcastRow.swift */,
 				5EB6B21324DA28C4E6E8BDC1 /* ContentView.swift */,
+				B1F0E1D2C3B4A5968778695A1 /* FavoriteEpisodesView.swift */,
+				C1F0E1D2C3B4A5968778695A1 /* FavoriteTracksView.swift */,
 				6A1F6AB4C85DD4FB9803AEC7 /* LiveView.swift */,
 				63B28DEEAA2489AC8EC700D2 /* LoginView.swift */,
 				29EE154B52FFEBF2A107E9E7 /* PlayerBarView.swift */,
@@ -159,6 +167,7 @@
 				3D17B337D265D510017AB400 /* Show.swift */,
 				5D93ED73478914AE8D645A23 /* StoredArchiveItem.swift */,
 				C896E1AAA1846FC38FDFB903 /* StoredFavoriteBroadcast.swift */,
+				A1F0E1D2C3B4A5968778695A1 /* StoredFavoriteShow.swift */,
 				6710C34757EB34512A46239A /* StoredListeningHistoryEntry.swift */,
 				E6A2AA19D015260A75E02B82 /* StoredPlaybackPosition.swift */,
 				D9538C505149AFD10ED778FC /* StoredShow.swift */,
@@ -265,6 +274,9 @@
 				319819E5DE4D2822017994ED /* Show.swift in Sources */,
 				5708F796C241AF05E3826060 /* StoredArchiveItem.swift in Sources */,
 				BDC9E980FF984EECD35B02F6 /* StoredFavoriteBroadcast.swift in Sources */,
+				A1F0E1D2C3B4A5968778695A0 /* StoredFavoriteShow.swift in Sources */,
+				B1F0E1D2C3B4A5968778695A0 /* FavoriteEpisodesView.swift in Sources */,
+				C1F0E1D2C3B4A5968778695A0 /* FavoriteTracksView.swift in Sources */,
 				87645EC009334A41E8BBA01D /* StoredListeningHistoryEntry.swift in Sources */,
 				DF77B54CE27FA8CA7F9855A5 /* StoredPlaybackPosition.swift in Sources */,
 				3B95BE571354B84CA012F046 /* StoredShow.swift in Sources */,

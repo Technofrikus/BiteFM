@@ -16,6 +16,11 @@ let package = Package(
             dependencies: [],
             path: "Sources/BiteFM",
             resources: [.process("Assets.xcassets")]
+        ),
+        .testTarget(
+            name: "BiteFMTests",
+            dependencies: ["BiteFM"],
+            path: "Tests/BiteFMTests"
         )
     ]
 )

@@ -50,6 +50,9 @@ struct ArchiveNew: View {
                             let item = storedItem.toArchiveItem()
                             BroadcastRow(
                                 item: item,
+                                onFavoriteTap: apiClient.isLoggedIn
+                                    ? { Task { await apiClient.toggleFavoriteBroadcast(slug: item.sendungSlug, displayTitle: item.sendungTitel) } }
+                                    : nil,
                                 selectedItemForDetail: $selectedItemForDetail,
                                 isInspectorPresented: $isInspectorPresented
                             )

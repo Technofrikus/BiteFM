@@ -8,6 +8,8 @@ struct ContentView: View {
         case live
         case archiveNew
         case archive
+        case favoriteEpisodes
+        case favoriteTracks
         case show(Show)
     }
     
@@ -29,6 +31,23 @@ struct ContentView: View {
                             }
                             NavigationLink(value: SidebarItem.archive) {
                                 Label("Archiv", systemImage: "archivebox")
+                            }
+                            
+                            NavigationLink(value: SidebarItem.favoriteEpisodes) {
+                                Label {
+                                    Text("Favoriten: Ausgaben")
+                                } icon: {
+                                    Image(systemName: "heart.fill")
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            NavigationLink(value: SidebarItem.favoriteTracks) {
+                                Label {
+                                    Text("Favoriten: Tracks")
+                                } icon: {
+                                    Image(systemName: "heart.fill")
+                                        .foregroundStyle(.white)
+                                }
                             }
                             
                             let favorites = apiClient.shows.filter { apiClient.isFavorite(show: $0) }
@@ -56,6 +75,10 @@ struct ContentView: View {
                                     .navigationTitle("Neu im Archiv")
                             case .archive:
                                 ArchiveView()
+                            case .favoriteEpisodes:
+                                FavoriteEpisodesView()
+                            case .favoriteTracks:
+                                FavoriteTracksView()
                             case .show(let show):
                                 BroadcastListView(show: show)
                                     .id(show.id)

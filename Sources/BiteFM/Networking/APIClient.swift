@@ -10,6 +10,12 @@ class APIClient: ObservableObject {
     @Published var archiveItems: [ArchiveItem] = []
     @Published var shows: [Show] = []
     @Published var favoriteSlugs: Set<String> = []
+    /// Episode (show) IDs from `get_favorites` → `shows[]`.
+    @Published var favoriteShowIDs: Set<Int> = []
+    @Published var favoriteShowItems: [FavoriteShowItem] = []
+    @Published var favoriteTrackItems: [FavoriteTrackItem] = []
+    /// Local or merged „Favorisiert am“-Zeitstempel pro Episoden-`show.id` (SwiftData + API).
+    @Published var favoriteShowFavoritedAt: [Int: Date] = [:]
     @Published var listenedShowIDs: Set<Int> = []
     @Published var liveMetadata: LiveMetadataResponse?
     @Published var errorMessage: String?
@@ -50,6 +56,13 @@ class APIClient: ObservableObject {
             if let storedFavorites = try? context.fetch(favoritesDescriptor) {
                 self.favoriteSlugs = Set(storedFavorites.map { $0.sendungSlug })
                 LogManager.shared.log("Loaded \(self.favoriteSlugs.count) favorite slugs from disk", type: .info)
+            }
+            
+            let favoriteShowsDescriptor = FetchDescriptor<StoredFavoriteShow>()
+            if let storedShowFavorites = try? context.fetch(favoriteShowsDescriptor) {
+                self.favoriteShowIDs = Set(storedShowFavorites.map { $0.showID })
+                self.favoriteShowFavoritedAt = Dictionary(uniqueKeysWithValues: storedShowFavorites.map { ($0.showID, $0.createdAt) })
+                LogManager.shared.log("Loaded \(self.favoriteShowIDs.count) favorite episode IDs from disk", type: .info)
             }
             
             // Load History
@@ -113,11 +126,14 @@ class APIClient: ObservableObject {
     }
     
     func isFavorite(item: ArchiveItem) -> Bool {
-        let showSlug = item.sendungSlug.lowercased()
-        let terminSlug = item.terminSlug.lowercased()
-        let title = item.sendungTitel
-        
-        return isFavorite(slug: showSlug, title: title) || isFavorite(slug: terminSlug, title: "")
+        FavoriteStateLogic.isFavoriteArchiveItem(
+            sendungSlug: item.sendungSlug,
+            terminSlug: item.terminSlug,
+            sendungTitel: item.sendungTitel,
+            terminID: item.terminID,
+            favoriteSlugs: favoriteSlugs,
+            favoriteShowIDs: favoriteShowIDs
+        )
     }
     
     func isFavorite(show: Show) -> Bool {
@@ -125,15 +141,20 @@ class APIClient: ObservableObject {
     }
     
     func isFavorite(slug: String, title: String) -> Bool {
-        let lSlug = slug.lowercased()
-        let isFav = favoriteSlugs.contains(lSlug) || favoriteSlugs.contains(title)
-        
-        return isFav
+        FavoriteStateLogic.isFavoriteBroadcast(slug: slug, title: title, favoriteSlugs: favoriteSlugs)
+    }
+    
+    func resolvedFavoritedAt(for item: FavoriteShowItem) -> Date {
+        item.favoritedAt ?? favoriteShowFavoritedAt[item.show.id] ?? .distantPast
     }
     
     func isEpisodeFavorite(item: ArchiveItem) -> Bool {
-        let lSlug = item.terminSlug.lowercased()
-        return favoriteSlugs.contains(lSlug)
+        FavoriteStateLogic.isEpisodeFavorite(
+            terminID: item.terminID,
+            terminSlug: item.terminSlug,
+            favoriteShowIDs: favoriteShowIDs,
+            favoriteSlugs: favoriteSlugs
+        )
     }
     
     func isPlayed(item: ArchiveItem) -> Bool {
@@ -296,9 +317,9 @@ class APIClient: ObservableObject {
                     
                     do {
                         let favoritesResponse = try decoder.decode(FavoritesResponse.self, from: data)
-                        LogManager.shared.log("Successfully decoded FavoritesResponse. Shows: \(favoritesResponse.shows.count)", type: .info)
+                        LogManager.shared.log("Successfully decoded FavoritesResponse. Shows: \(favoritesResponse.shows.count), tracks: \(favoritesResponse.tracks.count)", type: .info)
                         
-                        // Extract all broadcast slugs and titles
+                        // Extract all broadcast slugs and titles (Sendungen)
                         var slugs = Set<String>()
                         var syncItems: [FavoriteBroadcast] = []
                         
@@ -314,14 +335,22 @@ class APIClient: ObservableObject {
                         
                         for item in favoritesResponse.broadcasts { addBroadcast(item.broadcast) }
                         for item in favoritesResponse.shows { addBroadcast(item.broadcast) }
-                        for item in favoritesResponse.tracks { 
+                        for item in favoritesResponse.tracks {
                             if let broadcastInfo = item.broadcast { addBroadcast(broadcastInfo) }
                         }
                         
+                        let episodeIDs = Set(favoritesResponse.shows.map { $0.show.id })
+                        
                         self.favoriteSlugs = slugs
+                        self.favoriteShowIDs = episodeIDs
+                        self.favoriteShowItems = favoritesResponse.shows
+                        self.favoriteTrackItems = favoritesResponse.tracks
                         
                         if let context = modelContext {
                             try await syncFavoritesWithDatabase(items: syncItems, context: context)
+                            try await syncFavoriteShowsWithDatabase(showItems: favoritesResponse.shows, context: context)
+                            let rows = try context.fetch(FetchDescriptor<StoredFavoriteShow>())
+                            self.favoriteShowFavoritedAt = Dictionary(uniqueKeysWithValues: rows.map { ($0.showID, $0.createdAt) })
                         }
                     } catch {
                         LogManager.shared.log("FAILED to decode FavoritesResponse: \(error)", type: .error)
@@ -359,6 +388,158 @@ class APIClient: ObservableObject {
         }
         
         try context.save()
+    }
+    
+    private func syncFavoriteShowsWithDatabase(showItems: [FavoriteShowItem], context: ModelContext) async throws {
+        let serverIDs = Set(showItems.map { $0.show.id })
+        let descriptor = FetchDescriptor<StoredFavoriteShow>()
+        let existingEntries = try context.fetch(descriptor)
+        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.showID, $0) })
+        
+        for item in showItems {
+            let sid = item.show.id
+            if existingMap[sid] != nil {
+                continue
+            }
+            let created = item.favoritedAt ?? Date()
+            context.insert(StoredFavoriteShow(showID: sid, createdAt: created))
+        }
+        
+        for (sid, entry) in existingMap where !serverIDs.contains(sid) {
+            context.delete(entry)
+        }
+        
+        try context.save()
+    }
+    
+    private struct FavoriteUICache {
+        let favoriteSlugs: Set<String>
+        let favoriteShowIDs: Set<Int>
+        let favoriteShowItems: [FavoriteShowItem]
+        let favoriteTrackItems: [FavoriteTrackItem]
+        let favoriteShowFavoritedAt: [Int: Date]
+    }
+    
+    private func captureFavoriteUICache() -> FavoriteUICache {
+        FavoriteUICache(
+            favoriteSlugs: favoriteSlugs,
+            favoriteShowIDs: favoriteShowIDs,
+            favoriteShowItems: favoriteShowItems,
+            favoriteTrackItems: favoriteTrackItems,
+            favoriteShowFavoritedAt: favoriteShowFavoritedAt
+        )
+    }
+    
+    private func restoreFavoriteUICache(_ cache: FavoriteUICache) {
+        favoriteSlugs = cache.favoriteSlugs
+        favoriteShowIDs = cache.favoriteShowIDs
+        favoriteShowItems = cache.favoriteShowItems
+        favoriteTrackItems = cache.favoriteTrackItems
+        favoriteShowFavoritedAt = cache.favoriteShowFavoritedAt
+    }
+    
+    func toggleFavoriteBroadcast(slug: String, displayTitle: String = "") async {
+        let snapshot = captureFavoriteUICache()
+        let lower = slug.lowercased()
+        let was = FavoriteStateLogic.isFavoriteBroadcast(slug: slug, title: displayTitle, favoriteSlugs: favoriteSlugs)
+        if was {
+            favoriteSlugs.remove(lower)
+            if !displayTitle.isEmpty {
+                favoriteSlugs.remove(displayTitle)
+            }
+        } else {
+            favoriteSlugs.insert(lower)
+            if !displayTitle.isEmpty {
+                favoriteSlugs.insert(displayTitle)
+            }
+        }
+        
+        let success = await toggleChangeFavorite(queryItems: [URLQueryItem(name: "broadcast_slug", value: slug)])
+        if !success {
+            restoreFavoriteUICache(snapshot)
+        }
+    }
+    
+    func toggleFavoriteEpisode(showID: Int) async {
+        let snapshot = captureFavoriteUICache()
+        let was = favoriteShowIDs.contains(showID)
+        if was {
+            favoriteShowIDs.remove(showID)
+            favoriteShowItems.removeAll { $0.show.id == showID }
+        } else {
+            favoriteShowIDs.insert(showID)
+        }
+        
+        let success = await toggleChangeFavorite(queryItems: [URLQueryItem(name: "show_id", value: String(showID))])
+        if !success {
+            restoreFavoriteUICache(snapshot)
+        }
+    }
+    
+    /// Toggles favorite for a track (`track_id`); `trackID` is the favorite row id from `get_favorites` → `tracks[].id`.
+    func toggleFavoriteTrack(trackID: Int, cachedItem: FavoriteTrackItem? = nil) async {
+        let snapshot = captureFavoriteUICache()
+        let was = favoriteTrackItems.contains(where: { $0.id == trackID })
+        if was {
+            favoriteTrackItems.removeAll { $0.id == trackID }
+        } else if let cached = cachedItem {
+            favoriteTrackItems.insert(cached, at: 0)
+        }
+        
+        let success = await toggleChangeFavorite(queryItems: [URLQueryItem(name: "track_id", value: String(trackID))])
+        if !success {
+            restoreFavoriteUICache(snapshot)
+        }
+    }
+    
+    func isFavoriteTrackRow(id: Int) -> Bool {
+        favoriteTrackItems.contains(where: { $0.id == id })
+    }
+    
+    private func toggleChangeFavorite(queryItems: [URLQueryItem]) async -> Bool {
+        guard isLoggedIn else {
+            LogManager.shared.log("toggleChangeFavorite: not logged in", type: .debug)
+            return false
+        }
+        guard var components = URLComponents(string: "https://www.byte.fm/ajax/change-favorite/") else { return false }
+        components.queryItems = queryItems
+        
+        guard let url = components.url else { return false }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
+        
+        if let username = UserDefaults.standard.string(forKey: "savedUsername"),
+           let password = KeychainHelper.readPassword(account: username) {
+            let authString = "\(username):\(password)"
+            if let authData = authString.data(using: .utf8) {
+                let base64Auth = authData.base64EncodedString()
+                request.setValue("Basic \(base64Auth)", forHTTPHeaderField: "Authorization")
+            }
+        }
+        
+        do {
+            let (data, response) = try await performRequest(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                LogManager.shared.log("change-favorite: bad HTTP", type: .error)
+                return false
+            }
+            let decoded = try JSONDecoder().decode(ChangeFavoriteResponse.self, from: data)
+            if decoded.error != 0 {
+                LogManager.shared.log("change-favorite: error=\(decoded.error) status=\(decoded.status)", type: .error)
+                return false
+            }
+            if let container = modelContainer {
+                await fetchFavorites(modelContext: container.mainContext)
+            } else {
+                await fetchFavorites()
+            }
+            return true
+        } catch {
+            LogManager.shared.log("change-favorite failed: \(error.localizedDescription)", type: .error)
+            return false
+        }
     }
     
     func startLiveMetadataPolling() {
@@ -489,6 +670,10 @@ class APIClient: ObservableObject {
         isLoggedIn = false
         // Clear favorites and history
         favoriteSlugs.removeAll()
+        favoriteShowIDs.removeAll()
+        favoriteShowItems.removeAll()
+        favoriteTrackItems.removeAll()
+        favoriteShowFavoritedAt.removeAll()
         listenedShowIDs.removeAll()
         archiveItems.removeAll()
         
@@ -497,6 +682,11 @@ class APIClient: ObservableObject {
             let context = ModelContext(container)
             if let favorites = try? context.fetch(FetchDescriptor<StoredFavoriteBroadcast>()) {
                 for fav in favorites {
+                    context.delete(fav)
+                }
+            }
+            if let showFavs = try? context.fetch(FetchDescriptor<StoredFavoriteShow>()) {
+                for fav in showFavs {
                     context.delete(fav)
                 }
             }

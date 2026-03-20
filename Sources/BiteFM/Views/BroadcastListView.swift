@@ -9,6 +9,7 @@ struct BroadcastListView: View {
     @State private var currentPage = 1
     @State private var hasMorePages = true
     @State private var hidePlayed = false
+    @State private var searchText = ""
     
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
@@ -20,52 +21,87 @@ struct BroadcastListView: View {
         return broadcasts
     }
     
+    /// Ausgaben der geladenen Seiten, optional nach Suchtext (wie Sendungssuche im Archiv).
+    private var displayedBroadcasts: [BroadcastSummary] {
+        let base = filteredBroadcasts
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty { return base }
+        return base.filter { broadcast in
+            let fields: [String] = [
+                broadcast.subtitle,
+                broadcast.date,
+                broadcast.slug,
+                broadcast.description ?? "",
+                broadcast.moderator ?? ""
+            ]
+            return fields.contains { $0.localizedCaseInsensitiveContains(q) }
+        }
+    }
+    
     var body: some View {
         ZStack {
-            List {
-                ForEach(filteredBroadcasts) { broadcast in
-                    let item = broadcast.toArchiveItem(showTitle: show.titel, showSlug: show.slug, sendungID: show.id)
-                    BroadcastRow(
-                        item: item,
-                        showShowTitle: false,
-                        showHeart: true,
-                        selectedItemForDetail: $selectedItemForDetail,
-                        isInspectorPresented: $isInspectorPresented
-                    )
-                    .onAppear {
-                        // Pagination logic: if we are near the end of the visible list, load more
-                        if broadcast.id == filteredBroadcasts.last?.id && hasMorePages && !isLoading {
-                            Task {
-                                await loadMoreUntilVisible()
+            if listShowsEpisodes {
+                List {
+                    ForEach(displayedBroadcasts) { broadcast in
+                        let item = broadcast.toArchiveItem(showTitle: show.titel, showSlug: show.slug, sendungID: show.id)
+                        BroadcastRow(
+                            item: item,
+                            showShowTitle: false,
+                            showHeart: true,
+                            onFavoriteTap: apiClient.isLoggedIn
+                                ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
+                                : nil,
+                            selectedItemForDetail: $selectedItemForDetail,
+                            isInspectorPresented: $isInspectorPresented
+                        )
+                        .onAppear {
+                            // Pagination: Ende der geladenen (ungefilterten) Liste erreicht
+                            if broadcast.id == filteredBroadcasts.last?.id && hasMorePages && !isLoading {
+                                Task {
+                                    await loadMoreUntilVisible()
+                                }
                             }
                         }
                     }
-                }
-                
-                if isLoading {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
+                    
+                    if isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                        .padding()
                     }
-                    .padding()
                 }
-            }
-            .opacity(filteredBroadcasts.isEmpty && !isLoading ? 0 : 1)
-            
-            if filteredBroadcasts.isEmpty && !isLoading {
+            } else if filteredBroadcasts.isEmpty && !isLoading {
                 ContentUnavailableView(
                     hidePlayed ? "Keine ungehörten Sendungen" : "Keine Sendungen gefunden",
                     systemImage: hidePlayed ? "checkmark.circle" : "archivebox",
                     description: Text(hidePlayed ? "Alle Sendungen dieser Sendung wurden bereits gehört." : "")
                 )
+            } else if !filteredBroadcasts.isEmpty && displayedBroadcasts.isEmpty {
+                ContentUnavailableView(
+                    "Keine Treffer",
+                    systemImage: "magnifyingglass",
+                    description: Text("Keine Ausgabe passt zur Suche.")
+                )
             }
         }
+        .searchable(text: $searchText, prompt: "Ausgabe suchen…")
         .navigationTitle(apiClient.isFavorite(show: show) ? "❤️ \(show.titel)" : show.titel)
         .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack {
+                    Button(action: {
+                        Task { await apiClient.toggleFavoriteBroadcast(slug: show.slug, displayTitle: show.titel) }
+                    }) {
+                        Image(systemName: apiClient.isFavorite(show: show) ? "heart.fill" : "heart")
+                            .foregroundColor(apiClient.isFavorite(show: show) ? .red : .primary)
+                    }
+                    .help(apiClient.isFavorite(show: show) ? "Sendung aus Favoriten entfernen" : "Sendung als Favorit speichern")
+                    .disabled(!apiClient.isLoggedIn)
+                    
                     Button(action: {
                         hidePlayed.toggle()
                         if hidePlayed {
@@ -95,6 +131,7 @@ struct BroadcastListView: View {
         }
         .onChange(of: show.id) { oldValue, newValue in
             Task {
+                searchText = ""
                 currentPage = 1
                 broadcasts = []
                 hasMorePages = true
@@ -107,6 +144,11 @@ struct BroadcastListView: View {
             hasMorePages = true
             await loadMoreUntilVisible()
         }
+    }
+    
+    /// Liste sichtbar, solange Einträge da sind oder noch nachgeladen wird.
+    private var listShowsEpisodes: Bool {
+        !displayedBroadcasts.isEmpty || isLoading
     }
     
     private func loadMoreUntilVisible() async {

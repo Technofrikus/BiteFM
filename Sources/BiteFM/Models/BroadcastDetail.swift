@@ -105,3 +105,47 @@ struct PlaylistItem: Codable, Identifiable {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 }
+
+extension BroadcastDetail {
+    /// Best-effort start offset in seconds by matching the favorited track title to the episode playlist.
+    func startSeconds(matchingFavoriteTrackTitle favoriteTitle: String) -> Int? {
+        let want = Self.normalizeTitle(favoriteTitle)
+        guard !want.isEmpty else { return nil }
+        var bestScore = 0
+        var bestTime: Int?
+        for rec in recordings {
+            for pl in rec.playlist {
+                let t = Self.normalizeTitle(pl.title)
+                let combinedDash = Self.normalizeTitle("\(pl.artist) - \(pl.title)")
+                let combinedSpace = Self.normalizeTitle("\(pl.artist) \(pl.title)")
+                let score: Int
+                if t == want {
+                    score = 100
+                } else if combinedDash == want || combinedSpace == want {
+                    score = 95
+                } else if t.count >= 3, want.contains(t) {
+                    score = 85
+                } else if want.count >= 3, t.contains(want) {
+                    score = 82
+                } else if combinedDash.contains(want) || combinedSpace.contains(want) {
+                    score = 75
+                } else {
+                    score = 0
+                }
+                if score > bestScore {
+                    bestScore = score
+                    bestTime = pl.time
+                }
+            }
+        }
+        return bestTime
+    }
+    
+    private static func normalizeTitle(_ s: String) -> String {
+        s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .replacingOccurrences(of: "\u{2013}", with: "-")
+            .replacingOccurrences(of: "\u{2014}", with: "-")
+            .replacingOccurrences(of: "\u{2212}", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}

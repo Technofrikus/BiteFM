@@ -7,7 +7,7 @@
       "layers" : [
         {
           "fill" : "none",
-          "glass" : true,
+          "glass" : false,
           "hidden" : false,
           "image-name" : "Vorschlag1.png",
           "name" : "Vorschlag1",

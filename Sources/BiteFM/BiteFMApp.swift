@@ -17,6 +17,7 @@ struct BiteFMApp: App {
             let schema = Schema([
                 StoredArchiveItem.self,
                 StoredFavoriteBroadcast.self,
+                StoredFavoriteShow.self,
                 StoredListeningHistoryEntry.self,
                 StoredShow.self,
                 StoredPlaybackPosition.self
