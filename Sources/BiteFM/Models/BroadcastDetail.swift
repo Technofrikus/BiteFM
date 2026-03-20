@@ -1,6 +1,6 @@
 import Foundation
 
-struct BroadcastDetail: Codable {
+struct BroadcastDetail: Decodable {
     let id: Int
     let broadcastTitle: String
     let showSubtitle: String
@@ -22,6 +22,25 @@ struct BroadcastDetail: Codable {
         case showDescription = "show_description"
         case recordings
     }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try Self.decodeIntLenient(c, forKey: .id)
+        broadcastTitle = try c.decodeIfPresent(String.self, forKey: .broadcastTitle) ?? ""
+        showSubtitle = try c.decodeIfPresent(String.self, forKey: .showSubtitle) ?? ""
+        showTime = try c.decodeIfPresent(String.self, forKey: .showTime) ?? ""
+        showDate = try c.decodeIfPresent(String.self, forKey: .showDate) ?? ""
+        moderator = try c.decodeIfPresent(String.self, forKey: .moderator) ?? ""
+        moderatorImage = try c.decodeIfPresent(String.self, forKey: .moderatorImage)
+        showDescription = try c.decodeIfPresent(String.self, forKey: .showDescription) ?? ""
+        recordings = try c.decodeIfPresent([Recording].self, forKey: .recordings) ?? []
+    }
+    
+    private static func decodeIntLenient(_ c: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) throws -> Int {
+        if let v = try? c.decode(Int.self, forKey: key) { return v }
+        if let s = try? c.decode(String.self, forKey: key), let v = Int(s) { return v }
+        throw DecodingError.dataCorruptedError(forKey: key, in: c, debugDescription: "Expected Int or String for \(key)")
+    }
 }
 
 struct Recording: Codable {
@@ -32,6 +51,18 @@ struct Recording: Codable {
         case recordingUrl = "recording_url"
         case playlist
     }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        recordingUrl = try c.decodeIfPresent(String.self, forKey: .recordingUrl) ?? ""
+        playlist = try c.decodeIfPresent([PlaylistItem].self, forKey: .playlist) ?? []
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(recordingUrl, forKey: .recordingUrl)
+        try c.encode(playlist, forKey: .playlist)
+    }
 }
 
 struct PlaylistItem: Codable, Identifiable {
@@ -39,6 +70,34 @@ struct PlaylistItem: Codable, Identifiable {
     let artist: String
     let title: String
     let time: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case artist
+        case title
+        case time
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        artist = try c.decodeIfPresent(String.self, forKey: .artist) ?? ""
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        if let t = try? c.decode(Int.self, forKey: .time) {
+            time = t
+        } else if let d = try? c.decode(Double.self, forKey: .time) {
+            time = Int(d.rounded())
+        } else if let s = try? c.decode(String.self, forKey: .time), let v = Int(s) {
+            time = v
+        } else {
+            time = 0
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(artist, forKey: .artist)
+        try c.encode(title, forKey: .title)
+        try c.encode(time, forKey: .time)
+    }
     
     var timeString: String {
         let minutes = time / 60

@@ -4,18 +4,18 @@
             "type": "lldb",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:ByteFMWrapper}",
+            "cwd": "${workspaceFolder:BiteFM}",
             "name": "Debug BiteFM",
-            "program": "${workspaceFolder:ByteFMWrapper}/.build/debug/BiteFM",
+            "program": "${workspaceFolder:BiteFM}/.build/debug/BiteFM",
             "preLaunchTask": "swift: Build Debug BiteFM"
         },
         {
             "type": "lldb",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:ByteFMWrapper}",
+            "cwd": "${workspaceFolder:BiteFM}",
             "name": "Release BiteFM",
-            "program": "${workspaceFolder:ByteFMWrapper}/.build/release/BiteFM",
+            "program": "${workspaceFolder:BiteFM}/.build/release/BiteFM",
             "preLaunchTask": "swift: Build Release BiteFM"
         }
     ]

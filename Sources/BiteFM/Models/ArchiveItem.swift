@@ -11,6 +11,8 @@ struct ArchiveItem: Codable, Identifiable {
     let terminID: Int
     let terminSlug: String
     let sendungSlug: String
+    /// Sendungs-ID (`id_sendung`) — gleiche ID wie in der Sendungsliste; für die REST-URL wird der Slug der Sendung benötigt (z. B. `bytefm-mixtape`).
+    let sendungID: Int?
     let datum: String
     let datumDe: String
     let startTime: String
@@ -26,6 +28,7 @@ struct ArchiveItem: Codable, Identifiable {
         case terminID
         case terminSlug
         case sendungSlug
+        case sendungID = "id_sendung"
         case datum
         case datumDe = "datum_de"
         case startTime
@@ -40,7 +43,11 @@ struct ArchiveItem: Codable, Identifiable {
         return untertitelSendung
     }
     
-    var detailURL: URL? {
-        URL(string: "https://www.byte.fm/api/v1/broadcasts/\(sendungSlug)/\(datumDe)/\(terminSlug)/")
+    /// Termin-Slug wie in der REST-API (ASCII-Bindestriche; typografische Striche aus `termin_slug` ersetzen).
+    var terminSlugForBroadcastAPI: String {
+        terminSlug
+            .replacingOccurrences(of: "\u{2013}", with: "-")
+            .replacingOccurrences(of: "\u{2014}", with: "-")
+            .replacingOccurrences(of: "\u{2212}", with: "-")
     }
 }

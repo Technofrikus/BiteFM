@@ -70,7 +70,20 @@ struct BroadcastSummary: Codable, Identifiable {
     }
     
     // Convert to ArchiveItem for reuse in existing views/player
-    func toArchiveItem(showTitle: String, showSlug: String) -> ArchiveItem {
+    func toArchiveItem(showTitle: String, showSlug: String, sendungID: Int? = nil) -> ArchiveItem {
+        let rawDate = date.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isoDatum: String
+        if rawDate.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
+            isoDatum = rawDate
+        } else {
+            let parts = rawDate.split(separator: ".")
+            if parts.count == 3,
+               let d = Int(parts[0]), let m = Int(parts[1]), let y = Int(parts[2]) {
+                isoDatum = String(format: "%04d-%02d-%02d", y, m, d)
+            } else {
+                isoDatum = ""
+            }
+        }
         return ArchiveItem(
             audioFile1: "", // Will be filled from detail if needed, or we need another way
             audioFile2: "",
@@ -80,7 +93,8 @@ struct BroadcastSummary: Codable, Identifiable {
             terminID: id,
             terminSlug: slug,
             sendungSlug: showSlug,
-            datum: "", // We only have date as "06.08.2025"
+            sendungID: sendungID,
+            datum: isoDatum,
             datumDe: date,
             startTime: "",
             endTime: "",

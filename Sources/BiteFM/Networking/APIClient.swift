@@ -575,6 +575,7 @@ class APIClient: ObservableObject {
                 existing.untertitelSendung = item.untertitelSendung
                 existing.terminSlug = item.terminSlug
                 existing.sendungSlug = item.sendungSlug
+                existing.sendungID = item.sendungID
                 existing.datum = item.datum
                 existing.datumDe = item.datumDe
                 existing.startTime = item.startTime
@@ -682,13 +683,18 @@ class APIClient: ObservableObject {
             return cached
         }
         
-        guard let url = item.detailURL else { return nil }
+        guard let url = makeBroadcastDetailURL(for: item) else {
+            LogManager.shared.log(
+                "Broadcast detail: keine URL (datum_de leer?) terminID=\(item.terminID) datum_de=\(item.datumDe) sendung=\(item.sendungSlug) terminSlug=\(item.terminSlug)",
+                type: .error
+            )
+            return nil
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
         
-        // Add Basic Auth if we have credentials
         if let username = UserDefaults.standard.string(forKey: "savedUsername"),
            let password = KeychainHelper.readPassword(account: username) {
             let authString = "\(username):\(password)"
@@ -699,13 +705,49 @@ class APIClient: ObservableObject {
         }
         
         do {
-            let (data, _) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            guard (200...299).contains(status) else {
+                let preview = String(data: data.prefix(400), encoding: .utf8) ?? ""
+                LogManager.shared.log(
+                    "Broadcast detail HTTP \(status) for \(url.absoluteString) preview=\(preview.prefix(200))",
+                    type: .error
+                )
+                return nil
+            }
             let detail = try JSONDecoder().decode(BroadcastDetail.self, from: data)
             broadcastDetailsCache[item.id] = detail
             return detail
         } catch {
-            LogManager.shared.log("Failed to fetch broadcast detail: \(error)", type: .error)
+            LogManager.shared.log("Failed to fetch/decode broadcast detail for \(url.absoluteString): \(error)", type: .error)
             return nil
         }
+    }
+    
+    /// `GET /api/v1/broadcasts/{sendung_slug}/{datum_de}/{termin_slug}/?listen=no` — erster Pfadsegment = Slug der **Sendung** (wie in der Sendungsliste), nicht immer gleich `sendung_slug` aus dem Archiv-JSON.
+    private func makeBroadcastDetailURL(for item: ArchiveItem) -> URL? {
+        let dateSegment = item.datumDe.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !dateSegment.isEmpty else { return nil }
+        let showSegment = restShowSlugForBroadcastDetailAPI(for: item)
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "www.byte.fm"
+        components.path = "/api/v1/broadcasts/\(showSegment)/\(dateSegment)/\(item.terminSlugForBroadcastAPI)/"
+        components.queryItems = [URLQueryItem(name: "listen", value: "no")]
+        return components.url
+    }
+    
+    /// Slug der Sendung für die REST-URL: über `id_sendung` oder Titelabgleich mit der geladenen Sendungsliste, sonst `sendung_slug` aus dem Archiv.
+    private func restShowSlugForBroadcastDetailAPI(for item: ArchiveItem) -> String {
+        if let sid = item.sendungID,
+           let show = shows.first(where: { $0.id == sid }) {
+            return show.slug
+        }
+        let title = item.sendungTitel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty,
+           let show = shows.first(where: { $0.titel.caseInsensitiveCompare(title) == .orderedSame }) {
+            return show.slug
+        }
+        return item.sendungSlug
     }
 }

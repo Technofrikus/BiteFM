@@ -32,6 +32,12 @@ class AudioPlayerManager: NSObject, ObservableObject {
     private var lastUpdatedSongId: String?
     private var lastSavedPosition: Double = 0
     
+    /// Wenn die gespeicherte Position im letzten Intervall liegt, sonst startet Wiedergabe „am Ende“ ohne Ton.
+    private let nearEndPlaybackThreshold: Double = 5.0
+    
+    /// Nur in diesem Fall Position am Ende auf Anfang setzen (nicht bei explizitem `initialPosition`, z. B. Playlist).
+    private var resumeWasFromSavedPositionOnly = false
+    
     override init() {
         super.init()
         setupAudioSession()
@@ -74,6 +80,11 @@ class AudioPlayerManager: NSObject, ObservableObject {
     private func savePlaybackPosition() {
         guard let item = currentItem, !isLive, let container = modelContainer else { return }
         let currentPos = currentTime
+        
+        if duration > 0, currentPos >= duration - nearEndPlaybackThreshold {
+            clearStoredPlaybackPosition(for: item.terminID)
+            return
+        }
         
         // Only save if position changed significantly (more than 1 second)
         guard abs(currentPos - lastSavedPosition) > 1.0 else { return }
@@ -132,6 +143,7 @@ class AudioPlayerManager: NSObject, ObservableObject {
         isLive = false
         currentStreamType = nil
         lastUpdatedSongId = nil
+        resumeWasFromSavedPositionOnly = false
         hasMarkedCurrentItemAsPlayed = lastMarkedTerminID == item.terminID
         
         // Save previous item's position if any
@@ -165,6 +177,7 @@ class AudioPlayerManager: NSObject, ObservableObject {
                                 startAt = initialPosition
                             } else {
                                 startAt = await self.loadPlaybackPosition(for: item.terminID) ?? 0
+                                self.resumeWasFromSavedPositionOnly = true
                             }
                             
                             self.play(url: url, startAt: startAt)
@@ -192,6 +205,7 @@ class AudioPlayerManager: NSObject, ObservableObject {
                 startAt = initialPosition
             } else {
                 startAt = await self.loadPlaybackPosition(for: item.terminID) ?? 0
+                self.resumeWasFromSavedPositionOnly = true
             }
             
             self.play(url: url, startAt: startAt)
@@ -280,8 +294,18 @@ class AudioPlayerManager: NSObject, ObservableObject {
         } else if keyPath == "duration", let item = object as? AVPlayerItem {
             DispatchQueue.main.async {
                 let durationSeconds = item.duration.seconds
-                if durationSeconds.isFinite {
+                if durationSeconds.isFinite, durationSeconds > 0 {
                     self.duration = durationSeconds
+                    if !self.isLive, self.currentItem != nil, self.resumeWasFromSavedPositionOnly {
+                        let t = self.player?.currentTime().seconds ?? self.currentTime
+                        if t >= durationSeconds - self.nearEndPlaybackThreshold {
+                            if let terminID = self.currentItem?.terminID {
+                                self.clearStoredPlaybackPosition(for: terminID)
+                            }
+                            self.resumeWasFromSavedPositionOnly = false
+                            self.seek(to: 0)
+                        }
+                    }
                 }
             }
         }
@@ -438,22 +462,22 @@ class AudioPlayerManager: NSObject, ObservableObject {
     }
     
     @objc private func handlePlaybackEnded(notification: Notification) {
-        // Clear saved position when finished
-        guard let item = currentItem, !isLive, let container = modelContainer else { return }
-        let terminID = item.terminID
+        guard let item = currentItem, !isLive else { return }
+        clearStoredPlaybackPosition(for: item.terminID)
+    }
+    
+    private func clearStoredPlaybackPosition(for terminID: Int) {
+        guard let container = modelContainer else { return }
         let context = ModelContext(container)
-        
-        Task {
-            do {
-                let descriptor = FetchDescriptor<StoredPlaybackPosition>(predicate: #Predicate<StoredPlaybackPosition> { $0.terminID == terminID })
-                if let existing = try context.fetch(descriptor).first {
-                    context.delete(existing)
-                    try context.save()
-                    lastSavedPosition = 0
-                }
-            } catch {
-                // Silently fail
+        do {
+            let descriptor = FetchDescriptor<StoredPlaybackPosition>(predicate: #Predicate<StoredPlaybackPosition> { $0.terminID == terminID })
+            if let existing = try context.fetch(descriptor).first {
+                context.delete(existing)
+                try context.save()
             }
+            lastSavedPosition = 0
+        } catch {
+            // Silently fail
         }
     }
     

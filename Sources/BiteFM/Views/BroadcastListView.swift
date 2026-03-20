@@ -24,7 +24,7 @@ struct BroadcastListView: View {
         ZStack {
             List {
                 ForEach(filteredBroadcasts) { broadcast in
-                    let item = broadcast.toArchiveItem(showTitle: show.titel, showSlug: show.slug)
+                    let item = broadcast.toArchiveItem(showTitle: show.titel, showSlug: show.slug, sendungID: show.id)
                     BroadcastRow(
                         item: item,
                         showShowTitle: false,

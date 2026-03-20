@@ -11,6 +11,7 @@ final class StoredArchiveItem {
     var untertitelSendung: String
     var terminSlug: String
     var sendungSlug: String
+    var sendungID: Int?
     var datum: String
     var datumDe: String
     var startTime: String
@@ -28,6 +29,7 @@ final class StoredArchiveItem {
         self.untertitelSendung = item.untertitelSendung
         self.terminSlug = item.terminSlug
         self.sendungSlug = item.sendungSlug
+        self.sendungID = item.sendungID
         self.datum = item.datum
         self.datumDe = item.datumDe
         self.startTime = item.startTime
@@ -57,6 +59,7 @@ final class StoredArchiveItem {
             terminID: terminID,
             terminSlug: terminSlug,
             sendungSlug: sendungSlug,
+            sendungID: sendungID,
             datum: datum,
             datumDe: datumDe,
             startTime: startTime,

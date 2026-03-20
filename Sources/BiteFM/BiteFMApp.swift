@@ -3,6 +3,10 @@ import SwiftData
 
 @main
 struct BiteFMApp: App {
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
+    #endif
+    
     @StateObject private var apiClient = APIClient.shared
     @StateObject private var audioPlayerManager = AudioPlayerManager.shared
     
@@ -41,6 +45,11 @@ struct BiteFMApp: App {
             LogManager.shared.log("CRITICAL ERROR: Could not initialize ModelContainer: \(error)", type: .error)
             fatalError("Could not initialize ModelContainer")
         }
+        
+        #if os(macOS)
+        MacSpacePlaybackKeyMonitor.install()
+        MacPlaybackGlobalHotkey.install()
+        #endif
     }
 
     var body: some Scene {

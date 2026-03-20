@@ -71,7 +71,7 @@ struct BroadcastDetailView: View {
                                     Text("Beschreibung")
                                         .font(.headline)
                                     
-                                    Text(detail.showDescription.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression))
+                                    Text(detail.showDescription.htmlFragmentPlainText)
                                         .font(.body)
                                         .lineSpacing(2)
                                 }
@@ -100,47 +100,12 @@ struct BroadcastDetailView: View {
                                                     }
                                                 }()
                                                 
-                                                HStack(alignment: .top) {
-                                                    Text(song.timeString)
-                                                        .font(.caption2)
-                                                        .foregroundColor(isCurrentSong ? .accentColor : .secondary)
-                                                        .monospacedDigit()
-                                                        .frame(width: 35, alignment: .leading)
-                                                        .padding(.top, 2)
-                                                    
-                                                    VStack(alignment: .leading, spacing: 2) {
-                                                        Text(song.title)
-                                                            .font(.subheadline)
-                                                            .fontWeight(isCurrentSong ? .bold : .medium)
-                                                            .foregroundColor(isCurrentSong ? .accentColor : .primary)
-                                                        Text(song.artist)
-                                                            .font(.caption)
-                                                            .foregroundColor(isCurrentSong ? .accentColor.opacity(0.8) : .secondary)
-                                                    }
-                                                    
-                                                    Spacer()
-                                                    
-                                                    if isCurrentSong {
-                                                        Image(systemName: "play.circle.fill")
-                                                            .foregroundColor(.accentColor)
-                                                            .font(.caption)
-                                                            .padding(.top, 4)
-                                                    }
-                                                }
-                                                .padding(.vertical, 6)
-                                                .padding(.horizontal, 8)
-                                                .background(isCurrentSong ? Color.accentColor.opacity(0.1) : Color.clear)
-                                                .cornerRadius(4)
-                                                .contentShape(Rectangle())
-                                                .onTapGesture {
-                                                    // If we are already playing this item, just seek
-                                                    if playerManager.currentItem?.id == item.id {
-                                                        playerManager.seek(to: Double(song.time))
-                                                    } else {
-                                                        // Start playback from the specific song time
-                                                        playerManager.play(item: item, playlist: playlist, initialPosition: Double(song.time))
-                                                    }
-                                                }
+                                                BroadcastPlaylistSongRow(
+                                                    song: song,
+                                                    isCurrentSong: isCurrentSong,
+                                                    archiveItem: item,
+                                                    playlist: playlist
+                                                )
                                                 
                                                 if song.id != playlist.last?.id {
                                                     Divider().opacity(0.5)
@@ -155,6 +120,7 @@ struct BroadcastDetailView: View {
                             }
                             .padding()
                 }
+                .textSelection(.enabled)
             } else {
                 Text("Details konnten nicht geladen werden.")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -164,6 +130,72 @@ struct BroadcastDetailView: View {
             isLoading = true
             detail = await apiClient.fetchBroadcastDetail(for: item)
             isLoading = false
+        }
+    }
+}
+
+// MARK: - Playlist row
+// Textauswahl und Tap auf dieselbe Fläche schließen sich in SwiftUI aus; deshalb: eigene Play-Taste
+// (klar erkennbar) + Kontextmenü auf dem Songtext als zweiter Weg zum Abspielen.
+
+private struct BroadcastPlaylistSongRow: View {
+    let song: PlaylistItem
+    let isCurrentSong: Bool
+    let archiveItem: ArchiveItem
+    let playlist: [PlaylistItem]
+    
+    @EnvironmentObject private var playerManager: AudioPlayerManager
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button(action: playFromSong) {
+                Image(systemName: "play.circle.fill")
+                    .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(isCurrentSong ? Color.accentColor : Color.secondary)
+                    .accessibilityLabel("An dieser Stelle abspielen")
+            }
+            .buttonStyle(.plain)
+            .help("An dieser Stelle abspielen")
+            .frame(width: 28, alignment: .center)
+            
+            Text(song.timeString)
+                .font(.caption2)
+                .foregroundColor(isCurrentSong ? .accentColor : .secondary)
+                .monospacedDigit()
+                .frame(width: 38, alignment: .leading)
+                .padding(.top, 4)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(song.title)
+                    .font(.subheadline)
+                    .fontWeight(isCurrentSong ? .bold : .medium)
+                    .foregroundColor(isCurrentSong ? .accentColor : .primary)
+                Text(song.artist)
+                    .font(.caption)
+                    .foregroundColor(isCurrentSong ? .accentColor.opacity(0.8) : .secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .textSelection(.enabled)
+            .contextMenu {
+                Button {
+                    playFromSong()
+                } label: {
+                    Label("Von hier abspielen", systemImage: "play.circle")
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(isCurrentSong ? Color.accentColor.opacity(0.1) : Color.clear)
+        .cornerRadius(4)
+    }
+    
+    private func playFromSong() {
+        if playerManager.currentItem?.id == archiveItem.id {
+            playerManager.seek(to: Double(song.time))
+        } else {
+            playerManager.play(item: archiveItem, playlist: playlist, initialPosition: Double(song.time))
         }
     }
 }
