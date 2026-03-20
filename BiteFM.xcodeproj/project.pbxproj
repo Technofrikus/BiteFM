@@ -29,6 +29,7 @@
 		A8C308DF4882003D31A5F5FB /* BiteFMApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0279916C527C3CCC2EAEB46D /* BiteFMApp.swift */; };
 		B1830EA2F1C659C1B33A15B1 /* BroadcastDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7738AA3922BE150B8C800E08 /* BroadcastDetail.swift */; };
 		BDA28ABCDA810DFF2C667CC4 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BC17A6B81F8330C5B74395 /* String+Extensions.swift */; };
+		E8F1A2B3C4D5E6F708192A3B4C5D6E7FA /* ArchiveSectionHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F1A2B3C4D5E6F708192A3B4C5D6E7F9 /* ArchiveSectionHelpers.swift */; };
 		A8C4E2103F5B6D7E8091A2B3D /* MacSpacePlaybackKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C4E2103F5B6D7E8091A2B3C /* MacSpacePlaybackKeyMonitor.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* MacAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6D7D /* MacAppDelegate.swift */; };
 		D4E5F60718293A4B5C6D7E8F /* MacPlaybackGlobalHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8E /* MacPlaybackGlobalHotkey.swift */; };
@@ -69,6 +70,7 @@
 		E0E4E1B277E221051054138D /* ArchiveNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveNew.swift; sourceTree = "<group>"; };
 		E6A2AA19D015260A75E02B82 /* StoredPlaybackPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredPlaybackPosition.swift; sourceTree = "<group>"; };
 		F1BC17A6B81F8330C5B74395 /* String+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extensions.swift"; sourceTree = "<group>"; };
+		E8F1A2B3C4D5E6F708192A3B4C5D6E7F9 /* ArchiveSectionHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSectionHelpers.swift; sourceTree = "<group>"; };
 		A8C4E2103F5B6D7E8091A2B3C /* MacSpacePlaybackKeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSpacePlaybackKeyMonitor.swift; sourceTree = "<group>"; };
 		C3D4E5F60718293A4B5C6D7D /* MacAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppDelegate.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8E /* MacPlaybackGlobalHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlaybackGlobalHotkey.swift; sourceTree = "<group>"; };
@@ -79,6 +81,7 @@
 		6F8AC4FCAFBC22C4457BBD44 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				E8F1A2B3C4D5E6F708192A3B4C5D6E7F9 /* ArchiveSectionHelpers.swift */,
 				A8C4E2103F5B6D7E8091A2B3C /* MacSpacePlaybackKeyMonitor.swift */,
 				D4E5F60718293A4B5C6D7E8E /* MacPlaybackGlobalHotkey.swift */,
 				F1BC17A6B81F8330C5B74395 /* String+Extensions.swift */,
@@ -266,6 +269,7 @@
 				DF77B54CE27FA8CA7F9855A5 /* StoredPlaybackPosition.swift in Sources */,
 				3B95BE571354B84CA012F046 /* StoredShow.swift in Sources */,
 				BDA28ABCDA810DFF2C667CC4 /* String+Extensions.swift in Sources */,
+				E8F1A2B3C4D5E6F708192A3B4C5D6E7FA /* ArchiveSectionHelpers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

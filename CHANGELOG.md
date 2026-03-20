@@ -22,5 +22,12 @@
 - Sendungsliste: `toArchiveItem` übergibt `sendungID` für konsistente URLs.
 - Kein ISO-Datum im URL-Pfad (entfernt); robustere JSON-Dekodierung für Sendungsdetails bleibt erhalten.
 
+### Archiv-Navigation
+- **Neu im Archiv**: Liste nach **Kalendertag** in Abschnitte gegliedert; Überschriften „Heute / Gestern / Vorgestern“ jeweils mit Datum, ältere Tage mit Wochentag + Datum (`ArchiveSectionHelpers` + `ArchiveNew`).
+- **Archiv** (Sendungsliste): Gruppierung nach Anfangsbuchstabe; **#** (Ziffern & Sonstiges) zuerst, dann A–Z; **Indexstreifen** mit `#` oben; Inhalt als **ScrollView + VStack-Sektionen** (statt `List`), damit Sprungmarken zuverlässig scrollen (lazy `NSTableView` vermeiden).
+- Archiv-Sprung: **vertikale Elastizität** des Scrollviews wieder Standard (kein Abschalten mehr); nach `scrollTo` wird die **NSScrollView-Position auf den Inhalt begrenzt**, damit programmatisches Springen nicht kurz in den Gummiband-Bereich rutscht; zweiter `scrollTo`-Pass nach Layout (LazyVStack).
+- Archiv: Sprung zum Buchstaben wieder **animiert** (`easeInOut`); Hover im Index **ohne Layout-Animation** und feste Zeilenhöhe, damit die Sendungsliste beim Überfahren nicht mitwandert.
+- macOS: **Leertasten-Monitor** und **globaler Hotkey** werden in `applicationDidFinishLaunching` registriert (`MacAppDelegate`), nicht mehr in `BiteFMApp.init` (vermeidet fehlende Symbole / klarere Trennung).
+
 ### Projekt
-- Neue Dateien in Xcode-Target und ggf. `project.pbxproj` ergänzt (`MacSpacePlaybackKeyMonitor`, `MacPlaybackGlobalHotkey`, `MacAppDelegate`).
+- Neue Dateien in Xcode-Target und ggf. `project.pbxproj` ergänzt (`MacSpacePlaybackKeyMonitor`, `MacPlaybackGlobalHotkey`, `MacAppDelegate`, `ArchiveSectionHelpers`).

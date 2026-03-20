@@ -10,6 +10,12 @@ import AppKit
 
 /// Dock-Kontextmenü (Rechtsklick auf das Dock-Symbol): Wiedergabe steuern.
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MacSpacePlaybackKeyMonitor.install()
+        MacPlaybackGlobalHotkey.install()
+    }
+    
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         
