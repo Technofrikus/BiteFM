@@ -61,6 +61,9 @@ struct BroadcastRow: View {
             .opacity(apiClient.isPlayed(item: item) && !isPlaying ? 0.65 : 1.0)
             .onTapGesture {
                 playerManager.play(item: item)
+                if isInspectorPresented {
+                    selectedItemForDetail = item
+                }
             }
             
             // Separator line to visually separate areas
