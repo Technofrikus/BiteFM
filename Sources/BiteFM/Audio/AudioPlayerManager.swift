@@ -146,6 +146,10 @@ class AudioPlayerManager: NSObject, ObservableObject {
         resumeWasFromSavedPositionOnly = false
         hasMarkedCurrentItemAsPlayed = lastMarkedTerminID == item.terminID
         
+        Task {
+            await APIClient.shared.refreshListeningHistoryIfStale()
+        }
+        
         // Save previous item's position if any
         if let _ = currentItem {
             savePlaybackPosition()
@@ -238,13 +242,25 @@ class AudioPlayerManager: NSObject, ObservableObject {
             // it's enough to let the compiler know.
             Task { @MainActor in
                 guard let self = self else { return }
-                self.currentTime = time.seconds
+                let pos = time.seconds
+                guard pos.isFinite else { return }
+                self.currentTime = pos
                 
-                // Mark as played if we've listened for more than 15 seconds
+                // „Gehört“: Hörhistorie vom Server laden. Bedingung: Position > 15 s in der Datei
+                // (nicht „15 s lang angehört“), oder kurze Ausgaben (< 15 s Länge): nahe am Ende.
                 if !self.isLive, let item = self.currentItem, !self.hasMarkedCurrentItemAsPlayed {
-                    // Check if we've been playing for at least 15 seconds or are significantly through
-                    // (Handle cases where saved position starts at the very end, but usually 15s is good)
-                    if time.seconds > 15.0 {
+                    let dur: Double = {
+                        if self.duration > 0 { return self.duration }
+                        if let d = self.player?.currentItem?.duration.seconds, d.isFinite, d > 0 { return d }
+                        return 0
+                    }()
+                    let shouldMark: Bool
+                    if dur > 0, dur < 15 {
+                        shouldMark = pos >= dur - 1.0
+                    } else {
+                        shouldMark = pos > 15.0
+                    }
+                    if shouldMark {
                         self.hasMarkedCurrentItemAsPlayed = true
                         self.lastMarkedTerminID = item.terminID
                         Task {
@@ -421,7 +437,10 @@ class AudioPlayerManager: NSObject, ObservableObject {
             oldPlayer.removeObserver(self, forKeyPath: "status")
             oldPlayer.currentItem?.removeObserver(self, forKeyPath: "status")
             oldPlayer.currentItem?.removeObserver(self, forKeyPath: "duration")
-            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: oldPlayer.currentItem)
+            if let oldItem = oldPlayer.currentItem {
+                NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: oldItem)
+                NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: oldItem)
+            }
         }
         
         duration = 0 // Reset duration for new item
@@ -462,8 +481,14 @@ class AudioPlayerManager: NSObject, ObservableObject {
     }
     
     @objc private func handlePlaybackEnded(notification: Notification) {
-        guard let item = currentItem, !isLive else { return }
-        clearStoredPlaybackPosition(for: item.terminID)
+        Task { @MainActor in
+            guard let item = self.currentItem, !self.isLive else { return }
+            self.clearStoredPlaybackPosition(for: item.terminID)
+            self.hasMarkedCurrentItemAsPlayed = true
+            self.lastMarkedTerminID = item.terminID
+            // Hörhistorie vom Server laden — UI aktualisiert sich über `listenedShowIDs`.
+            await APIClient.shared.markAsPlayed(item: item)
+        }
     }
     
     private func clearStoredPlaybackPosition(for terminID: Int) {

@@ -23,6 +23,11 @@ class APIClient: ObservableObject {
     
     var modelContainer: ModelContainer?
     
+    /// Ab wann eine neue Historie-Abfrage beim Start der Wiedergabe sinnvoll ist (letzte erfolgreiche Abfrage älter als das).
+    private let listeningHistoryPlaybackStaleInterval: TimeInterval = 30 * 60
+    
+    private static let listeningHistoryLastSuccessKey = "listeningHistoryLastFetchSuccessAt"
+    
     private var broadcastDetailsCache: [Int: BroadcastDetail] = [:]
     private var pollingTask: Task<Void, Never>?
     private var archivePollingTask: Task<Void, Never>?
@@ -115,9 +120,30 @@ class APIClient: ObservableObject {
                     let context = modelContainer?.mainContext
                     await fetchHistory(modelContext: context)
                 }
-                try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000) // 30 minutes
+                try? await Task.sleep(nanoseconds: 3 * 60 * 60 * 1_000_000_000) // 3 hours
             }
         }
+    }
+    
+    private func dateOfLastListeningHistoryFetchSuccess() -> Date? {
+        let t = UserDefaults.standard.double(forKey: Self.listeningHistoryLastSuccessKey)
+        return t > 0 ? Date(timeIntervalSince1970: t) : nil
+    }
+    
+    private func recordListeningHistoryFetchSuccess() {
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.listeningHistoryLastSuccessKey)
+    }
+    
+    /// Ruft die Hörhistorie ab, wenn der Nutzer eingeloggt ist und die letzte erfolgreiche Abfrage älter als 30 Minuten ist (oder noch nie stattfand).
+    func refreshListeningHistoryIfStale() async {
+        guard isLoggedIn else { return }
+        let now = Date()
+        if let last = dateOfLastListeningHistoryFetchSuccess(),
+           now.timeIntervalSince(last) < listeningHistoryPlaybackStaleInterval {
+            return
+        }
+        let context = modelContainer?.mainContext
+        await fetchListeningHistory(modelContext: context)
     }
     
     // Helper to call fetchListeningHistory with correct naming
@@ -165,11 +191,10 @@ class APIClient: ObservableObject {
         return listenedShowIDs.contains(broadcastID)
     }
     
+    /// Lädt die Hörhistorie vom Server neu (`listeningHistoryEntries.php`). Die App sendet keinen eigenen „als gehört markieren“-Request;
+    /// `listenedShowIDs` spiegelt nur, was die API zurückgibt (`show_id` = Termin-ID der Ausgabe).
     func markAsPlayed(item: ArchiveItem) async {
-        // Here we could potentially call an API to mark it as played
-        // For now, we update local history and re-fetch from server to be in sync
-        // if the server actually records history upon playback starting.
-        LogManager.shared.log("Marking as played: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
+        LogManager.shared.log("Syncing listening history after play: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
         
         if let context = modelContainer.map({ ModelContext($0) }) {
             await fetchListeningHistory(modelContext: context)
@@ -245,6 +270,7 @@ class APIClient: ObservableObject {
                         
                         let ids = Set(historyResponse.data.map { $0.showID })
                         self.listenedShowIDs = ids
+                        self.recordListeningHistoryFetchSuccess()
                         
                         if let context = modelContext {
                             try await syncListeningHistoryWithDatabase(items: historyResponse.data, context: context)
@@ -676,6 +702,7 @@ class APIClient: ObservableObject {
         favoriteShowFavoritedAt.removeAll()
         listenedShowIDs.removeAll()
         archiveItems.removeAll()
+        UserDefaults.standard.removeObject(forKey: Self.listeningHistoryLastSuccessKey)
         
         // Clear favorites and history from database
         if let container = modelContainer {
