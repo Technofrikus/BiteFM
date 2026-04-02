@@ -7,6 +7,8 @@ import AppKit
 
 struct BroadcastDetailView: View {
     let item: ArchiveItem
+    /// When embedded in Now Playing, the primary play banner is redundant (transport bar handles playback).
+    var showsPrimaryPlayAction: Bool = true
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @State private var detail: BroadcastDetail?
@@ -56,23 +58,24 @@ struct BroadcastDetailView: View {
                                 }
                                 .padding(.bottom, 8)
                                 
-                                // Play Button
-                                Button(action: {
-                                    playerManager.play(item: item, playlist: detail.recordings.first?.playlist)
-                                }) {
-                                    HStack {
-                                        Image(systemName: playerManager.currentItem?.id == item.id && playerManager.isPlaying ? "pause.fill" : "play.fill")
-                                        Text(playerManager.currentItem?.id == item.id && playerManager.isPlaying ? "Pause" : "Abspielen")
+                                if showsPrimaryPlayAction {
+                                    Button(action: {
+                                        playerManager.play(item: item, playlist: detail.recordings.first?.playlist)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: playerManager.currentItem?.id == item.id && playerManager.isPlaying ? "pause.fill" : "play.fill")
+                                            Text(playerManager.currentItem?.id == item.id && playerManager.isPlaying ? "Pause" : "Abspielen")
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(Color.accentColor)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(8)
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(Color.accentColor)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(8)
+                                    .buttonStyle(.plain)
+
+                                    Divider()
                                 }
-                                .buttonStyle(.plain)
-                                
-                                Divider()
                                 
                                 // Description
                                 VStack(alignment: .leading, spacing: 8) {

@@ -63,6 +63,7 @@ private struct InitialLoadingView: View {
 
 private struct LoggedInRootView: View {
     @EnvironmentObject private var apiClient: APIClient
+    @EnvironmentObject private var playerManager: AudioPlayerManager
 
     enum SidebarItem: Hashable {
         case live
@@ -85,6 +86,7 @@ private struct LoggedInRootView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var selectedTab: MainTab = .live
     @State private var logoutAlertPresented: Bool = false
+    @State private var isNowPlayingExpanded: Bool = false
 
     private var useCompactRoot: Bool {
         #if os(iOS)
@@ -103,8 +105,8 @@ private struct LoggedInRootView: View {
                 compactTabShell
             } else {
                 splitShell
+                PlayerBarView()
             }
-            PlayerBarView()
         }
         .alert("Abmelden?", isPresented: $logoutAlertPresented) {
             Button("Abbrechen", role: .cancel) {}
@@ -117,10 +119,97 @@ private struct LoggedInRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: APIClient.requestLogoutConfirmationNotification)) { _ in
             logoutAlertPresented = true
         }
+        .onChange(of: playerManager.currentItem?.id) { _, _ in
+            if playerManager.currentItem == nil && !playerManager.isLive {
+                isNowPlayingExpanded = false
+            }
+        }
+        .onChange(of: playerManager.isLive) { _, newValue in
+            if playerManager.currentItem == nil && !newValue {
+                isNowPlayingExpanded = false
+            }
+        }
     }
 
     /// Only mount the active tab to keep root-level subscribers lightweight on iPhone.
+    #if os(iOS)
+    @ViewBuilder
     private var compactTabShell: some View {
+        if #available(iOS 26.1, *) {
+            compactTabShellWithBottomAccessory
+        } else {
+            compactTabShellLegacyInset
+        }
+    }
+
+    /// iOS 26.1+: System-Tab-Bottom-Accessory (`tabViewBottomAccessory(isEnabled:)`) + Tab-Leisten-Minimizer — erst ab 26.1 im SDK mit Deployment Target 17 aufrufbar.
+    @available(iOS 26.1, *)
+    private var compactTabShellWithBottomAccessory: some View {
+        let miniActive = playerManager.currentItem != nil || playerManager.isLive
+        return TabView(selection: $selectedTab) {
+            Tab("Live", systemImage: "radio", value: MainTab.live) {
+                NavigationStack {
+                    Group {
+                        if selectedTab == .live {
+                            LiveView()
+                        }
+                    }
+                    .navigationTitle("Live")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+            }
+
+            Tab("Neu", systemImage: "clock", value: MainTab.archiveNew) {
+                NavigationStack {
+                    Group {
+                        if selectedTab == .archiveNew {
+                            ArchiveNew()
+                        }
+                    }
+                    .navigationTitle("Neu im Archiv")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+            }
+
+            Tab("Archiv", systemImage: "archivebox", value: MainTab.archive) {
+                NavigationStack {
+                    Group {
+                        if selectedTab == .archive {
+                            ArchiveView()
+                        }
+                    }
+                }
+            }
+
+            Tab("Favoriten", systemImage: "heart.fill", value: MainTab.favorites) {
+                NavigationStack {
+                    Group {
+                        if selectedTab == .favorites {
+                            FavoritesHubView()
+                        }
+                    }
+                    .navigationTitle("Favoriten")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+            }
+        }
+        .tabBarMinimizeBehavior(.automatic)
+        .tabViewBottomAccessory(isEnabled: miniActive) {
+            MiniPlayerBarView(onExpand: {
+                isNowPlayingExpanded = true
+            }, chrome: .tabAccessory)
+            .environmentObject(playerManager)
+        }
+        .sheet(isPresented: $isNowPlayingExpanded) {
+            ExpandedNowPlayingView()
+                .environmentObject(apiClient)
+                .environmentObject(playerManager)
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    /// iOS 17–26.0: `safeAreaInset` + klassische `tabItem`-Tabs (kein `tabViewBottomAccessory` im SDK bei älteren OS).
+    private var compactTabShellLegacyInset: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
                 Group {
@@ -129,9 +218,7 @@ private struct LoggedInRootView: View {
                     }
                 }
                 .navigationTitle("Live")
-                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
-                #endif
             }
             .tabItem { Label("Live", systemImage: "radio") }
             .tag(MainTab.live)
@@ -143,14 +230,11 @@ private struct LoggedInRootView: View {
                     }
                 }
                 .navigationTitle("Neu im Archiv")
-                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
-                #endif
             }
             .tabItem { Label("Neu", systemImage: "clock") }
             .tag(MainTab.archiveNew)
 
-            // Same container as other tabs: a bare Group breaks tab registration on iOS.
             NavigationStack {
                 Group {
                     if selectedTab == .archive {
@@ -168,14 +252,30 @@ private struct LoggedInRootView: View {
                     }
                 }
                 .navigationTitle("Favoriten")
-                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
-                #endif
             }
             .tabItem { Label("Favoriten", systemImage: "heart.fill") }
             .tag(MainTab.favorites)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if playerManager.currentItem != nil || playerManager.isLive {
+                MiniPlayerBarView(onExpand: {
+                    isNowPlayingExpanded = true
+                }, chrome: .safeAreaInsetRow)
+            }
+        }
+        .sheet(isPresented: $isNowPlayingExpanded) {
+            ExpandedNowPlayingView()
+                .environmentObject(apiClient)
+                .environmentObject(playerManager)
+                .presentationDragIndicator(.visible)
+        }
     }
+    #else
+    private var compactTabShell: some View {
+        EmptyView()
+    }
+    #endif
 
     private var splitShell: some View {
         VStack(spacing: 0) {
