@@ -476,7 +476,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         var nowPlayingInfo = [String: Any]()
         
         let tracks = metadata?.tracks[streamType.rawValue] ?? []
-        let currentTrack = tracks.first?.unescapedHTML ?? streamType.displayName
+        let currentTrack = tracks.first?.decodedBasicHTMLEntities ?? streamType.displayName
         let currentShow = metadata?.currentShowTitle[streamType.rawValue] ?? "BiteFM Live"
         
         nowPlayingInfo[MPMediaItemPropertyTitle] = currentTrack

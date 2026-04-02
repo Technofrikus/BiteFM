@@ -1009,7 +1009,10 @@ public class APIClient: ObservableObject {
                 )
                 return nil
             }
-            let detail = try JSONDecoder().decode(BroadcastDetail.self, from: data)
+            // Decode off the MainActor so große JSON-Antworten die UI nicht blockieren.
+            let detail = try await Task.detached(priority: .userInitiated) {
+                try JSONDecoder().decode(BroadcastDetail.self, from: data)
+            }.value
             broadcastDetailsCache[item.id] = detail
             return detail
         } catch {

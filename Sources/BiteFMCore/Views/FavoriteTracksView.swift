@@ -17,35 +17,44 @@ struct FavoriteTracksView: View {
     @State private var loadingTimeoutTask: Task<Void, Never>?
     
     var body: some View {
-        NavigationStack {
-            Group {
-                if apiClient.favoriteTrackItems.isEmpty {
-                    ContentUnavailableView(
-                        "Keine Track-Favoriten",
-                        systemImage: "music.note",
-                        description: Text("Favorisierte Tracks erscheinen hier, sobald du welche auf byte.fm speicherst.")
-                    )
-                } else {
-                    List {
-                        ForEach(apiClient.favoriteTrackItems, id: \.id) { entry in
-                            favoriteTrackRow(entry: entry)
-                        }
+        #if os(macOS)
+        NavigationStack { tracksContent }
+        #else
+        tracksContent
+        #endif
+    }
+
+    private var tracksContent: some View {
+        Group {
+            if apiClient.favoriteTrackItems.isEmpty {
+                ContentUnavailableView(
+                    "Keine Track-Favoriten",
+                    systemImage: "music.note",
+                    description: Text("Favorisierte Tracks erscheinen hier, sobald du welche auf byte.fm speicherst.")
+                )
+            } else {
+                List {
+                    ForEach(apiClient.favoriteTrackItems, id: \.id) { entry in
+                        favoriteTrackRow(entry: entry)
                     }
                 }
             }
-            .navigationTitle("Favoriten: Tracks")
-            .onChange(of: playerManager.currentItem?.id) { _, newID in
-                guard let tid = loadingTerminID, newID == tid else { return }
-                loadingTerminID = nil
-                loadingTimeoutTask?.cancel()
-                loadingTimeoutTask = nil
-            }
-            .refreshable {
-                if let ctx = apiClient.modelContainer?.mainContext {
-                    await apiClient.fetchFavorites(modelContext: ctx)
-                } else {
-                    await apiClient.fetchFavorites()
-                }
+        }
+        .navigationTitle("Favoriten: Tracks")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .onChange(of: playerManager.currentItem?.id) { _, newID in
+            guard let tid = loadingTerminID, newID == tid else { return }
+            loadingTerminID = nil
+            loadingTimeoutTask?.cancel()
+            loadingTimeoutTask = nil
+        }
+        .refreshable {
+            if let ctx = apiClient.modelContainer?.mainContext {
+                await apiClient.fetchFavorites(modelContext: ctx)
+            } else {
+                await apiClient.fetchFavorites()
             }
         }
     }

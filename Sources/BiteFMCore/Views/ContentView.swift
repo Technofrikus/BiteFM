@@ -129,6 +129,9 @@ private struct LoggedInRootView: View {
                     }
                 }
                 .navigationTitle("Live")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             }
             .tabItem { Label("Live", systemImage: "radio") }
             .tag(MainTab.live)
@@ -140,17 +143,20 @@ private struct LoggedInRootView: View {
                     }
                 }
                 .navigationTitle("Neu im Archiv")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             }
             .tabItem { Label("Neu", systemImage: "clock") }
             .tag(MainTab.archiveNew)
 
+            // Same container as other tabs: a bare Group breaks tab registration on iOS.
             NavigationStack {
                 Group {
                     if selectedTab == .archive {
                         ArchiveView()
                     }
                 }
-                .navigationTitle("Archiv")
             }
             .tabItem { Label("Archiv", systemImage: "archivebox") }
             .tag(MainTab.archive)
@@ -162,6 +168,9 @@ private struct LoggedInRootView: View {
                     }
                 }
                 .navigationTitle("Favoriten")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             }
             .tabItem { Label("Favoriten", systemImage: "heart.fill") }
             .tag(MainTab.favorites)

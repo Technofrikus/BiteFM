@@ -82,12 +82,14 @@ struct ArchiveNew: View {
                     }
                     .help(hidePlayed ? "Alle Sendungen anzeigen" : "Gehörte Sendungen ausblenden")
 
+                    #if os(macOS)
                     Button(action: {
                         isInspectorPresented.toggle()
                     }) {
                         Label("Details anzeigen", systemImage: "sidebar.right")
                     }
                     .help("Info ein-/ausblenden")
+                    #endif
                 }
             }
         }

@@ -17,6 +17,24 @@
             "name": "Release BiteFM",
             "program": "${workspaceFolder:BiteFM}/.build/release/BiteFM",
             "preLaunchTask": "swift: Build Release BiteFM"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BiteFM}",
+            "name": "Debug BiteFMMac",
+            "program": "${workspaceFolder:BiteFM}/.build/debug/BiteFMMac",
+            "preLaunchTask": "swift: Build Debug BiteFMMac"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BiteFM}",
+            "name": "Release BiteFMMac",
+            "program": "${workspaceFolder:BiteFM}/.build/release/BiteFMMac",
+            "preLaunchTask": "swift: Build Release BiteFMMac"
         }
     ]
 }

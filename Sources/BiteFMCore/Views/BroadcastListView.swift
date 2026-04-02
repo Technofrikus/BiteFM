@@ -114,13 +114,15 @@ struct BroadcastListView: View {
                               systemImage: hidePlayed ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
                     .help(hidePlayed ? "Alle Sendungen anzeigen" : "Gehörte Sendungen ausblenden")
-                    
+
+                    #if os(macOS)
                     Button(action: {
                         isInspectorPresented.toggle()
                     }) {
                         Label("Details anzeigen", systemImage: "sidebar.right")
                     }
                     .help("Info ein-/ausblenden")
+                    #endif
                 }
             }
         }

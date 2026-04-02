@@ -41,73 +41,82 @@ struct FavoriteEpisodesView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            Group {
-                if apiClient.favoriteShowItems.isEmpty {
-                    ContentUnavailableView(
-                        "Keine Ausgaben-Favoriten",
-                        systemImage: "heart.text.square",
-                        description: Text("Favorisierte Einzel-Ausgaben erscheinen hier, sobald du welche auf byte.fm speicherst.")
-                    )
-                } else {
-                    List {
-                        ForEach(sortedEpisodes, id: \.id) { entry in
-                            let item = entry.toArchiveItem()
-                            BroadcastRow(
-                                item: item,
-                                showShowTitle: false,
-                                showHeart: true,
-                                onFavoriteTap: apiClient.isLoggedIn
-                                    ? { Task { await apiClient.toggleFavoriteEpisode(showID: entry.show.id) } }
-                                    : nil,
-                                selectedItemForDetail: $selectedItemForDetail,
-                                isInspectorPresented: $isInspectorPresented
-                            )
-                        }
+        #if os(macOS)
+        NavigationStack { episodesContent }
+        #else
+        episodesContent
+        #endif
+    }
+
+    private var episodesContent: some View {
+        Group {
+            if apiClient.favoriteShowItems.isEmpty {
+                ContentUnavailableView(
+                    "Keine Ausgaben-Favoriten",
+                    systemImage: "heart.text.square",
+                    description: Text("Favorisierte Einzel-Ausgaben erscheinen hier, sobald du welche auf byte.fm speicherst.")
+                )
+            } else {
+                List {
+                    ForEach(sortedEpisodes, id: \.id) { entry in
+                        let item = entry.toArchiveItem()
+                        BroadcastRow(
+                            item: item,
+                            showShowTitle: false,
+                            showHeart: true,
+                            onFavoriteTap: apiClient.isLoggedIn
+                                ? { Task { await apiClient.toggleFavoriteEpisode(showID: entry.show.id) } }
+                                : nil,
+                            selectedItemForDetail: $selectedItemForDetail,
+                            isInspectorPresented: $isInspectorPresented
+                        )
                     }
                 }
             }
-            .navigationTitle("Favoriten: Ausgaben")
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    if horizontalSizeClass == .compact {
-                        Menu {
-                            Picker("Sortierung", selection: $sortMode) {
-                                ForEach(SortMode.allCases, id: \.self) { mode in
-                                    Text(mode.rawValue).tag(mode)
-                                }
-                            }
-                        } label: {
-                            Label("Sortierung: \(sortMode.rawValue)", systemImage: "arrow.up.arrow.down.circle")
-                        }
-                    } else {
+        }
+        .navigationTitle("Favoriten: Ausgaben")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                if horizontalSizeClass == .compact {
+                    Menu {
                         Picker("Sortierung", selection: $sortMode) {
                             ForEach(SortMode.allCases, id: \.self) { mode in
                                 Text(mode.rawValue).tag(mode)
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 420)
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isInspectorPresented.toggle()
                     } label: {
-                        Label("Details anzeigen", systemImage: "sidebar.right")
+                        Label("Sortierung: \(sortMode.rawValue)", systemImage: "arrow.up.arrow.down.circle")
                     }
-                    #if os(macOS)
-                    .help("Info ein-/ausblenden")
-                    #endif
+                } else {
+                    Picker("Sortierung", selection: $sortMode) {
+                        ForEach(SortMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 420)
                 }
             }
-            .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
-            .refreshable {
-                if let ctx = apiClient.modelContainer?.mainContext {
-                    await apiClient.fetchFavorites(modelContext: ctx)
-                } else {
-                    await apiClient.fetchFavorites()
+            #if os(macOS)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isInspectorPresented.toggle()
+                } label: {
+                    Label("Details anzeigen", systemImage: "sidebar.right")
                 }
+                .help("Info ein-/ausblenden")
+            }
+            #endif
+        }
+        .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
+        .refreshable {
+            if let ctx = apiClient.modelContainer?.mainContext {
+                await apiClient.fetchFavorites(modelContext: ctx)
+            } else {
+                await apiClient.fetchFavorites()
             }
         }
     }

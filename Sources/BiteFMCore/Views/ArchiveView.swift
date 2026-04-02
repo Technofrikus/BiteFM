@@ -86,6 +86,9 @@ struct ArchiveView: View {
                     }
                 }
                 .navigationTitle("Archiv")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .searchable(text: $searchText, prompt: "Sendung suchen...")
                 .task {
                     if apiClient.shows.isEmpty {

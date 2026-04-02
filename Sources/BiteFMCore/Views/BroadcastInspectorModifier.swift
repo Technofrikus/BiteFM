@@ -3,6 +3,40 @@ import SwiftUI
 import AppKit
 #endif
 
+/// iPhone: Sheet wird über `selectedItem` gesteuert (`sheet(item:)`), damit SwiftUI die `ArchiveItem`-Identität
+/// nicht verliert (vermeidet „Keine Sendung ausgewählt“ bei schnellem Tippen). Schließen: Zieh-Indikator + „Fertig“ unten;
+/// der Scroll der `BroadcastDetailView` koordiniert iOS mit dem Sheet (Zieh greift, wenn der Inhalt oben ist).
+private struct BroadcastDetailSheetContainer: View {
+    let item: ArchiveItem
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            BroadcastDetailView(item: item)
+                .navigationTitle("Details")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    #if os(iOS)
+                    ToolbarItem(placement: .bottomBar) {
+                        Button("Fertig") {
+                            dismiss()
+                        }
+                        .font(.body.weight(.semibold))
+                    }
+                    #else
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Schließen") {
+                            dismiss()
+                        }
+                    }
+                    #endif
+                }
+        }
+    }
+}
+
 struct BroadcastInspectorModifier: ViewModifier {
     @Binding var isPresented: Bool
     @Binding var selectedItem: ArchiveItem?
@@ -12,26 +46,18 @@ struct BroadcastInspectorModifier: ViewModifier {
         Group {
             if horizontalSizeClass == .compact {
                 content
-                    .sheet(isPresented: $isPresented) {
-                        NavigationStack {
-                            Group {
-                                if let item = selectedItem {
-                                    BroadcastDetailView(item: item)
-                                        .navigationTitle("Details")
-                                        #if os(iOS)
-                                        .navigationBarTitleDisplayMode(.inline)
-                                        #endif
-                                } else {
-                                    ContentUnavailableView("Keine Sendung ausgewählt", systemImage: "info.circle")
-                                }
-                            }
-                            .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
-                                    Button("Schließen") {
-                                        isPresented = false
-                                    }
-                                }
-                            }
+                    .sheet(item: $selectedItem) { item in
+                        BroadcastDetailSheetContainer(item: item)
+                            #if os(iOS)
+                            .presentationDragIndicator(.visible)
+                            #endif
+                    }
+                    .onChange(of: selectedItem?.id) { _, newValue in
+                        isPresented = newValue != nil
+                    }
+                    .onChange(of: isPresented) { _, newValue in
+                        if !newValue {
+                            selectedItem = nil
                         }
                     }
             } else {

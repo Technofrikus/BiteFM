@@ -25,56 +25,49 @@ struct BroadcastRow: View {
     var body: some View {
         Group {
             if isCompact {
-                compactLayout
+                HStack(alignment: .top, spacing: 10) {
+                    playbackTapArea
+                    detailInfoButton
+                }
             } else {
-                regularLayout
+                HStack(alignment: .top, spacing: 0) {
+                    playbackTapArea
+                    Divider()
+                        .frame(height: 28)
+                        .padding(.horizontal, 6)
+                    detailInfoButton
+                }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .background(isPlaying ? Color.accentColor.opacity(0.1) : Color.clear)
         .cornerRadius(8)
+        .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
     }
 
-    private var regularLayout: some View {
-        HStack(spacing: 0) {
-            playbackBlock
-            Divider()
-                .frame(height: 30)
-                .padding(.horizontal, 4)
-            detailAffordance
-        }
-    }
-
-    /// iPhone: vertical stack, full-width tap for play, explicit details button.
-    private var compactLayout: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            playbackBlock
-            HStack {
-                Spacer(minLength: 0)
-                compactDetailButton
-            }
-        }
-    }
-
-    private var playbackBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
+    /// Tappable column: play; if the inspector is open, keep selection in sync.
+    private var playbackTapArea: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .top, spacing: 6) {
                 heartControl
                 if !isPlaying && apiClient.isPlayed(item: item) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.secondary)
                         .font(.caption2)
+                        .padding(.top, 3)
                 }
                 Text(showShowTitle ? item.sendungTitel : item.subtitle)
                     .font(.headline)
                     .foregroundColor(isPlaying ? .accentColor : .primary)
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if showShowTitle {
                 Text(item.subtitle)
                     .font(.subheadline)
                     .foregroundColor(isPlaying ? .accentColor.opacity(0.8) : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("\(item.datumDe) \(item.startTime.isEmpty ? "" : "| \(item.startTime) - \(item.endTime)")")
                 .font(.caption)
@@ -91,6 +84,20 @@ struct BroadcastRow: View {
         }
     }
 
+    private var detailInfoButton: some View {
+        let isSelected = selectedItemForDetail?.id == item.id && isInspectorPresented
+        return Button(action: toggleDetailPresentation) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 18))
+                .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                .frame(width: 40, height: 40)
+                .background(isSelected ? Color.accentColor : Color.clear)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isSelected ? "Details schließen" : "Details")
+    }
+
     @ViewBuilder
     private var heartControl: some View {
         if showHeart {
@@ -102,6 +109,7 @@ struct BroadcastRow: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .padding(.top, 2)
                 #if os(macOS)
                 .help(isFav ? "Favorit entfernen" : "Als Favorit speichern")
                 #endif
@@ -109,38 +117,14 @@ struct BroadcastRow: View {
                 Image(systemName: "heart.fill")
                     .foregroundColor(.red)
                     .font(.caption)
+                    .padding(.top, 2)
             }
         }
     }
 
-    private var detailAffordance: some View {
-        HStack(spacing: 0) {
-            Image(systemName: "info.circle")
-                .font(.system(size: 18))
-                .foregroundColor(selectedItemForDetail?.id == item.id && isInspectorPresented ? .white : .accentColor)
-                .frame(width: 44, height: 44)
-                .background(selectedItemForDetail?.id == item.id && isInspectorPresented ? Color.accentColor : Color.clear)
-                .clipShape(Circle())
-        }
-        .frame(maxWidth: 60, maxHeight: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: toggleDetailPresentation)
-    }
-
-    private var compactDetailButton: some View {
-        Button(action: toggleDetailPresentation) {
-            Label(
-                selectedItemForDetail?.id == item.id && isInspectorPresented ? "Details schließen" : "Details",
-                systemImage: "info.circle"
-            )
-            .font(.subheadline)
-            .labelStyle(.titleAndIcon)
-        }
-        .buttonStyle(.bordered)
-    }
-
     private func toggleDetailPresentation() {
         if isInspectorPresented, selectedItemForDetail?.id == item.id {
+            selectedItemForDetail = nil
             isInspectorPresented = false
         } else {
             selectedItemForDetail = item
