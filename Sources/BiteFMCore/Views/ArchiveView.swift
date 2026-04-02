@@ -103,22 +103,59 @@ struct ArchiveView: View {
     }
 
     private var archiveScrollContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(letterSections, id: \.letter) { section in
-                    archiveLetterSectionBlock(section: section)
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(letterSections, id: \.letter) { section in
+                        archiveLetterSectionBlock(section: section)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    #if os(macOS)
+                    ArchiveScrollClampHostViewRepresentable()
+                        .allowsHitTesting(false)
+                    #endif
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                #if os(macOS)
-                ArchiveScrollClampHostViewRepresentable()
-                    .allowsHitTesting(false)
-                #endif
+            .animation(nil, value: hoveredIndexSymbol)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .opacity(archiveListDimmedForPlaceholder ? 0.35 : 1)
+
+            if searchText.isEmpty, apiClient.shows.isEmpty {
+                Group {
+                    if apiClient.lastListRefreshFailedWithoutNetwork {
+                        ContentUnavailableView(
+                            "Keine Verbindung",
+                            systemImage: "wifi.slash",
+                            description: Text("Du bist offline oder das Netzwerk ist nicht erreichbar. Archiv-Sendungen können jetzt nicht geladen werden.")
+                        )
+                    } else {
+                        ContentUnavailableView {
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                Text("Lade Archiv…")
+                                    .font(.headline)
+                            }
+                        } description: {
+                            Text("Sendungsliste wird geladen.")
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !searchText.isEmpty, filteredShows.isEmpty {
+                ContentUnavailableView(
+                    "Keine Treffer",
+                    systemImage: "magnifyingglass",
+                    description: Text("Keine Sendung passt zur Suche.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .animation(nil, value: hoveredIndexSymbol)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var archiveListDimmedForPlaceholder: Bool {
+        (searchText.isEmpty && apiClient.shows.isEmpty) || (!searchText.isEmpty && filteredShows.isEmpty)
     }
 
     @ViewBuilder
@@ -254,34 +291,42 @@ struct ArchiveView: View {
         return Color.clear
     }
     
+    /// Typo wie bei „Neu im Archiv“ (`BroadcastRow`: `.headline` / `.subheadline`, Herz `.body`).
     @ViewBuilder
     private func showRow(for show: Show) -> some View {
         let isPlaying = playerManager.currentItem?.sendungTitel == show.titel && playerManager.isPlaying
-        
+        let accessoryBox: CGFloat = 22
+
         NavigationLink(destination: BroadcastListView(show: show)) {
-            HStack {
-                VStack(alignment: .leading) {
-                    HStack(spacing: 4) {
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
                         if apiClient.isFavorite(show: show) {
                             Image(systemName: "heart.fill")
                                 .foregroundColor(.red)
-                                .font(.caption)
+                                .font(.body)
+                                .frame(width: accessoryBox, height: accessoryBox)
                         }
-                        Text(show.titel)
-                            .font(.headline)
-                            .foregroundColor(isPlaying ? .accentColor : .primary)
+                        Spacer(minLength: 0)
                     }
+                    Text(show.titel)
+                        .font(.headline)
+                        .foregroundColor(isPlaying ? .accentColor : .primary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                     if !show.untertitel.isEmpty {
                         Text(show.untertitel)
                             .font(.subheadline)
                             .foregroundColor(isPlaying ? .accentColor.opacity(0.8) : .secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Spacer()
-                
+                Spacer(minLength: 8)
                 if isPlaying {
                     Image(systemName: "speaker.wave.2.fill")
+                        .font(.body)
                         .foregroundColor(.accentColor)
+                        .frame(width: accessoryBox, height: accessoryBox)
                 }
             }
             .padding(.horizontal, 12)

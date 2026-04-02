@@ -74,11 +74,19 @@ struct BroadcastListView: View {
                     }
                 }
             } else if filteredBroadcasts.isEmpty && !isLoading {
-                ContentUnavailableView(
-                    hidePlayed ? "Keine ungehörten Sendungen" : "Keine Sendungen gefunden",
-                    systemImage: hidePlayed ? "checkmark.circle" : "archivebox",
-                    description: Text(hidePlayed ? "Alle Sendungen dieser Sendung wurden bereits gehört." : "")
-                )
+                if apiClient.lastListRefreshFailedWithoutNetwork {
+                    ContentUnavailableView(
+                        "Keine Verbindung",
+                        systemImage: "wifi.slash",
+                        description: Text("Du bist offline oder das Netzwerk ist nicht erreichbar. Ausgaben dieser Sendung können jetzt nicht geladen werden.")
+                    )
+                } else {
+                    ContentUnavailableView(
+                        hidePlayed ? "Keine ungehörten Sendungen" : "Keine Sendungen gefunden",
+                        systemImage: hidePlayed ? "checkmark.circle" : "archivebox",
+                        description: Text(hidePlayed ? "Alle Sendungen dieser Sendung wurden bereits gehört." : "")
+                    )
+                }
             } else if !filteredBroadcasts.isEmpty && displayedBroadcasts.isEmpty {
                 ContentUnavailableView(
                     "Keine Treffer",
@@ -141,6 +149,7 @@ struct BroadcastListView: View {
             }
         }
         .refreshable {
+            guard !isInspectorPresented else { return }
             currentPage = 1
             broadcasts = []
             hasMorePages = true

@@ -51,11 +51,19 @@ struct FavoriteEpisodesView: View {
     private var episodesContent: some View {
         Group {
             if apiClient.favoriteShowItems.isEmpty {
-                ContentUnavailableView(
-                    "Keine Ausgaben-Favoriten",
-                    systemImage: "heart.text.square",
-                    description: Text("Favorisierte Einzel-Ausgaben erscheinen hier, sobald du welche auf byte.fm speicherst.")
-                )
+                if apiClient.lastListRefreshFailedWithoutNetwork {
+                    ContentUnavailableView(
+                        "Keine Verbindung",
+                        systemImage: "wifi.slash",
+                        description: Text("Du bist offline oder das Netzwerk ist nicht erreichbar. Favoriten können jetzt nicht geladen werden.")
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Keine Ausgaben-Favoriten",
+                        systemImage: "heart.text.square",
+                        description: Text("Favorisierte Einzel-Ausgaben erscheinen hier, sobald du welche auf byte.fm speicherst.")
+                    )
+                }
             } else {
                 List {
                     ForEach(sortedEpisodes, id: \.id) { entry in
@@ -113,6 +121,7 @@ struct FavoriteEpisodesView: View {
         }
         .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
         .refreshable {
+            guard !isInspectorPresented else { return }
             if let ctx = apiClient.modelContainer?.mainContext {
                 await apiClient.fetchFavorites(modelContext: ctx)
             } else {

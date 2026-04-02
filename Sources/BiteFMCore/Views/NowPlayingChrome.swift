@@ -37,14 +37,13 @@ struct MiniPlayerBarView: View {
 
     private var miniRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            Button(action: onExpand) {
-                VStack(alignment: .leading, spacing: 4) {
-                    PlayerBarMetadataBlock()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+            // `Button` in `tabViewBottomAccessory` + häufige SwiftUI-Updates kann Taps schlucken — explizite Tap-Geste.
+            VStack(alignment: .leading, spacing: 4) {
+                PlayerBarMetadataBlock()
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onExpand)
 
             Button(action: { playerManager.togglePlayPause() }) {
                 let imageName: String = {
@@ -133,12 +132,24 @@ struct ExpandedNowPlayingView: View {
 
     /// Live: undurchsichtiger Hintergrund bis in die untere Safe Area — vermeidet den schmalen grauen Rand um die Blur-Leiste bei nur einem Stop-Button.
     private func expandedControlsChrome(live: Bool) -> some View {
-        PlaybackControlsStack(
-            compactTimeline: true,
-            keyboardShortcut: false,
-            spacing: 10,
-            transportIconScale: Self.expandedTransportIconScale
-        )
+        Group {
+            #if os(iOS)
+            PlaybackControlsStack(
+                compactTimeline: true,
+                keyboardShortcut: false,
+                spacing: 10,
+                transportIconScale: Self.expandedTransportIconScale,
+                showsAirPlayRoutePicker: true
+            )
+            #else
+            PlaybackControlsStack(
+                compactTimeline: true,
+                keyboardShortcut: false,
+                spacing: 10,
+                transportIconScale: Self.expandedTransportIconScale
+            )
+            #endif
+        }
         .padding(.horizontal)
         .padding(.top, 10)
         .padding(.bottom, 8)

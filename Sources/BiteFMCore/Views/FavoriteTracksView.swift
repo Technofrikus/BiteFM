@@ -27,11 +27,19 @@ struct FavoriteTracksView: View {
     private var tracksContent: some View {
         Group {
             if apiClient.favoriteTrackItems.isEmpty {
-                ContentUnavailableView(
-                    "Keine Track-Favoriten",
-                    systemImage: "music.note",
-                    description: Text("Favorisierte Tracks erscheinen hier, sobald du welche auf byte.fm speicherst.")
-                )
+                if apiClient.lastListRefreshFailedWithoutNetwork {
+                    ContentUnavailableView(
+                        "Keine Verbindung",
+                        systemImage: "wifi.slash",
+                        description: Text("Du bist offline oder das Netzwerk ist nicht erreichbar. Favoriten können jetzt nicht geladen werden.")
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Keine Track-Favoriten",
+                        systemImage: "music.note",
+                        description: Text("Favorisierte Tracks erscheinen hier, sobald du welche auf byte.fm speicherst.")
+                    )
+                }
             } else {
                 List {
                     ForEach(apiClient.favoriteTrackItems, id: \.id) { entry in

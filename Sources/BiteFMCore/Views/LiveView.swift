@@ -74,6 +74,8 @@ struct LiveView: View {
                                     .foregroundColor(.secondary.opacity(0.8))
                             }
                         }
+                        // Feste Mindesthöhe verhindert, dass Stream-Picker und „Stream starten“ bei „nur Musik“ nach oben springen.
+                        .frame(minHeight: horizontalSizeClass == .compact ? 128 : 144, alignment: .top)
                     }
                     .padding(.top)
                 }
@@ -91,7 +93,9 @@ struct LiveView: View {
                     if playerManager.isLive && playerManager.isPlaying && playerManager.currentStreamType == selectedStream {
                         playerManager.pause()
                     } else {
-                        playerManager.playLive(streamType: selectedStream)
+                        Task {
+                            await playerManager.playLive(streamType: selectedStream)
+                        }
                     }
                 }) {
                     HStack(spacing: 8) {
@@ -152,6 +156,16 @@ struct LiveView: View {
         .onDisappear {
             guard enablePolling else { return }
             apiClient.stopLiveMetadataPolling()
+        }
+        .alert("Wiedergabe", isPresented: .init(
+            get: { playerManager.userFacingPlaybackError != nil },
+            set: { if !$0 { playerManager.clearPlaybackError() } }
+        )) {
+            Button("OK", role: .cancel) {
+                playerManager.clearPlaybackError()
+            }
+        } message: {
+            Text(playerManager.userFacingPlaybackError ?? "")
         }
     }
     

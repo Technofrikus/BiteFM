@@ -1,9 +1,27 @@
 import SwiftUI
 import SwiftData
+import UIKit
 import BiteFMCore
+
+/// Relays background `URLSession` events so downloads can finish after the app was suspended.
+final class BiteFMiOSAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        if identifier == IOSDownloadManager.backgroundSessionIdentifier {
+            IOSDownloadManager.shared.setBackgroundCompletionHandler(completionHandler)
+        } else {
+            completionHandler()
+        }
+    }
+}
 
 @main
 struct BiteFMiOSApp: App {
+    @UIApplicationDelegateAdaptor(BiteFMiOSAppDelegate.self) private var appDelegate
+
     let container: ModelContainer
 
     init() {
@@ -23,6 +41,7 @@ struct BiteFMiOSApp: App {
             ContentView()
                 .environmentObject(APIClient.shared)
                 .environmentObject(AudioPlayerManager.shared)
+                .environmentObject(IOSDownloadManager.shared)
         }
         .modelContainer(container)
     }

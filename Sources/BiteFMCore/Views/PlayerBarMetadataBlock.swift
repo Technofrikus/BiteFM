@@ -16,7 +16,7 @@ struct PlayerBarMetadataBlock: View {
 
                 if let song = currentSong {
                     HStack(spacing: 8) {
-                        Text("\(song.artist) — \(song.title)")
+                        Text("\(song.artist) — \(song.title)".bitefm_sanitizedDisplayLine)
                             .font(.headline)
                             .lineLimit(2)
                             .minimumScaleFactor(0.75)
@@ -24,14 +24,14 @@ struct PlayerBarMetadataBlock: View {
                             ProgressView().controlSize(.small)
                         }
                     }
-                    Text("\(item.sendungTitel) — \(item.subtitle)")
+                    Text("\(item.sendungTitel.bitefm_sanitizedDisplayLine) — \(item.subtitle.bitefm_sanitizedDisplayLine)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
                 } else {
                     HStack(spacing: 8) {
-                        Text(item.sendungTitel)
+                        Text(item.sendungTitel.bitefm_sanitizedDisplayLine)
                             .font(.headline)
                             .lineLimit(2)
                             .minimumScaleFactor(0.75)
@@ -39,7 +39,7 @@ struct PlayerBarMetadataBlock: View {
                             ProgressView().controlSize(.small)
                         }
                     }
-                    Text(item.subtitle)
+                    Text(item.subtitle.bitefm_sanitizedDisplayLine)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineLimit(2)

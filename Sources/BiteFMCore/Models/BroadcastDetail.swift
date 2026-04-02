@@ -1,15 +1,15 @@
 import Foundation
 
-struct BroadcastDetail: Decodable {
-    let id: Int
-    let broadcastTitle: String
-    let showSubtitle: String
-    let showTime: String
-    let showDate: String
-    let moderator: String
-    let moderatorImage: String?
-    let showDescription: String
-    let recordings: [Recording]
+public struct BroadcastDetail: Codable {
+    public let id: Int
+    public let broadcastTitle: String
+    public let showSubtitle: String
+    public let showTime: String
+    public let showDate: String
+    public let moderator: String
+    public let moderatorImage: String?
+    public let showDescription: String
+    public let recordings: [Recording]
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -23,7 +23,7 @@ struct BroadcastDetail: Decodable {
         case recordings
     }
     
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try Self.decodeIntLenient(c, forKey: .id)
         broadcastTitle = try c.decodeIfPresent(String.self, forKey: .broadcastTitle) ?? ""
@@ -35,6 +35,19 @@ struct BroadcastDetail: Decodable {
         showDescription = try c.decodeIfPresent(String.self, forKey: .showDescription) ?? ""
         recordings = try c.decodeIfPresent([Recording].self, forKey: .recordings) ?? []
     }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(broadcastTitle, forKey: .broadcastTitle)
+        try c.encode(showSubtitle, forKey: .showSubtitle)
+        try c.encode(showTime, forKey: .showTime)
+        try c.encode(showDate, forKey: .showDate)
+        try c.encode(moderator, forKey: .moderator)
+        try c.encodeIfPresent(moderatorImage, forKey: .moderatorImage)
+        try c.encode(showDescription, forKey: .showDescription)
+        try c.encode(recordings, forKey: .recordings)
+    }
     
     private static func decodeIntLenient(_ c: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) throws -> Int {
         if let v = try? c.decode(Int.self, forKey: key) { return v }
@@ -43,22 +56,22 @@ struct BroadcastDetail: Decodable {
     }
 }
 
-struct Recording: Codable {
-    let recordingUrl: String
-    let playlist: [PlaylistItem]
+public struct Recording: Codable {
+    public let recordingUrl: String
+    public let playlist: [PlaylistItem]
     
     enum CodingKeys: String, CodingKey {
         case recordingUrl = "recording_url"
         case playlist
     }
     
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         recordingUrl = try c.decodeIfPresent(String.self, forKey: .recordingUrl) ?? ""
         playlist = try c.decodeIfPresent([PlaylistItem].self, forKey: .playlist) ?? []
     }
     
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(recordingUrl, forKey: .recordingUrl)
         try c.encode(playlist, forKey: .playlist)

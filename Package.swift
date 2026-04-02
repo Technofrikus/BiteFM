@@ -27,7 +27,8 @@ let package = Package(
         .testTarget(
             name: "BiteFMTests",
             dependencies: ["BiteFMCore"],
-            path: "Tests/BiteFMTests"
+            path: "Tests/BiteFMTests",
+            exclude: ["DownloadsVerificationMatrix.md"]
         )
     ]
 )

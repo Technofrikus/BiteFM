@@ -5,6 +5,19 @@ import SwiftData
 @MainActor
 public enum BiteFMBootstrap {
     public static func createModelContainer() throws -> ModelContainer {
+        #if os(iOS)
+        let schema = Schema([
+            StoredArchiveItem.self,
+            StoredFavoriteBroadcast.self,
+            StoredFavoriteShow.self,
+            StoredListeningHistoryEntry.self,
+            StoredShow.self,
+            StoredPlaybackPosition.self,
+            StoredDownloadedEpisode.self,
+            StoredOfflineBroadcastDetail.self,
+            StoredDownloadSettings.self
+        ])
+        #else
         let schema = Schema([
             StoredArchiveItem.self,
             StoredFavoriteBroadcast.self,
@@ -13,6 +26,7 @@ public enum BiteFMBootstrap {
             StoredShow.self,
             StoredPlaybackPosition.self
         ])
+        #endif
 
         let fileManager = FileManager.default
         guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
@@ -32,6 +46,9 @@ public enum BiteFMBootstrap {
     public static func configureServices(modelContainer container: ModelContainer) {
         APIClient.shared.setup(modelContainer: container)
         AudioPlayerManager.shared.setup(modelContainer: container)
+        #if os(iOS)
+        IOSDownloadManager.shared.setup(modelContainer: container)
+        #endif
     }
 
     public enum BootstrapError: Error {

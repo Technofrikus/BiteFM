@@ -34,6 +34,9 @@ public struct ContentView: View {
                 Task { @MainActor in
                     await Task.yield()
                     apiClient.resumeDeferredPollingIfConfigured()
+                    #if os(iOS)
+                    await IOSDownloadManager.shared.runForegroundMaintenance()
+                    #endif
                 }
             case .background:
                 apiClient.pauseDeferredPolling()
@@ -64,11 +67,17 @@ private struct InitialLoadingView: View {
 private struct LoggedInRootView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    #if os(iOS)
+    @EnvironmentObject private var downloadManager: IOSDownloadManager
+    #endif
 
     enum SidebarItem: Hashable {
         case live
         case archiveNew
         case archive
+        #if os(iOS)
+        case downloads
+        #endif
         case favoriteEpisodes
         case favoriteTracks
         case show(Show)
@@ -79,6 +88,9 @@ private struct LoggedInRootView: View {
         case archiveNew
         case archive
         case favorites
+        #if os(iOS)
+        case downloads
+        #endif
     }
 
     @State private var selection: SidebarItem? = .live
@@ -87,6 +99,9 @@ private struct LoggedInRootView: View {
     @State private var selectedTab: MainTab = .live
     @State private var logoutAlertPresented: Bool = false
     @State private var isNowPlayingExpanded: Bool = false
+    #if os(iOS)
+    @State private var didApplyOfflineLaunchTab = false
+    #endif
 
     private var useCompactRoot: Bool {
         #if os(iOS)
@@ -108,6 +123,19 @@ private struct LoggedInRootView: View {
                 PlayerBarView()
             }
         }
+        #if os(iOS)
+        .task {
+            guard !didApplyOfflineLaunchTab else { return }
+            didApplyOfflineLaunchTab = true
+            let online = await NetworkPathProbe.isPathSatisfied()
+            guard !online else { return }
+            if useCompactRoot {
+                selectedTab = .downloads
+            } else {
+                selection = .downloads
+            }
+        }
+        #endif
         .alert("Abmelden?", isPresented: $logoutAlertPresented) {
             Button("Abbrechen", role: .cancel) {}
             Button("Abmelden", role: .destructive) {
@@ -129,25 +157,136 @@ private struct LoggedInRootView: View {
                 isNowPlayingExpanded = false
             }
         }
+        #if os(iOS)
+        .alert("Download-Speicher", isPresented: Binding(
+            get: { downloadManager.budgetPrompt != nil },
+            set: { if !$0 { downloadManager.clearBudgetPromptBannerOnly() } }
+        )) {
+            Button("Älteste löschen") {
+                Task { await downloadManager.confirmDeleteOldestForBudgetAndRetry() }
+            }
+            Button("Abbrechen", role: .cancel) {
+                downloadManager.dismissBudgetPrompt()
+            }
+        } message: {
+            Text(downloadManager.budgetPrompt?.message ?? "")
+        }
+        .alert("Speicher", isPresented: Binding(
+            get: { downloadManager.deviceSpaceError != nil },
+            set: { if !$0 { downloadManager.deviceSpaceError = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                downloadManager.deviceSpaceError = nil
+            }
+        } message: {
+            Text(downloadManager.deviceSpaceError ?? "")
+        }
+        .sheet(isPresented: $isNowPlayingExpanded) {
+            ExpandedNowPlayingView()
+                .environmentObject(apiClient)
+                .environmentObject(playerManager)
+                .presentationDragIndicator(.visible)
+        }
+        #endif
     }
 
     /// Only mount the active tab to keep root-level subscribers lightweight on iPhone.
+    /// Tab-Leiste liegt in einer **eigenen** `View`, die nur `AudioPlayerManager` beobachtet — nicht `IOSDownloadManager`,
+    /// damit Häufige Download-Fortschritts-Updates die Miniplayer-Taps/`tabViewBottomAccessory` nicht lahmlegen.
     #if os(iOS)
     @ViewBuilder
     private var compactTabShell: some View {
         if #available(iOS 26.1, *) {
-            compactTabShellWithBottomAccessory
+            IPhoneTabShellWithBottomAccessory(selectedTab: $selectedTab, isNowPlayingExpanded: $isNowPlayingExpanded)
         } else {
-            compactTabShellLegacyInset
+            IPhoneTabShellLegacyInset(selectedTab: $selectedTab, isNowPlayingExpanded: $isNowPlayingExpanded)
         }
     }
 
-    /// iOS 26.1+: System-Tab-Bottom-Accessory (`tabViewBottomAccessory(isEnabled:)`) + Tab-Leisten-Minimizer — erst ab 26.1 im SDK mit Deployment Target 17 aufrufbar.
+    /// iOS 26.1+: System-Tab-Bottom-Accessory + Tab-Leisten-Minimizer.
     @available(iOS 26.1, *)
-    private var compactTabShellWithBottomAccessory: some View {
-        let miniActive = playerManager.currentItem != nil || playerManager.isLive
-        return TabView(selection: $selectedTab) {
-            Tab("Live", systemImage: "radio", value: MainTab.live) {
+    private struct IPhoneTabShellWithBottomAccessory: View {
+        @EnvironmentObject private var playerManager: AudioPlayerManager
+        @Binding var selectedTab: MainTab
+        @Binding var isNowPlayingExpanded: Bool
+
+        var body: some View {
+            let miniActive = playerManager.currentItem != nil || playerManager.isLive
+            TabView(selection: $selectedTab) {
+                Tab("Live", systemImage: "radio", value: MainTab.live) {
+                    NavigationStack {
+                        Group {
+                            if selectedTab == .live {
+                                LiveView()
+                            }
+                        }
+                        .navigationTitle("Live")
+                        .navigationBarTitleDisplayMode(.inline)
+                    }
+                }
+
+                Tab("Neu", systemImage: "clock", value: MainTab.archiveNew) {
+                    NavigationStack {
+                        Group {
+                            if selectedTab == .archiveNew {
+                                ArchiveNew()
+                            }
+                        }
+                        .navigationTitle("Neu im Archiv")
+                        .navigationBarTitleDisplayMode(.inline)
+                    }
+                }
+
+                Tab("Archiv", systemImage: "archivebox", value: MainTab.archive) {
+                    NavigationStack {
+                        Group {
+                            if selectedTab == .archive {
+                                ArchiveView()
+                            }
+                        }
+                    }
+                }
+
+                Tab("Favoriten", systemImage: "heart.fill", value: MainTab.favorites) {
+                    NavigationStack {
+                        Group {
+                            if selectedTab == .favorites {
+                                FavoritesHubView()
+                            }
+                        }
+                        .navigationTitle("Favoriten")
+                        .navigationBarTitleDisplayMode(.inline)
+                    }
+                }
+
+                Tab("Downloads", systemImage: "arrow.down.circle", value: MainTab.downloads) {
+                    NavigationStack {
+                        Group {
+                            if selectedTab == .downloads {
+                                DownloadsView()
+                            }
+                        }
+                    }
+                }
+            }
+            .tabBarMinimizeBehavior(.automatic)
+            .tabViewBottomAccessory(isEnabled: miniActive) {
+                MiniPlayerBarView(onExpand: {
+                    isNowPlayingExpanded = true
+                }, chrome: .tabAccessory)
+                .environmentObject(playerManager)
+            }
+        }
+    }
+
+    /// iOS 17–26.0: `safeAreaInset` + klassische `tabItem`-Tabs.
+    private struct IPhoneTabShellLegacyInset: View {
+        @EnvironmentObject private var playerManager: AudioPlayerManager
+        @Binding var selectedTab: MainTab
+        @Binding var isNowPlayingExpanded: Bool
+
+        var body: some View {
+            TabView(selection: $selectedTab) {
                 NavigationStack {
                     Group {
                         if selectedTab == .live {
@@ -157,9 +296,9 @@ private struct LoggedInRootView: View {
                     .navigationTitle("Live")
                     .navigationBarTitleDisplayMode(.inline)
                 }
-            }
+                .tabItem { Label("Live", systemImage: "radio") }
+                .tag(MainTab.live)
 
-            Tab("Neu", systemImage: "clock", value: MainTab.archiveNew) {
                 NavigationStack {
                     Group {
                         if selectedTab == .archiveNew {
@@ -169,9 +308,9 @@ private struct LoggedInRootView: View {
                     .navigationTitle("Neu im Archiv")
                     .navigationBarTitleDisplayMode(.inline)
                 }
-            }
+                .tabItem { Label("Neu", systemImage: "clock") }
+                .tag(MainTab.archiveNew)
 
-            Tab("Archiv", systemImage: "archivebox", value: MainTab.archive) {
                 NavigationStack {
                     Group {
                         if selectedTab == .archive {
@@ -179,9 +318,9 @@ private struct LoggedInRootView: View {
                         }
                     }
                 }
-            }
+                .tabItem { Label("Archiv", systemImage: "archivebox") }
+                .tag(MainTab.archive)
 
-            Tab("Favoriten", systemImage: "heart.fill", value: MainTab.favorites) {
                 NavigationStack {
                     Group {
                         if selectedTab == .favorites {
@@ -191,84 +330,26 @@ private struct LoggedInRootView: View {
                     .navigationTitle("Favoriten")
                     .navigationBarTitleDisplayMode(.inline)
                 }
-            }
-        }
-        .tabBarMinimizeBehavior(.automatic)
-        .tabViewBottomAccessory(isEnabled: miniActive) {
-            MiniPlayerBarView(onExpand: {
-                isNowPlayingExpanded = true
-            }, chrome: .tabAccessory)
-            .environmentObject(playerManager)
-        }
-        .sheet(isPresented: $isNowPlayingExpanded) {
-            ExpandedNowPlayingView()
-                .environmentObject(apiClient)
-                .environmentObject(playerManager)
-                .presentationDragIndicator(.visible)
-        }
-    }
+                .tabItem { Label("Favoriten", systemImage: "heart.fill") }
+                .tag(MainTab.favorites)
 
-    /// iOS 17–26.0: `safeAreaInset` + klassische `tabItem`-Tabs (kein `tabViewBottomAccessory` im SDK bei älteren OS).
-    private var compactTabShellLegacyInset: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                Group {
-                    if selectedTab == .live {
-                        LiveView()
+                NavigationStack {
+                    Group {
+                        if selectedTab == .downloads {
+                            DownloadsView()
+                        }
                     }
                 }
-                .navigationTitle("Live")
-                .navigationBarTitleDisplayMode(.inline)
+                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
+                .tag(MainTab.downloads)
             }
-            .tabItem { Label("Live", systemImage: "radio") }
-            .tag(MainTab.live)
-
-            NavigationStack {
-                Group {
-                    if selectedTab == .archiveNew {
-                        ArchiveNew()
-                    }
-                }
-                .navigationTitle("Neu im Archiv")
-                .navigationBarTitleDisplayMode(.inline)
-            }
-            .tabItem { Label("Neu", systemImage: "clock") }
-            .tag(MainTab.archiveNew)
-
-            NavigationStack {
-                Group {
-                    if selectedTab == .archive {
-                        ArchiveView()
-                    }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if playerManager.currentItem != nil || playerManager.isLive {
+                    MiniPlayerBarView(onExpand: {
+                        isNowPlayingExpanded = true
+                    }, chrome: .safeAreaInsetRow)
                 }
             }
-            .tabItem { Label("Archiv", systemImage: "archivebox") }
-            .tag(MainTab.archive)
-
-            NavigationStack {
-                Group {
-                    if selectedTab == .favorites {
-                        FavoritesHubView()
-                    }
-                }
-                .navigationTitle("Favoriten")
-                .navigationBarTitleDisplayMode(.inline)
-            }
-            .tabItem { Label("Favoriten", systemImage: "heart.fill") }
-            .tag(MainTab.favorites)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if playerManager.currentItem != nil || playerManager.isLive {
-                MiniPlayerBarView(onExpand: {
-                    isNowPlayingExpanded = true
-                }, chrome: .safeAreaInsetRow)
-            }
-        }
-        .sheet(isPresented: $isNowPlayingExpanded) {
-            ExpandedNowPlayingView()
-                .environmentObject(apiClient)
-                .environmentObject(playerManager)
-                .presentationDragIndicator(.visible)
         }
     }
     #else
@@ -290,6 +371,11 @@ private struct LoggedInRootView: View {
                     NavigationLink(value: SidebarItem.archive) {
                         Label("Archiv", systemImage: "archivebox")
                     }
+                    #if os(iOS)
+                    NavigationLink(value: SidebarItem.downloads) {
+                        Label("Downloads", systemImage: "arrow.down.circle")
+                    }
+                    #endif
 
                     NavigationLink(value: SidebarItem.favoriteEpisodes) {
                         Label {
@@ -333,6 +419,10 @@ private struct LoggedInRootView: View {
                             .navigationTitle("Neu im Archiv")
                     case .archive:
                         ArchiveView()
+                    #if os(iOS)
+                    case .downloads:
+                        DownloadsView()
+                    #endif
                     case .favoriteEpisodes:
                         FavoriteEpisodesView()
                     case .favoriteTracks:
@@ -395,6 +485,9 @@ private struct FavoritesHubView: View {
             }
         }
         .navigationTitle("Favoriten")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 
@@ -402,4 +495,7 @@ private struct FavoritesHubView: View {
     ContentView()
         .environmentObject(APIClient.shared)
         .environmentObject(AudioPlayerManager.shared)
+        #if os(iOS)
+        .environmentObject(IOSDownloadManager.shared)
+        #endif
 }

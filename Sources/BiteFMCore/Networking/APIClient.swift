@@ -22,8 +22,33 @@ public class APIClient: ObservableObject {
     @Published var liveMetadata: LiveMetadataResponse?
     @Published var errorMessage: String?
     @Published var didFinishInitialBootstrap = false
-    
+    /// Set when a main list fetch fails with a connectivity error and the UI might be empty; cleared on any successful list refresh.
+    @Published public private(set) var lastListRefreshFailedWithoutNetwork = false
+
     var modelContainer: ModelContainer?
+
+    public static func isLikelyNetworkConnectivityFailure(_ error: Error) -> Bool {
+        if let urlErr = error as? URLError {
+            switch urlErr.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .cannotFindHost,
+                 .timedOut, .dnsLookupFailed, .internationalRoamingOff, .callIsActive:
+                return true
+            default:
+                break
+            }
+        }
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain {
+            switch ns.code {
+            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed,
+                 NSURLErrorCannotFindHost, NSURLErrorTimedOut, NSURLErrorDNSLookupFailed:
+                return true
+            default:
+                break
+            }
+        }
+        return false
+    }
 
     public func requestLogoutConfirmation() {
         NotificationCenter.default.post(name: Self.requestLogoutConfirmationNotification, object: nil)
@@ -37,6 +62,7 @@ public class APIClient: ObservableObject {
     private var broadcastDetailsCache: [Int: BroadcastDetail] = [:]
     private var pollingTask: Task<Void, Never>?
     private var archivePollingTask: Task<Void, Never>?
+    private var pendingHistoryVerificationShowID: Int?
     
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -44,6 +70,41 @@ public class APIClient: ObservableObject {
         config.httpShouldSetCookies = true
         return URLSession(configuration: config)
     }()
+
+    private func agentDebugLog(
+        runId: String = "initial",
+        hypothesisId: String,
+        location: String,
+        message: String,
+        data: [String: Any]
+    ) {
+        let payload: [String: Any] = [
+            "sessionId": "d22446",
+            "runId": runId,
+            "hypothesisId": hypothesisId,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+        ]
+        guard JSONSerialization.isValidJSONObject(payload),
+              let json = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        var line = json
+        line.append(0x0A)
+        let url = URL(fileURLWithPath: "/Users/tf/Nextcloud/gitfolder/BiteFM/.cursor/debug-d22446.log")
+        if FileManager.default.fileExists(atPath: url.path),
+           let handle = try? FileHandle(forWritingTo: url) {
+            do {
+                try handle.seekToEnd()
+                try handle.write(contentsOf: line)
+                try handle.close()
+            } catch {
+                try? handle.close()
+            }
+        } else {
+            try? line.write(to: url)
+        }
+    }
     
     public init() {
         // Check if we have saved credentials to be "logged in" immediately
@@ -239,6 +300,21 @@ public class APIClient: ObservableObject {
     /// Lädt die Hörhistorie vom Server neu (`listeningHistoryEntries.php`). Die App sendet keinen eigenen „als gehört markieren“-Request;
     /// `listenedShowIDs` spiegelt nur, was die API zurückgibt (`show_id` = Termin-ID der Ausgabe).
     func markAsPlayed(item: ArchiveItem) async {
+        pendingHistoryVerificationShowID = item.terminID
+        // #region agent log
+        agentDebugLog(
+            hypothesisId: "H1",
+            location: "APIClient.swift:275",
+            message: "mark_as_played_invoked",
+            data: [
+                "terminID": item.terminID,
+                "alreadyInLocalHistory": listenedShowIDs.contains(item.terminID),
+                "isLoggedIn": isLoggedIn,
+                "hasSavedUsername": UserDefaults.standard.string(forKey: "savedUsername") != nil,
+                "hasSavedPassword": UserDefaults.standard.string(forKey: "savedUsername").flatMap { KeychainHelper.readPassword(account: $0) } != nil
+            ]
+        )
+        // #endregion
         LogManager.shared.log("Syncing listening history after play: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
         
         if let context = modelContainer.map({ ModelContext($0) }) {
@@ -312,6 +388,20 @@ public class APIClient: ObservableObject {
         }
         
         LogManager.shared.log("Fetching listening history from \(url.absoluteString)...", type: .info)
+        let trackedShowID = pendingHistoryVerificationShowID
+        // #region agent log
+        agentDebugLog(
+            hypothesisId: "H1",
+            location: "APIClient.swift:351",
+            message: "listening_history_request_started",
+            data: [
+                "method": request.httpMethod ?? "",
+                "url": url.absoluteString,
+                "hasAuthorization": request.value(forHTTPHeaderField: "Authorization") != nil,
+                "trackedShowID": trackedShowID ?? -1
+            ]
+        )
+        // #endregion
         
         do {
             let (data, response) = try await performRequest(for: request)
@@ -328,6 +418,22 @@ public class APIClient: ObservableObject {
                         let ids = Set(historyResponse.data.map { $0.showID })
                         self.listenedShowIDs = ids
                         self.recordListeningHistoryFetchSuccess()
+                        // #region agent log
+                        agentDebugLog(
+                            hypothesisId: trackedShowID == nil ? "H1" : "H4",
+                            location: "APIClient.swift:370",
+                            message: "listening_history_response_decoded",
+                            data: [
+                                "statusCode": httpResponse.statusCode,
+                                "responseCount": historyResponse.data.count,
+                                "trackedShowID": trackedShowID ?? -1,
+                                "containsTrackedShow": trackedShowID.map(ids.contains) ?? false
+                            ]
+                        )
+                        // #endregion
+                        if trackedShowID != nil {
+                            pendingHistoryVerificationShowID = nil
+                        }
                         
                         if let context = modelContext {
                             try await syncListeningHistoryWithDatabase(items: historyResponse.data, context: context)
@@ -341,6 +447,20 @@ public class APIClient: ObservableObject {
             if isBenignCancellation(error) {
                 LogManager.shared.log("Listening history fetch cancelled", type: .debug)
                 return
+            }
+            // #region agent log
+            agentDebugLog(
+                hypothesisId: trackedShowID == nil ? "H1" : "H4",
+                location: "APIClient.swift:393",
+                message: "listening_history_request_failed",
+                data: [
+                    "trackedShowID": trackedShowID ?? -1,
+                    "error": error.localizedDescription
+                ]
+            )
+            // #endregion
+            if trackedShowID != nil {
+                pendingHistoryVerificationShowID = nil
             }
             LogManager.shared.log("Failed to fetch listening history: \(error.localizedDescription)", type: .error)
         }
@@ -405,7 +525,8 @@ public class APIClient: ObservableObject {
                     do {
                         let favoritesResponse = try decoder.decode(FavoritesResponse.self, from: data)
                         LogManager.shared.log("Successfully decoded FavoritesResponse. Shows: \(favoritesResponse.shows.count), tracks: \(favoritesResponse.tracks.count)", type: .info)
-                        
+                        lastListRefreshFailedWithoutNetwork = false
+
                         // Extract all broadcast slugs and titles (Sendungen)
                         var slugs = Set<String>()
                         var syncItems: [FavoriteBroadcast] = []
@@ -450,6 +571,9 @@ public class APIClient: ObservableObject {
                 return
             }
             LogManager.shared.log("Failed to fetch favorites: \(error.localizedDescription)", type: .error)
+            if Self.isLikelyNetworkConnectivityFailure(error) {
+                lastListRefreshFailedWithoutNetwork = true
+            }
         }
     }
     
@@ -769,6 +893,7 @@ public class APIClient: ObservableObject {
         }
         UserDefaults.standard.removeObject(forKey: "savedUsername")
         isLoggedIn = false
+        lastListRefreshFailedWithoutNetwork = false
         // Clear favorites and history
         favoriteSlugs.removeAll()
         favoriteShowIDs.removeAll()
@@ -801,6 +926,9 @@ public class APIClient: ObservableObject {
                     context.delete(item)
                 }
             }
+            #if os(iOS)
+            IOSDownloadManager.purgeAllOnLogout(container: container)
+            #endif
             try? context.save()
         }
         
@@ -829,7 +957,7 @@ public class APIClient: ObservableObject {
                     do {
                         let items = try JSONDecoder().decode([ArchiveItem].self, from: data)
                         LogManager.shared.log("Successfully fetched \(items.count) archive items.", type: .info)
-                        
+                        lastListRefreshFailedWithoutNetwork = false
                         if let context = modelContext {
                             try await syncWithDatabase(items: items, context: context)
                         }
@@ -847,6 +975,9 @@ public class APIClient: ObservableObject {
             }
             LogManager.shared.log("FAILED to fetch archive: \(error.localizedDescription)", type: .error)
             errorMessage = "Failed to fetch archive: \(error.localizedDescription)"
+            if Self.isLikelyNetworkConnectivityFailure(error) {
+                lastListRefreshFailedWithoutNetwork = true
+            }
         }
     }
 
@@ -913,13 +1044,17 @@ public class APIClient: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                 let decodedShows = try JSONDecoder().decode([Show].self, from: data)
                 self.shows = decodedShows
-                
+                lastListRefreshFailedWithoutNetwork = false
+
                 if let context = modelContext {
                     try await syncShowsWithDatabase(items: decodedShows, context: context)
                 }
             }
         } catch {
             LogManager.shared.log("Failed to fetch shows: \(error.localizedDescription)", type: .error)
+            if Self.isLikelyNetworkConnectivityFailure(error) {
+                lastListRefreshFailedWithoutNetwork = true
+            }
         }
     }
     
@@ -965,9 +1100,13 @@ public class APIClient: ObservableObject {
         do {
             let (data, _) = try await session.data(for: request)
             let result = try JSONDecoder().decode(PaginatedBroadcasts.self, from: data)
+            lastListRefreshFailedWithoutNetwork = false
             return result
         } catch {
             LogManager.shared.log("Failed to fetch broadcasts for \(showSlug): \(error)", type: .error)
+            if Self.isLikelyNetworkConnectivityFailure(error) {
+                lastListRefreshFailedWithoutNetwork = true
+            }
             return nil
         }
     }
@@ -979,9 +1118,15 @@ public class APIClient: ObservableObject {
         
         guard let url = makeBroadcastDetailURL(for: item) else {
             LogManager.shared.log(
-                "Broadcast detail: keine URL (datum_de leer?) terminID=\(item.terminID) datum_de=\(item.datumDe) sendung=\(item.sendungSlug) terminSlug=\(item.terminSlug)",
+                "Broadcast detail: keine URL (Offline/ungültig?) terminID=\(item.terminID) datum_de=\(item.datumDe) sendung=\(item.sendungSlug) terminSlug=\(item.terminSlug)",
                 type: .error
             )
+            #if os(iOS)
+            if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
+                broadcastDetailsCache[item.id] = offline
+                return offline
+            }
+            #endif
             return nil
         }
         
@@ -1007,6 +1152,12 @@ public class APIClient: ObservableObject {
                     "Broadcast detail HTTP \(status) for \(url.absoluteString) preview=\(preview.prefix(200))",
                     type: .error
                 )
+                #if os(iOS)
+                if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
+                    broadcastDetailsCache[item.id] = offline
+                    return offline
+                }
+                #endif
                 return nil
             }
             // Decode off the MainActor so große JSON-Antworten die UI nicht blockieren.
@@ -1017,9 +1168,27 @@ public class APIClient: ObservableObject {
             return detail
         } catch {
             LogManager.shared.log("Failed to fetch/decode broadcast detail for \(url.absoluteString): \(error)", type: .error)
+            #if os(iOS)
+            if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
+                broadcastDetailsCache[item.id] = offline
+                return offline
+            }
+            #endif
             return nil
         }
     }
+
+    #if os(iOS)
+    private func offlineBroadcastDetailFromStore(terminID: Int) -> BroadcastDetail? {
+        guard let container = modelContainer else { return nil }
+        let ctx = ModelContext(container)
+        let fd = FetchDescriptor<StoredOfflineBroadcastDetail>(
+            predicate: #Predicate<StoredOfflineBroadcastDetail> { $0.terminID == terminID }
+        )
+        guard let row = try? ctx.fetch(fd).first else { return nil }
+        return try? row.decodeDetail()
+    }
+    #endif
     
     /// `GET /api/v1/broadcasts/{sendung_slug}/{datum_de}/{termin_slug}/?listen=no` — erster Pfadsegment = Slug der **Sendung** (wie in der Sendungsliste), nicht immer gleich `sendung_slug` aus dem Archiv-JSON.
     private func makeBroadcastDetailURL(for item: ArchiveItem) -> URL? {

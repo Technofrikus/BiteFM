@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import AVKit
+#endif
 
 enum PlaybackTimeFormatting {
     static func string(from seconds: Double) -> String {
@@ -131,17 +134,60 @@ struct PlaybackControlsStack: View {
     var keyboardShortcut: Bool = false
     var spacing: CGFloat = 10
     var transportIconScale: CGFloat = 1
+    #if os(iOS)
+    /// System-Auswahl für AirPlay/Bluetooth-Audio (`AVRoutePickerView`).
+    var showsAirPlayRoutePicker: Bool = false
+    #endif
 
     var body: some View {
         VStack(spacing: spacing) {
+            #if os(iOS)
+            if showsAirPlayRoutePicker {
+                ZStack {
+                    HStack {
+                        Spacer(minLength: 0)
+                        PlaybackTransportButtons(
+                            useKeyboardShortcut: keyboardShortcut,
+                            iconScale: transportIconScale
+                        )
+                        Spacer(minLength: 0)
+                    }
+                    HStack {
+                        Spacer(minLength: 0)
+                        AirPlayRoutePickerRepresentable()
+                            .frame(width: 36 * transportIconScale, height: 36 * transportIconScale)
+                    }
+                }
+            } else {
+                PlaybackTransportButtons(
+                    useKeyboardShortcut: keyboardShortcut,
+                    iconScale: transportIconScale
+                )
+            }
+            #else
             PlaybackTransportButtons(
                 useKeyboardShortcut: keyboardShortcut,
                 iconScale: transportIconScale
             )
+            #endif
             PlaybackSeekBar(compactTimeline: compactTimeline)
         }
     }
 }
+
+#if os(iOS)
+/// Zeigt den Route-Picker von iOS (AirPlay, Lautsprecher, BT) — gleiche System-UI wie in anderen Musik-Apps.
+private struct AirPlayRoutePickerRepresentable: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let v = AVRoutePickerView()
+        v.prioritizesVideoDevices = false
+        v.tintColor = .label
+        return v
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
+#endif
 
 #if os(macOS)
 private struct SpaceBarPlayShortcut: ViewModifier {
