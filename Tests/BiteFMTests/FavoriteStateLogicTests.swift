@@ -1,5 +1,5 @@
 import XCTest
-@testable import BiteFM
+@testable import BiteFMCore
 
 final class FavoriteStateLogicTests: XCTestCase {
     func testBroadcastFavoriteSlugCaseInsensitive() {

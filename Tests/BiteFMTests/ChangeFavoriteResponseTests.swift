@@ -1,5 +1,5 @@
 import XCTest
-@testable import BiteFM
+@testable import BiteFMCore
 
 final class ChangeFavoriteResponseTests: XCTestCase {
     func testDecodeBroadcastOnly() throws {

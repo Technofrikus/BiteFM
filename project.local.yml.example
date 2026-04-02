@@ -1,0 +1,8 @@
+# XcodeGen unterstützt hier kein optionales Include: Diese Zeilen unter
+# targets → BiteFMiOS → settings in project.yml einfügen (oder dauerhaft dort pflegen):
+#
+#   DEVELOPMENT_TEAM: ABCDE12345
+#
+# Team-ID: Xcode → Settings… → Accounts → [Apple ID] → Team → „Team ID“ (10 Zeichen).
+# Alternativ: In Xcode TARGETS → BiteFMiOS → Signing & Capabilities ein Team wählen
+# (wird beim nächsten `xcodegen generate` wieder überschrieben, solange DEVELOPMENT_TEAM fehlt).

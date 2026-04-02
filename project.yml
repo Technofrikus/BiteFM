@@ -1,18 +1,40 @@
 name: BiteFM
 options:
   bundleIdPrefix: com.technofrikus
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+packages:
+  BiteFMSPM:
+    path: .
 settings:
   configs:
     Debug:
       ENABLE_DEBUG_DYLIB: NO
+
 schemes:
   BiteFM:
     build:
       targets:
-        BiteFM: [run, test, profile, analyze, archive]
+        BiteFMMac: [run, test, profile, analyze, archive]
+        BiteFMTests: [test]
     run:
       config: Debug
     test:
+      config: Debug
+      targets:
+        - BiteFMTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+  BiteFMiOS:
+    build:
+      targets:
+        BiteFMiOS: [run, profile, analyze, archive]
+    run:
       config: Debug
     profile:
       config: Release
@@ -20,17 +42,24 @@ schemes:
       config: Debug
     archive:
       config: Release
+
 targets:
-  BiteFM:
+  BiteFMMac:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
+    sources:
+      - path: Sources/BiteFMMac
+      # Gleiches Asset-Katalog wie BiteFMCore (AppIcon + gemeinsame Bilder); SPM liefert Logo per Bundle.module.
+      - path: Sources/BiteFMCore/Assets.xcassets
+    dependencies:
+      - package: BiteFMSPM
+        product: BiteFMCore
     settings:
       configs:
         Debug:
           ENABLE_DEBUG_DYLIB: NO
-      PRODUCT_NAME: "BiteFM"
-    sources: [Sources/BiteFM]
+      PRODUCT_NAME: BiteFM
     info:
       path: Info.plist
       properties:
@@ -38,3 +67,43 @@ targets:
         NSHighResolutionCapable: true
         NSPrincipalClass: NSApplication
         CFBundleDisplayName: "BiteFM"
+
+  BiteFMiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources/BiteFMiOS
+      - path: Sources/BiteFMCore/Assets.xcassets
+    dependencies:
+      - package: BiteFMSPM
+        product: BiteFMCore
+    settings:
+      PRODUCT_NAME: BiteFM
+      TARGETED_DEVICE_FAMILY: "1,2"
+      # Echtes Gerät: Unter Target BiteFMiOS → Signing & Capabilities ein Team wählen.
+      # Nach `xcodegen generate` ggf. erneut setzen, solange hier keine DEVELOPMENT_TEAM steht.
+      CODE_SIGN_STYLE: Automatic
+    info:
+      path: Info-iOS.plist
+      properties:
+        CFBundleDisplayName: "BiteFM"
+        LSRequiresIPhoneOS: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIBackgroundModes:
+          - audio
+        UILaunchScreen: {}
+
+  BiteFMTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/BiteFMTests
+    dependencies:
+      - target: BiteFMMac
+      - package: BiteFMSPM
+        product: BiteFMCore
+    settings:
+      GENERATE_INFOPLIST_FILE: YES

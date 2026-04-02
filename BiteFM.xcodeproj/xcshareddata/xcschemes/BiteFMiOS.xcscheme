@@ -1,37 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "1430"
-   version = "1.7">
+   version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
-      buildImplicitDependencies = "YES"
-      runPostActionsOnFailure = "NO">
+      buildImplicitDependencies = "YES">
       <BuildActionEntries>
          <BuildActionEntry
-            buildForTesting = "YES"
+            buildForTesting = "NO"
             buildForRunning = "YES"
             buildForProfiling = "YES"
             buildForArchiving = "YES"
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2714EBE26621EC91F046AB7A"
-               BuildableName = "BiteFMMac.app"
-               BlueprintName = "BiteFMMac"
-               ReferencedContainer = "container:BiteFM.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4487D46B839AC58F0CA0BE66"
-               BuildableName = "BiteFMTests.xctest"
-               BlueprintName = "BiteFMTests"
+               BlueprintIdentifier = "4A2FB6E6368FC85D3E1C1663"
+               BuildableName = "BiteFM.app"
+               BlueprintName = "BiteFMiOS"
                ReferencedContainer = "container:BiteFM.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -41,32 +26,18 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES"
-      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      shouldUseLaunchSchemeArgsEnv = "YES">
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2714EBE26621EC91F046AB7A"
-            BuildableName = "BiteFMMac.app"
-            BlueprintName = "BiteFMMac"
+            BlueprintIdentifier = "4A2FB6E6368FC85D3E1C1663"
+            BuildableName = "BiteFM.app"
+            BlueprintName = "BiteFMiOS"
             ReferencedContainer = "container:BiteFM.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4487D46B839AC58F0CA0BE66"
-               BuildableName = "BiteFMTests.xctest"
-               BlueprintName = "BiteFMTests"
-               ReferencedContainer = "container:BiteFM.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -82,14 +53,12 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2714EBE26621EC91F046AB7A"
-            BuildableName = "BiteFMMac.app"
-            BlueprintName = "BiteFMMac"
+            BlueprintIdentifier = "4A2FB6E6368FC85D3E1C1663"
+            BuildableName = "BiteFM.app"
+            BlueprintName = "BiteFMiOS"
             ReferencedContainer = "container:BiteFM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -101,14 +70,12 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2714EBE26621EC91F046AB7A"
-            BuildableName = "BiteFMMac.app"
-            BlueprintName = "BiteFMMac"
+            BlueprintIdentifier = "4A2FB6E6368FC85D3E1C1663"
+            BuildableName = "BiteFM.app"
+            BlueprintName = "BiteFMiOS"
             ReferencedContainer = "container:BiteFM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">

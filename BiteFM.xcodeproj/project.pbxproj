@@ -7,178 +7,148 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		06396D84E0815A1BCCD5A03D /* LogManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38184DF7425D231679E9B5AA /* LogManager.swift */; };
-		096EE74B9E84BBB2C82D10F7 /* BroadcastRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979A52BD6C878098008F370A /* BroadcastRow.swift */; };
-		0C0E37CA0905DF20F6F8EFB4 /* BroadcastDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C8617DC14CB667A1FF444A /* BroadcastDetailView.swift */; };
-		11248EFEDCF49BB9F7CB1B40 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 03647380629A6CAF3AAEDA08 /* Assets.xcassets */; };
-		16D0E2F1CB3A4838CCC20B0F /* BroadcastListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D74328FF192C360D3DECCF /* BroadcastListView.swift */; };
-		319819E5DE4D2822017994ED /* Show.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D17B337D265D510017AB400 /* Show.swift */; };
-		35C0C4003FDC0575604D5132 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D289842C992C6539365E8F2 /* KeychainHelper.swift */; };
-		36376C4CC68D0ADE9F825BDD /* FavoriteBroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63BCF720330AEA57269C126A /* FavoriteBroadcast.swift */; };
-		37E5135DE3CB200DE15BB43D /* PlayerBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29EE154B52FFEBF2A107E9E7 /* PlayerBarView.swift */; };
-		3B95BE571354B84CA012F046 /* StoredShow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9538C505149AFD10ED778FC /* StoredShow.swift */; };
-		3BF7DD36B08F8AB97AEB9000 /* BroadcastInspectorModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 166474C4839B020237C39934 /* BroadcastInspectorModifier.swift */; };
-		51A8D7D8BAAA2CCEFC6B44FD /* ArchiveItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E320743551142C56F1B26C0 /* ArchiveItem.swift */; };
-		5708F796C241AF05E3826060 /* StoredArchiveItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D93ED73478914AE8D645A23 /* StoredArchiveItem.swift */; };
-		5D4F40163630049C7B75C47C /* AudioPlayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0E0C054F0CB893601FB9AF /* AudioPlayerManager.swift */; };
-		5FF307CE4C83FA9BA896B331 /* ArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A9B588B9BD69D35183A2C1 /* ArchiveView.swift */; };
-		6DD3BD6DDB4DB1761BE99103 /* LiveMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6B91D19D99CD0ECF0EA98EE /* LiveMetadata.swift */; };
-		80DA8DECE043761D1E6539EF /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA6F0B1FE59B225148D9419 /* APIClient.swift */; };
-		87645EC009334A41E8BBA01D /* StoredListeningHistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6710C34757EB34512A46239A /* StoredListeningHistoryEntry.swift */; };
-		A0CE749CDB6C0CD26695E37D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB6B21324DA28C4E6E8BDC1 /* ContentView.swift */; };
-		A8C308DF4882003D31A5F5FB /* BiteFMApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0279916C527C3CCC2EAEB46D /* BiteFMApp.swift */; };
-		B1830EA2F1C659C1B33A15B1 /* BroadcastDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7738AA3922BE150B8C800E08 /* BroadcastDetail.swift */; };
-		BDA28ABCDA810DFF2C667CC4 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BC17A6B81F8330C5B74395 /* String+Extensions.swift */; };
-		E8F1A2B3C4D5E6F708192A3B4C5D6E7FA /* ArchiveSectionHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F1A2B3C4D5E6F708192A3B4C5D6E7F9 /* ArchiveSectionHelpers.swift */; };
-		A8C4E2103F5B6D7E8091A2B3D /* MacSpacePlaybackKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C4E2103F5B6D7E8091A2B3C /* MacSpacePlaybackKeyMonitor.swift */; };
-		C3D4E5F60718293A4B5C6D7E /* MacAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6D7D /* MacAppDelegate.swift */; };
-		D4E5F60718293A4B5C6D7E8F /* MacPlaybackGlobalHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8E /* MacPlaybackGlobalHotkey.swift */; };
-		BDC9E980FF984EECD35B02F6 /* StoredFavoriteBroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = C896E1AAA1846FC38FDFB903 /* StoredFavoriteBroadcast.swift */; };
-		A1F0E1D2C3B4A5968778695A0 /* StoredFavoriteShow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F0E1D2C3B4A5968778695A1 /* StoredFavoriteShow.swift */; };
-		B1F0E1D2C3B4A5968778695A0 /* FavoriteEpisodesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F0E1D2C3B4A5968778695A1 /* FavoriteEpisodesView.swift */; };
-		C1F0E1D2C3B4A5968778695A0 /* FavoriteTracksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F0E1D2C3B4A5968778695A1 /* FavoriteTracksView.swift */; };
-		C6B3E06AE5AC1C82C06B5E9F /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63B28DEEAA2489AC8EC700D2 /* LoginView.swift */; };
-		C7B2D56A7A4870AAF67333B2 /* ListeningHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C5D74314945ED3093270A8 /* ListeningHistory.swift */; };
-		DABE31160A6200151D49D983 /* LiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A1F6AB4C85DD4FB9803AEC7 /* LiveView.swift */; };
-		DF77B54CE27FA8CA7F9855A5 /* StoredPlaybackPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A2AA19D015260A75E02B82 /* StoredPlaybackPosition.swift */; };
-		F6D02C684D580D1E4CCC3F5C /* ArchiveNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E4E1B277E221051054138D /* ArchiveNew.swift */; };
+		08055A022B00DC47C3C7D094 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 530772E642BED6FE0502FF10 /* Assets.xcassets */; };
+		109D3A2B31E636A7F934BE27 /* MacPlaybackGlobalHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = A483538F2E6698D5BA7D4314 /* MacPlaybackGlobalHotkey.swift */; };
+		1151CA5373AED850456B97E0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 530772E642BED6FE0502FF10 /* Assets.xcassets */; };
+		29F1E0A3E1A3F0CABD74909B /* BiteFMCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2B434F33AFFB235322437DA9 /* BiteFMCore */; };
+		2BDDA8B60D7938E8F5B3524C /* BiteFMiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C96E3F47CB200D0528DBC5 /* BiteFMiOSApp.swift */; };
+		372C81403F93F8DA87D0D044 /* FavoriteStateLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3456133ACFB446A45664DE /* FavoriteStateLogicTests.swift */; };
+		387EFDA5C7D68E2515F3EF97 /* MacAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B31DEB4DA60B282167D4D44 /* MacAppDelegate.swift */; };
+		440513F9271821872B63953E /* ChangeFavoriteResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD912B8E3F7AD1CC548BD8AA /* ChangeFavoriteResponseTests.swift */; };
+		6AB614125F732D44130767EE /* BiteFMMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD4F8305DA80311B05F07B5 /* BiteFMMacApp.swift */; };
+		82F22C8A7413B75D18C74DDF /* BiteFMCore in Frameworks */ = {isa = PBXBuildFile; productRef = AED80C76F7243BD65351B3A7 /* BiteFMCore */; };
+		93D106F7122F0E0619EF7590 /* BroadcastDetailTrackMatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */; };
+		C67EE98BF63EFC8F9C4C13DC /* FavoriteTrackItemDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */; };
+		DC975EE8EF29377C258FAC8D /* MacSpacePlaybackKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3E21FC348BAD7B856C85D7 /* MacSpacePlaybackKeyMonitor.swift */; };
+		DDFD88E9B0EF5D2C42CEAE51 /* ArchiveSectionHelpersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A85A2322759B51E65F7523 /* ArchiveSectionHelpersTests.swift */; };
+		ED7EB4B3E57BB5D0BF6D66AD /* BiteFMCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4DC56BC922F1C764C1F047A2 /* BiteFMCore */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		5D8E9E9588EA2BE064965318 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 300E44B9AB063EC893A08199 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2714EBE26621EC91F046AB7A;
+			remoteInfo = BiteFMMac;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		0279916C527C3CCC2EAEB46D /* BiteFMApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiteFMApp.swift; sourceTree = "<group>"; };
-		03647380629A6CAF3AAEDA08 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		166474C4839B020237C39934 /* BroadcastInspectorModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastInspectorModifier.swift; sourceTree = "<group>"; };
-		29EE154B52FFEBF2A107E9E7 /* PlayerBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBarView.swift; sourceTree = "<group>"; };
-		2D289842C992C6539365E8F2 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
-		36C8617DC14CB667A1FF444A /* BroadcastDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailView.swift; sourceTree = "<group>"; };
-		38184DF7425D231679E9B5AA /* LogManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogManager.swift; sourceTree = "<group>"; };
-		3D17B337D265D510017AB400 /* Show.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Show.swift; sourceTree = "<group>"; };
-		482A2829B914B2E1A5B5D4FB /* BiteFM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BiteFM.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		4AA6F0B1FE59B225148D9419 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
-		5D93ED73478914AE8D645A23 /* StoredArchiveItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredArchiveItem.swift; sourceTree = "<group>"; };
-		5EB6B21324DA28C4E6E8BDC1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		63B28DEEAA2489AC8EC700D2 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		63BCF720330AEA57269C126A /* FavoriteBroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteBroadcast.swift; sourceTree = "<group>"; };
-		6710C34757EB34512A46239A /* StoredListeningHistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredListeningHistoryEntry.swift; sourceTree = "<group>"; };
-		6A1F6AB4C85DD4FB9803AEC7 /* LiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveView.swift; sourceTree = "<group>"; };
-		7738AA3922BE150B8C800E08 /* BroadcastDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetail.swift; sourceTree = "<group>"; };
-		7E320743551142C56F1B26C0 /* ArchiveItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveItem.swift; sourceTree = "<group>"; };
-		81A9B588B9BD69D35183A2C1 /* ArchiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveView.swift; sourceTree = "<group>"; };
-		979A52BD6C878098008F370A /* BroadcastRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastRow.swift; sourceTree = "<group>"; };
-		9D0E0C054F0CB893601FB9AF /* AudioPlayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerManager.swift; sourceTree = "<group>"; };
-		A4D74328FF192C360D3DECCF /* BroadcastListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastListView.swift; sourceTree = "<group>"; };
-		C7C5D74314945ED3093270A8 /* ListeningHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningHistory.swift; sourceTree = "<group>"; };
-		C896E1AAA1846FC38FDFB903 /* StoredFavoriteBroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredFavoriteBroadcast.swift; sourceTree = "<group>"; };
-		A1F0E1D2C3B4A5968778695A1 /* StoredFavoriteShow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredFavoriteShow.swift; sourceTree = "<group>"; };
-		B1F0E1D2C3B4A5968778695A1 /* FavoriteEpisodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteEpisodesView.swift; sourceTree = "<group>"; };
-		C1F0E1D2C3B4A5968778695A1 /* FavoriteTracksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTracksView.swift; sourceTree = "<group>"; };
-		D9538C505149AFD10ED778FC /* StoredShow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredShow.swift; sourceTree = "<group>"; };
-		E0E4E1B277E221051054138D /* ArchiveNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveNew.swift; sourceTree = "<group>"; };
-		E6A2AA19D015260A75E02B82 /* StoredPlaybackPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredPlaybackPosition.swift; sourceTree = "<group>"; };
-		F1BC17A6B81F8330C5B74395 /* String+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extensions.swift"; sourceTree = "<group>"; };
-		E8F1A2B3C4D5E6F708192A3B4C5D6E7F9 /* ArchiveSectionHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSectionHelpers.swift; sourceTree = "<group>"; };
-		A8C4E2103F5B6D7E8091A2B3C /* MacSpacePlaybackKeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSpacePlaybackKeyMonitor.swift; sourceTree = "<group>"; };
-		C3D4E5F60718293A4B5C6D7D /* MacAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppDelegate.swift; sourceTree = "<group>"; };
-		D4E5F60718293A4B5C6D7E8E /* MacPlaybackGlobalHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlaybackGlobalHotkey.swift; sourceTree = "<group>"; };
-		F6B91D19D99CD0ECF0EA98EE /* LiveMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMetadata.swift; sourceTree = "<group>"; };
+		16C96E3F47CB200D0528DBC5 /* BiteFMiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiteFMiOSApp.swift; sourceTree = "<group>"; };
+		530772E642BED6FE0502FF10 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6FD4885D96A1A79C3D8D9CEF /* BiteFM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BiteFM.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B31DEB4DA60B282167D4D44 /* MacAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppDelegate.swift; sourceTree = "<group>"; };
+		87A85A2322759B51E65F7523 /* ArchiveSectionHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSectionHelpersTests.swift; sourceTree = "<group>"; };
+		A483538F2E6698D5BA7D4314 /* MacPlaybackGlobalHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlaybackGlobalHotkey.swift; sourceTree = "<group>"; };
+		ABD4F8305DA80311B05F07B5 /* BiteFMMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiteFMMacApp.swift; sourceTree = "<group>"; };
+		AD912B8E3F7AD1CC548BD8AA /* ChangeFavoriteResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeFavoriteResponseTests.swift; sourceTree = "<group>"; };
+		B2B131EE96867DA1857013B2 /* BiteFM */ = {isa = PBXFileReference; lastKnownFileType = folder; name = BiteFM; path = .; sourceTree = SOURCE_ROOT; };
+		B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTrackItemDecodingTests.swift; sourceTree = "<group>"; };
+		C8D731A890D97D69C6E7427B /* BiteFMMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BiteFMMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailTrackMatchTests.swift; sourceTree = "<group>"; };
+		D24352E7C78FD486BAD3B483 /* BiteFMTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BiteFMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DD3E21FC348BAD7B856C85D7 /* MacSpacePlaybackKeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSpacePlaybackKeyMonitor.swift; sourceTree = "<group>"; };
+		FC3456133ACFB446A45664DE /* FavoriteStateLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteStateLogicTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		065B27F5F7021BAE3119E025 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ED7EB4B3E57BB5D0BF6D66AD /* BiteFMCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9B071573B808338D2ECF673B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				29F1E0A3E1A3F0CABD74909B /* BiteFMCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F336527A329677BCB317E414 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				82F22C8A7413B75D18C74DDF /* BiteFMCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
-		6F8AC4FCAFBC22C4457BBD44 /* Utils */ = {
+		1B208ABE2409BE1A373EB423 /* BiteFMiOS */ = {
 			isa = PBXGroup;
 			children = (
-				E8F1A2B3C4D5E6F708192A3B4C5D6E7F9 /* ArchiveSectionHelpers.swift */,
-				A8C4E2103F5B6D7E8091A2B3C /* MacSpacePlaybackKeyMonitor.swift */,
-				D4E5F60718293A4B5C6D7E8E /* MacPlaybackGlobalHotkey.swift */,
-				F1BC17A6B81F8330C5B74395 /* String+Extensions.swift */,
+				16C96E3F47CB200D0528DBC5 /* BiteFMiOSApp.swift */,
 			);
-			path = Utils;
+			name = BiteFMiOS;
+			path = Sources/BiteFMiOS;
 			sourceTree = "<group>";
 		};
-		736893108281AEDF00D5B0F0 /* Networking */ = {
+		49D595D6C9510703C8F5CD3D /* BiteFMTests */ = {
 			isa = PBXGroup;
 			children = (
-				4AA6F0B1FE59B225148D9419 /* APIClient.swift */,
-				2D289842C992C6539365E8F2 /* KeychainHelper.swift */,
-				38184DF7425D231679E9B5AA /* LogManager.swift */,
+				87A85A2322759B51E65F7523 /* ArchiveSectionHelpersTests.swift */,
+				CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */,
+				AD912B8E3F7AD1CC548BD8AA /* ChangeFavoriteResponseTests.swift */,
+				FC3456133ACFB446A45664DE /* FavoriteStateLogicTests.swift */,
+				B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */,
 			);
-			path = Networking;
+			name = BiteFMTests;
+			path = Tests/BiteFMTests;
 			sourceTree = "<group>";
 		};
-		81493F1C4987530F5631660E /* Views */ = {
+		4B9DDBC341ADB45C6A35BD06 /* BiteFMMac */ = {
 			isa = PBXGroup;
 			children = (
-				E0E4E1B277E221051054138D /* ArchiveNew.swift */,
-				81A9B588B9BD69D35183A2C1 /* ArchiveView.swift */,
-				36C8617DC14CB667A1FF444A /* BroadcastDetailView.swift */,
-				166474C4839B020237C39934 /* BroadcastInspectorModifier.swift */,
-				A4D74328FF192C360D3DECCF /* BroadcastListView.swift */,
-				979A52BD6C878098008F370A /* BroadcastRow.swift */,
-				5EB6B21324DA28C4E6E8BDC1 /* ContentView.swift */,
-				B1F0E1D2C3B4A5968778695A1 /* FavoriteEpisodesView.swift */,
-				C1F0E1D2C3B4A5968778695A1 /* FavoriteTracksView.swift */,
-				6A1F6AB4C85DD4FB9803AEC7 /* LiveView.swift */,
-				63B28DEEAA2489AC8EC700D2 /* LoginView.swift */,
-				29EE154B52FFEBF2A107E9E7 /* PlayerBarView.swift */,
+				ABD4F8305DA80311B05F07B5 /* BiteFMMacApp.swift */,
+				7B31DEB4DA60B282167D4D44 /* MacAppDelegate.swift */,
+				A483538F2E6698D5BA7D4314 /* MacPlaybackGlobalHotkey.swift */,
+				DD3E21FC348BAD7B856C85D7 /* MacSpacePlaybackKeyMonitor.swift */,
 			);
-			path = Views;
+			name = BiteFMMac;
+			path = Sources/BiteFMMac;
 			sourceTree = "<group>";
 		};
 		8BC3A83C1D4E2585EBF9920B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				482A2829B914B2E1A5B5D4FB /* BiteFM.app */,
+				6FD4885D96A1A79C3D8D9CEF /* BiteFM.app */,
+				C8D731A890D97D69C6E7427B /* BiteFMMac.app */,
+				D24352E7C78FD486BAD3B483 /* BiteFMTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		ABF0503AF79088D086B71BE6 /* BiteFM */ = {
+		A4B3F764ABED76F0250E019D /* BiteFMCore */ = {
 			isa = PBXGroup;
 			children = (
-				03647380629A6CAF3AAEDA08 /* Assets.xcassets */,
-				0279916C527C3CCC2EAEB46D /* BiteFMApp.swift */,
-				C3D4E5F60718293A4B5C6D7D /* MacAppDelegate.swift */,
-				AF53A163B0793CA133AB81A3 /* Audio */,
-				F7E92C34DDE0D672B1C631C1 /* Models */,
-				736893108281AEDF00D5B0F0 /* Networking */,
-				6F8AC4FCAFBC22C4457BBD44 /* Utils */,
-				81493F1C4987530F5631660E /* Views */,
+				530772E642BED6FE0502FF10 /* Assets.xcassets */,
 			);
-			name = BiteFM;
-			path = Sources/BiteFM;
+			name = BiteFMCore;
+			path = Sources/BiteFMCore;
 			sourceTree = "<group>";
 		};
-		AF53A163B0793CA133AB81A3 /* Audio */ = {
+		C439494213899DB48A4B81DC /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				9D0E0C054F0CB893601FB9AF /* AudioPlayerManager.swift */,
+				B2B131EE96867DA1857013B2 /* BiteFM */,
 			);
-			path = Audio;
-			sourceTree = "<group>";
-		};
-		F7E92C34DDE0D672B1C631C1 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				7E320743551142C56F1B26C0 /* ArchiveItem.swift */,
-				7738AA3922BE150B8C800E08 /* BroadcastDetail.swift */,
-				63BCF720330AEA57269C126A /* FavoriteBroadcast.swift */,
-				C7C5D74314945ED3093270A8 /* ListeningHistory.swift */,
-				F6B91D19D99CD0ECF0EA98EE /* LiveMetadata.swift */,
-				3D17B337D265D510017AB400 /* Show.swift */,
-				5D93ED73478914AE8D645A23 /* StoredArchiveItem.swift */,
-				C896E1AAA1846FC38FDFB903 /* StoredFavoriteBroadcast.swift */,
-				A1F0E1D2C3B4A5968778695A1 /* StoredFavoriteShow.swift */,
-				6710C34757EB34512A46239A /* StoredListeningHistoryEntry.swift */,
-				E6A2AA19D015260A75E02B82 /* StoredPlaybackPosition.swift */,
-				D9538C505149AFD10ED778FC /* StoredShow.swift */,
-			);
-			path = Models;
+			name = Packages;
 			sourceTree = "<group>";
 		};
 		FD1068A9FC66BA5FCE66C238 = {
 			isa = PBXGroup;
 			children = (
-				ABF0503AF79088D086B71BE6 /* BiteFM */,
+				A4B3F764ABED76F0250E019D /* BiteFMCore */,
+				1B208ABE2409BE1A373EB423 /* BiteFMiOS */,
+				4B9DDBC341ADB45C6A35BD06 /* BiteFMMac */,
+				49D595D6C9510703C8F5CD3D /* BiteFMTests */,
+				C439494213899DB48A4B81DC /* Packages */,
 				8BC3A83C1D4E2585EBF9920B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -186,22 +156,64 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		CBA9130A8A7322B2D128FF02 /* BiteFM */ = {
+		2714EBE26621EC91F046AB7A /* BiteFMMac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = EE0E76CD6FD89FD036CAA8EC /* Build configuration list for PBXNativeTarget "BiteFM" */;
+			buildConfigurationList = F0EA4794DD26A16C948FEC0A /* Build configuration list for PBXNativeTarget "BiteFMMac" */;
 			buildPhases = (
-				A2C0CEE08F526E5490239176 /* Sources */,
-				849D7C1175610E4A9C143A24 /* Resources */,
+				8B6C146FCE5115775F1B9746 /* Sources */,
+				6CBBF54C64D6EE6260A2DEDA /* Resources */,
+				065B27F5F7021BAE3119E025 /* Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = BiteFM;
+			name = BiteFMMac;
 			packageProductDependencies = (
+				4DC56BC922F1C764C1F047A2 /* BiteFMCore */,
 			);
-			productName = BiteFM;
-			productReference = 482A2829B914B2E1A5B5D4FB /* BiteFM.app */;
+			productName = BiteFMMac;
+			productReference = C8D731A890D97D69C6E7427B /* BiteFMMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4487D46B839AC58F0CA0BE66 /* BiteFMTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D309F1EB3EBF41B75AC30299 /* Build configuration list for PBXNativeTarget "BiteFMTests" */;
+			buildPhases = (
+				57D81E82A3AFB7C21D105987 /* Sources */,
+				9B071573B808338D2ECF673B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C7DF7FB0FB78A06F832B1794 /* PBXTargetDependency */,
+			);
+			name = BiteFMTests;
+			packageProductDependencies = (
+				2B434F33AFFB235322437DA9 /* BiteFMCore */,
+			);
+			productName = BiteFMTests;
+			productReference = D24352E7C78FD486BAD3B483 /* BiteFMTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		4A2FB6E6368FC85D3E1C1663 /* BiteFMiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7CD9C55C7B7DCD58B5AB9A20 /* Build configuration list for PBXNativeTarget "BiteFMiOS" */;
+			buildPhases = (
+				D0DA6C473CD1F475B3623048 /* Sources */,
+				68F48F94C4EDF43A10747233 /* Resources */,
+				F336527A329677BCB317E414 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BiteFMiOS;
+			packageProductDependencies = (
+				AED80C76F7243BD65351B3A7 /* BiteFMCore */,
+			);
+			productName = BiteFMiOS;
+			productReference = 6FD4885D96A1A79C3D8D9CEF /* BiteFM.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -211,7 +223,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2630;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					4A2FB6E6368FC85D3E1C1663 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
 			};
 			buildConfigurationList = AB40AD66BDF7FF907F0A3A42 /* Build configuration list for PBXProject "BiteFM" */;
 			developmentRegion = en;
@@ -222,112 +239,145 @@
 			);
 			mainGroup = FD1068A9FC66BA5FCE66C238;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1E818404F8AFF88B1B98D5FB /* XCLocalSwiftPackageReference "." */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8BC3A83C1D4E2585EBF9920B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				CBA9130A8A7322B2D128FF02 /* BiteFM */,
+				2714EBE26621EC91F046AB7A /* BiteFMMac */,
+				4487D46B839AC58F0CA0BE66 /* BiteFMTests */,
+				4A2FB6E6368FC85D3E1C1663 /* BiteFMiOS */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		849D7C1175610E4A9C143A24 /* Resources */ = {
+		68F48F94C4EDF43A10747233 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				11248EFEDCF49BB9F7CB1B40 /* Assets.xcassets in Resources */,
+				08055A022B00DC47C3C7D094 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6CBBF54C64D6EE6260A2DEDA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1151CA5373AED850456B97E0 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A2C0CEE08F526E5490239176 /* Sources */ = {
+		57D81E82A3AFB7C21D105987 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				80DA8DECE043761D1E6539EF /* APIClient.swift in Sources */,
-				51A8D7D8BAAA2CCEFC6B44FD /* ArchiveItem.swift in Sources */,
-				F6D02C684D580D1E4CCC3F5C /* ArchiveNew.swift in Sources */,
-				5FF307CE4C83FA9BA896B331 /* ArchiveView.swift in Sources */,
-				5D4F40163630049C7B75C47C /* AudioPlayerManager.swift in Sources */,
-				A8C308DF4882003D31A5F5FB /* BiteFMApp.swift in Sources */,
-				C3D4E5F60718293A4B5C6D7E /* MacAppDelegate.swift in Sources */,
-				B1830EA2F1C659C1B33A15B1 /* BroadcastDetail.swift in Sources */,
-				0C0E37CA0905DF20F6F8EFB4 /* BroadcastDetailView.swift in Sources */,
-				3BF7DD36B08F8AB97AEB9000 /* BroadcastInspectorModifier.swift in Sources */,
-				16D0E2F1CB3A4838CCC20B0F /* BroadcastListView.swift in Sources */,
-				096EE74B9E84BBB2C82D10F7 /* BroadcastRow.swift in Sources */,
-				A0CE749CDB6C0CD26695E37D /* ContentView.swift in Sources */,
-				36376C4CC68D0ADE9F825BDD /* FavoriteBroadcast.swift in Sources */,
-				35C0C4003FDC0575604D5132 /* KeychainHelper.swift in Sources */,
-				C7B2D56A7A4870AAF67333B2 /* ListeningHistory.swift in Sources */,
-				6DD3BD6DDB4DB1761BE99103 /* LiveMetadata.swift in Sources */,
-				DABE31160A6200151D49D983 /* LiveView.swift in Sources */,
-				06396D84E0815A1BCCD5A03D /* LogManager.swift in Sources */,
-				A8C4E2103F5B6D7E8091A2B3D /* MacSpacePlaybackKeyMonitor.swift in Sources */,
-				D4E5F60718293A4B5C6D7E8F /* MacPlaybackGlobalHotkey.swift in Sources */,
-				C6B3E06AE5AC1C82C06B5E9F /* LoginView.swift in Sources */,
-				37E5135DE3CB200DE15BB43D /* PlayerBarView.swift in Sources */,
-				319819E5DE4D2822017994ED /* Show.swift in Sources */,
-				5708F796C241AF05E3826060 /* StoredArchiveItem.swift in Sources */,
-				BDC9E980FF984EECD35B02F6 /* StoredFavoriteBroadcast.swift in Sources */,
-				A1F0E1D2C3B4A5968778695A0 /* StoredFavoriteShow.swift in Sources */,
-				B1F0E1D2C3B4A5968778695A0 /* FavoriteEpisodesView.swift in Sources */,
-				C1F0E1D2C3B4A5968778695A0 /* FavoriteTracksView.swift in Sources */,
-				87645EC009334A41E8BBA01D /* StoredListeningHistoryEntry.swift in Sources */,
-				DF77B54CE27FA8CA7F9855A5 /* StoredPlaybackPosition.swift in Sources */,
-				3B95BE571354B84CA012F046 /* StoredShow.swift in Sources */,
-				BDA28ABCDA810DFF2C667CC4 /* String+Extensions.swift in Sources */,
-				E8F1A2B3C4D5E6F708192A3B4C5D6E7FA /* ArchiveSectionHelpers.swift in Sources */,
+				DDFD88E9B0EF5D2C42CEAE51 /* ArchiveSectionHelpersTests.swift in Sources */,
+				93D106F7122F0E0619EF7590 /* BroadcastDetailTrackMatchTests.swift in Sources */,
+				440513F9271821872B63953E /* ChangeFavoriteResponseTests.swift in Sources */,
+				372C81403F93F8DA87D0D044 /* FavoriteStateLogicTests.swift in Sources */,
+				C67EE98BF63EFC8F9C4C13DC /* FavoriteTrackItemDecodingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B6C146FCE5115775F1B9746 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6AB614125F732D44130767EE /* BiteFMMacApp.swift in Sources */,
+				387EFDA5C7D68E2515F3EF97 /* MacAppDelegate.swift in Sources */,
+				109D3A2B31E636A7F934BE27 /* MacPlaybackGlobalHotkey.swift in Sources */,
+				DC975EE8EF29377C258FAC8D /* MacSpacePlaybackKeyMonitor.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0DA6C473CD1F475B3623048 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2BDDA8B60D7938E8F5B3524C /* BiteFMiOSApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		C7DF7FB0FB78A06F832B1794 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2714EBE26621EC91F046AB7A /* BiteFMMac */;
+			targetProxy = 5D8E9E9588EA2BE064965318 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		252ACDAE3C2F6D4F160F0BD4 /* Debug */ = {
+		4CB87FA1F4D5C720C5F69507 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
-				ENABLE_DEBUG_DYLIB = NO;
-				INFOPLIST_FILE = Info.plist;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G3B579TTTD;
+				INFOPLIST_FILE = "Info-iOS.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/../Frameworks",
+					"@executable_path/Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFM;
-				SDKROOT = macosx;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMiOS;
+				PRODUCT_NAME = BiteFM;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		5FBE72953B4AE6648E9CDA57 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G3B579TTTD;
+				INFOPLIST_FILE = "Info-iOS.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMiOS;
+				PRODUCT_NAME = BiteFM;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		6C49283620A92256EAD12D0E /* Release */ = {
+		787A2547A9324EFA2EF6A6D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
-				INFOPLIST_FILE = Info.plist;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFM;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMTests;
 				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BiteFMMac.app/Contents/MacOS/BiteFMMac";
 			};
-			name = Release;
+			name = Debug;
 		};
 		8084A79345260B4FFF26D65A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -358,12 +408,10 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -378,15 +426,66 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		96134BB11BEC9AE0CB3977F8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMMac;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		9657F15007F167F468891B30 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BiteFMMac.app/Contents/MacOS/BiteFMMac";
+			};
+			name = Release;
+		};
+		B6C1A9857578527613090632 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_DEBUG_DYLIB = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMMac;
+				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
@@ -394,7 +493,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -425,11 +523,9 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -438,11 +534,11 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -452,6 +548,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		7CD9C55C7B7DCD58B5AB9A20 /* Build configuration list for PBXNativeTarget "BiteFMiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5FBE72953B4AE6648E9CDA57 /* Debug */,
+				4CB87FA1F4D5C720C5F69507 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		AB40AD66BDF7FF907F0A3A42 /* Build configuration list for PBXProject "BiteFM" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -461,16 +566,47 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		EE0E76CD6FD89FD036CAA8EC /* Build configuration list for PBXNativeTarget "BiteFM" */ = {
+		D309F1EB3EBF41B75AC30299 /* Build configuration list for PBXNativeTarget "BiteFMTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				252ACDAE3C2F6D4F160F0BD4 /* Debug */,
-				6C49283620A92256EAD12D0E /* Release */,
+				787A2547A9324EFA2EF6A6D1 /* Debug */,
+				9657F15007F167F468891B30 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F0EA4794DD26A16C948FEC0A /* Build configuration list for PBXNativeTarget "BiteFMMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B6C1A9857578527613090632 /* Debug */,
+				96134BB11BEC9AE0CB3977F8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1E818404F8AFF88B1B98D5FB /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2B434F33AFFB235322437DA9 /* BiteFMCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BiteFMCore;
+		};
+		4DC56BC922F1C764C1F047A2 /* BiteFMCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BiteFMCore;
+		};
+		AED80C76F7243BD65351B3A7 /* BiteFMCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BiteFMCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 300E44B9AB063EC893A08199 /* Project object */;
 }

@@ -4,7 +4,7 @@
 */
 
 import XCTest
-@testable import BiteFM
+@testable import BiteFMCore
 
 final class BroadcastDetailTrackMatchTests: XCTestCase {
     func testResolvesOffsetByTrackTitle() throws {

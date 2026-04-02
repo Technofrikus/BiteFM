@@ -1,6 +1,6 @@
-# BiteFM macOS Client
+# BiteFM (macOS + iOS)
 
-Ein nativer macOS-Client für den Radiosender [ByteFM](https://www.byte.fm), optimiert für eine nahtlose Integration in das Betriebssystem und ein flüssiges Nutzererlebnis beim Durchstöbern des Archivs und beim Hören der Livestreams.
+Ein nativer Client für den Radiosender [ByteFM](https://www.byte.fm). **Gemeinsame Logik** (`BiteFMCore`), mit schlanken App-Hüllen für **macOS** (`BiteFMMac`) und **iOS** (`BiteFMiOS`): adaptive Navigation (`NavigationSplitView` vs. `TabView`), kompakte Layouts auf dem iPhone und macOS-Menü/Hotkeys nur auf dem Mac.
 
 ## Hauptmerkmale
 
@@ -29,18 +29,32 @@ Ein nativer macOS-Client für den Radiosender [ByteFM](https://www.byte.fm), opt
 - **Fenster-Management**: Intelligente Anpassung der Fensterbreite beim Öffnen des Detail-Bereichs für optimale Lesbarkeit.
 
 ## Technische Basis
-- **SwiftUI**: Moderne, deklarative UI-Entwicklung für macOS.
+- **SwiftPM-Package**: Library `BiteFMCore` + ausführbares `BiteFMMac` für `swift build` / CLI.
+- **SwiftUI**: Adaptive UI (regular vs. compact) für Mac und iPhone.
 - **SwiftData**: Persistente Speicherung und Abfrage von Archiv-Daten.
 - **AVFoundation (AVPlayer)**: Hochwertige Audio-Wiedergabe und Streaming-Management.
 - **MediaPlayer Framework**: Systemweite Integration der Wiedergabesteuerung.
-- **xcodegen**: Projektverwaltung über eine `project.yml` für konsistente Build-Konfigurationen.
+- **xcodegen**: Xcode-Projekt mit zwei App-Targets (Mac + iOS) und lokalem SPM-Package.
 
 ## Installation & Entwicklung
-Das Projekt nutzt `xcodegen` zur Generierung der Xcode-Projektdatei.
+
+### Xcode (Mac- und iPhone-App)
 
 1. Installiere `xcodegen` (falls nicht vorhanden): `brew install xcodegen`
 2. Generiere das Projekt: `xcodegen generate`
 3. Öffne `BiteFM.xcodeproj` in Xcode.
+4. Schemes: **BiteFM** (macOS), **BiteFMiOS** (iPhone/iPad). iOS nutzt `Info-iOS.plist` inkl. **Background Audio** (`audio`).
+5. **Echtes iPhone:** Scheme **BiteFMiOS**, Zielgerät wählen. Unter *Signing & Capabilities* für das Target **BiteFMiOS** ein **Team** auswählen (Apple-ID mit kostenloser oder bezahlter Mitgliedschaft). Dauerhaft über `xcodegen generate`: `DEVELOPMENT_TEAM` unter `BiteFMiOS` → `settings` in `project.yml` setzen (siehe `project.local.yml.example`).
+
+### SwiftPM (nur Core + Mac-CLI)
+
+```bash
+swift build
+swift test
+swift run BiteFMMac
+```
+
+Details zu manuellen UI-/Audio-Checks: siehe `TESTING.md`.
 
 ---
 *Hinweis: Dies ist ein inoffizieller Client und steht in keiner direkten Verbindung zur ByteFM GmbH.*
