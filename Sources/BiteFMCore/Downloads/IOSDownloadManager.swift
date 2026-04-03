@@ -44,7 +44,6 @@ public final class IOSDownloadManager: ObservableObject {
     private var terminIDToTask: [Int: Int] = [:]
     /// Source URL for active tasks — used to pick a **correct file extension** (AVPlayer rejects `.bin` for MP3).
     private var taskToRemoteURL: [Int: URL] = [:]
-    private var watchdogByTaskID: [Int: Task<Void, Never>] = [:]
 
     /// Fast path for SwiftUI lists.
     @Published private(set) public var snapshotByTerminID: [Int: EpisodeDownloadUISnapshot] = [:]
@@ -77,20 +76,20 @@ public final class IOSDownloadManager: ObservableObject {
         if bridge == nil {
             let b = DownloadSessionBridge(manager: self)
             bridge = b
-            // Default (foreground) session is reliable for HTTPS to archiv.bytefm.com; background sessions
-            // often fail or stall with some CDNs/TLS stacks while the app is open.
-            let config = URLSessionConfiguration.default
+            // Background configuration so transfers continue after the app is suspended (not force-quit).
+            // `UIApplicationDelegate.handleEventsForBackgroundURLSession` + `urlSessionDidFinishEvents`
+            // complete the system handshake; `UIBackgroundModes` includes `fetch` (Info-iOS.plist).
+            let config = URLSessionConfiguration.background(withIdentifier: Self.backgroundSessionIdentifier)
             config.isDiscretionary = false
+            config.sessionSendsLaunchEvents = true
             config.waitsForConnectivity = true
             config.allowsExpensiveNetworkAccess = true
             config.allowsConstrainedNetworkAccess = true
             config.timeoutIntervalForRequest = 120
             config.timeoutIntervalForResource = 86_400
-            // Match APIClient so session cookies (e.g. login) apply to archiv.bytefm.com if needed.
             config.httpCookieStorage = HTTPCookieStorage.shared
             config.httpCookieAcceptPolicy = .always
             config.httpShouldSetCookies = true
-            // Browser-like defaults: Cloudflare/CDN often rejects non-Safari clients for large media.
             config.httpAdditionalHeaders = [
                 "User-Agent": Self.safariLikeDownloadUserAgent,
                 "Accept": "*/*",
@@ -137,9 +136,14 @@ public final class IOSDownloadManager: ObservableObject {
     private func reconnectRunningTasks(activeTasks: [URLSessionTask]) {
         let downloadTasks = activeTasks.compactMap { $0 as? URLSessionDownloadTask }
         for t in downloadTasks {
-            if let desc = t.taskDescription, let tid = Int(desc) {
-                taskToTerminID[t.taskIdentifier] = tid
-                terminIDToTask[tid] = t.taskIdentifier
+            if let desc = t.taskDescription, let terminID = Int(desc) {
+                let ident = t.taskIdentifier
+                taskToTerminID[ident] = terminID
+                terminIDToTask[terminID] = ident
+                if taskToRemoteURL[ident] == nil {
+                    let u = t.originalRequest?.url ?? t.currentRequest?.url
+                    if let u { taskToRemoteURL[ident] = u }
+                }
             }
         }
         Task { await refreshSnapshotFromStore() }
@@ -397,8 +401,6 @@ public final class IOSDownloadManager: ObservableObject {
         Task { @MainActor in
             defer { Self.removeStagedDownloadTempFileIfNeeded(at: localURL) }
             defer { Task { @MainActor [weak self] in await self?.processDownloadQueue() } }
-            watchdogByTaskID[taskIdentifier]?.cancel()
-            watchdogByTaskID[taskIdentifier] = nil
             let remoteSourceURL = taskToRemoteURL.removeValue(forKey: taskIdentifier)
             guard let terminID = taskToTerminID.removeValue(forKey: taskIdentifier) else { return }
             terminIDToTask.removeValue(forKey: terminID)
@@ -526,8 +528,6 @@ public final class IOSDownloadManager: ObservableObject {
         totalBytesExpectedToWrite: Int64
     ) {
         Task { @MainActor in
-            watchdogByTaskID[taskIdentifier]?.cancel()
-            watchdogByTaskID[taskIdentifier] = nil
             guard let terminID = taskToTerminID[taskIdentifier] else { return }
             let p: Double
             if totalBytesExpectedToWrite > 0 {
@@ -597,42 +597,7 @@ public final class IOSDownloadManager: ObservableObject {
             type: .info
         )
         task.resume()
-        scheduleWatchdog(taskIdentifier: task.taskIdentifier, terminID: item.terminID)
         await refreshSnapshotFromStore()
-    }
-
-    private func scheduleWatchdog(taskIdentifier: Int, terminID: Int) {
-        watchdogByTaskID[taskIdentifier]?.cancel()
-        watchdogByTaskID[taskIdentifier] = Task { @MainActor [weak self] in
-            guard let self else { return }
-            try? await Task.sleep(nanoseconds: 25_000_000_000)
-            guard !Task.isCancelled else { return }
-            guard self.taskToTerminID[taskIdentifier] == terminID else { return }
-            guard let container = self.modelContainer else { return }
-            let ctx = ModelContext(container)
-            let fd = FetchDescriptor<StoredDownloadedEpisode>(
-                predicate: #Predicate<StoredDownloadedEpisode> { $0.terminID == terminID }
-            )
-            guard let row = try? ctx.fetch(fd).first else { return }
-            if row.progress <= 0.0001 {
-                row.status = .failed
-                row.errorMessage = "Download-Timeout: Keine Daten empfangen (25s)."
-                self.lastErrorMessage = row.errorMessage
-                try? ctx.save()
-                LogManager.shared.log(
-                    "Watchdog timeout for task \(taskIdentifier), terminID \(terminID) — cancelling task",
-                    type: .error
-                )
-                self.urlSession?.getAllTasks { tasks in
-                    tasks.first(where: { $0.taskIdentifier == taskIdentifier })?.cancel()
-                }
-                self.taskToTerminID.removeValue(forKey: taskIdentifier)
-                self.terminIDToTask.removeValue(forKey: terminID)
-                self.taskToRemoteURL.removeValue(forKey: taskIdentifier)
-                self.watchdogByTaskID[taskIdentifier] = nil
-                await self.refreshSnapshotFromStore()
-            }
-        }
     }
 
     private func fetchOrCreateRow(for item: ArchiveItem, context: ModelContext) throws -> StoredDownloadedEpisode {
