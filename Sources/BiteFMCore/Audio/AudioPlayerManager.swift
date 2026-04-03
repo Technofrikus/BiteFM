@@ -2,6 +2,9 @@ import Foundation
 import AVFoundation
 import MediaPlayer
 import SwiftData
+#if os(iOS)
+import UIKit
+#endif
 
 @MainActor
 public class AudioPlayerManager: NSObject, ObservableObject {
@@ -43,7 +46,29 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     
     /// Nur in diesem Fall Position am Ende auf Anfang setzen (nicht bei explizitem `initialPosition`, z. B. Playlist).
     private var resumeWasFromSavedPositionOnly = false
-    
+
+    #if os(iOS)
+    /// Lock Screen / Dynamic Island zeigen ohne Artwork nur ein generisches Symbol; das App-Icon ist nicht per API ladbar — wir nutzen das Marken-Logo aus dem Asset-Katalog.
+    private static let brandNowPlayingArtwork: MPMediaItemArtwork? = {
+        guard let image = UIImage(named: "Logo", in: Bundle.module, compatibleWith: nil) else { return nil }
+        return MPMediaItemArtwork(boundsSize: image.size) { size in
+            guard size.width > 0, size.height > 0 else { return image }
+            let format = UIGraphicsImageRendererFormat.default()
+            format.scale = image.scale
+            let renderer = UIGraphicsImageRenderer(size: size, format: format)
+            return renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: size))
+            }
+        }
+    }()
+
+    private static func applyBrandArtworkToNowPlayingInfo(_ info: inout [String: Any]) {
+        if let artwork = brandNowPlayingArtwork {
+            info[MPMediaItemPropertyArtwork] = artwork
+        }
+    }
+    #endif
+
     public override init() {
         super.init()
         setupAudioSession()
@@ -464,7 +489,10 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
             nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         }
-        
+        #if os(iOS)
+        Self.applyBrandArtworkToNowPlayingInfo(&nowPlayingInfo)
+        #endif
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
 
@@ -559,7 +587,10 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         
         nowPlayingInfo[MPMediaItemPropertyTitle] = currentTrack
         nowPlayingInfo[MPMediaItemPropertyArtist] = currentShow
-        
+        #if os(iOS)
+        Self.applyBrandArtworkToNowPlayingInfo(&nowPlayingInfo)
+        #endif
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
     
@@ -715,7 +746,10 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         var nowPlayingInfo = [String: Any]()
         nowPlayingInfo[MPMediaItemPropertyTitle] = "BiteFM Live"
         nowPlayingInfo[MPMediaItemPropertyArtist] = "Radio für gute Musik"
-        
+        #if os(iOS)
+        Self.applyBrandArtworkToNowPlayingInfo(&nowPlayingInfo)
+        #endif
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
     
@@ -723,7 +757,10 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         var nowPlayingInfo = [String: Any]()
         nowPlayingInfo[MPMediaItemPropertyTitle] = item.sendungTitel
         nowPlayingInfo[MPMediaItemPropertyArtist] = item.subtitle
-        
+        #if os(iOS)
+        Self.applyBrandArtworkToNowPlayingInfo(&nowPlayingInfo)
+        #endif
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
 
@@ -731,6 +768,9 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         guard var nowPlayingInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo else { 
             var newInfo = [String: Any]()
             newInfo[MPNowPlayingInfoPropertyPlaybackRate] = rate
+            #if os(iOS)
+            Self.applyBrandArtworkToNowPlayingInfo(&newInfo)
+            #endif
             MPNowPlayingInfoCenter.default().nowPlayingInfo = newInfo
             #if os(macOS)
             MPNowPlayingInfoCenter.default().playbackState = rate > 0 ? .playing : .paused

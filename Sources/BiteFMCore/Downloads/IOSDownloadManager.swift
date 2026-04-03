@@ -108,6 +108,30 @@ public final class IOSDownloadManager: ObservableObject {
         Task { await applyRetentionIfNeeded() }
         Task { await reconcileOrphans() }
         Task { await migrateLegacyBinDownloadFilenamesIfNeeded() }
+        Self.purgeOrphanStagedDownloadTempFilesOnLaunch()
+    }
+
+    /// Nach App-Start: Reste von abgestürzten Sessions (`bitefm-download-*.tmp`). Normalerweise räumt `downloadDidFinish` sofort auf.
+    private static func purgeOrphanStagedDownloadTempFilesOnLaunch() {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory
+        guard let items = try? fm.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { return }
+        for url in items {
+            let name = url.lastPathComponent
+            guard name.hasPrefix("bitefm-download-"), url.pathExtension == "tmp" else { continue }
+            try? fm.removeItem(at: url)
+        }
+    }
+
+    /// Die vom Delegate nach `temporaryDirectory` verschobene Datei — ohne Löschen liegt sie **zusätzlich** zur Kopie unter Library nochmals vollständig im Temp (schnell mehrere GB).
+    private static func removeStagedDownloadTempFileIfNeeded(at localURL: URL) {
+        let fm = FileManager.default
+        let norm = localURL.standardizedFileURL
+        let path = norm.path
+        let tmpRoot = fm.temporaryDirectory.standardizedFileURL.path
+        guard path.hasPrefix(tmpRoot), norm.lastPathComponent.hasPrefix("bitefm-download-") else { return }
+        guard fm.fileExists(atPath: path) else { return }
+        try? fm.removeItem(at: norm)
     }
 
     private func reconnectRunningTasks(activeTasks: [URLSessionTask]) {
@@ -371,6 +395,7 @@ public final class IOSDownloadManager: ObservableObject {
         error: Error?
     ) {
         Task { @MainActor in
+            defer { Self.removeStagedDownloadTempFileIfNeeded(at: localURL) }
             defer { Task { @MainActor [weak self] in await self?.processDownloadQueue() } }
             watchdogByTaskID[taskIdentifier]?.cancel()
             watchdogByTaskID[taskIdentifier] = nil
@@ -434,6 +459,12 @@ public final class IOSDownloadManager: ObservableObject {
                 try ctx.save()
                 await cacheModeratorImageIfNeeded(terminID: terminID, context: ctx)
             } catch {
+                if let base = try? DownloadFilesDirectory.baseDirectory() {
+                    let partial = base.appendingPathComponent(destName, isDirectory: false)
+                    if fm.fileExists(atPath: partial.path) {
+                        try? fm.removeItem(at: partial)
+                    }
+                }
                 row.status = .failed
                 row.errorMessage = error.localizedDescription
                 lastErrorMessage = row.errorMessage
