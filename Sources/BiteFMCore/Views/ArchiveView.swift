@@ -11,19 +11,23 @@ struct ArchiveView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var searchText = ""
     @State private var hoveredIndexSymbol: String?
+    @State private var favoritesOnly = false
 
     private var showLetterIndexStrip: Bool {
         horizontalSizeClass != .compact
     }
     
     private var filteredShows: [Show] {
+        var list = apiClient.shows
+        if favoritesOnly {
+            list = list.filter { apiClient.isFavorite(show: $0) }
+        }
         if searchText.isEmpty {
-            return apiClient.shows
-        } else {
-            return apiClient.shows.filter { 
-                $0.titel.localizedCaseInsensitiveContains(searchText) || 
-                $0.untertitel.localizedCaseInsensitiveContains(searchText)
-            }
+            return list
+        }
+        return list.filter {
+            $0.titel.localizedCaseInsensitiveContains(searchText) ||
+            $0.untertitel.localizedCaseInsensitiveContains(searchText)
         }
     }
     
@@ -90,6 +94,19 @@ struct ArchiveView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
                 .searchable(text: $searchText, prompt: "Sendung suchen...")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            favoritesOnly.toggle()
+                        } label: {
+                            Label(
+                                favoritesOnly ? "Alle Sendungen" : "Nur Favoriten",
+                                systemImage: favoritesOnly ? "heart.fill" : "heart"
+                            )
+                        }
+                        .help(favoritesOnly ? "Alle Sendungen anzeigen" : "Nur favorisierte Sendungen anzeigen")
+                    }
+                }
                 .task {
                     if apiClient.shows.isEmpty {
                         await apiClient.fetchShows(modelContext: modelContext)
@@ -143,6 +160,13 @@ struct ArchiveView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if favoritesOnly, searchText.isEmpty, filteredShows.isEmpty, !apiClient.shows.isEmpty {
+                ContentUnavailableView(
+                    "Keine Favoriten-Sendungen",
+                    systemImage: "heart",
+                    description: Text("Du hast noch keine Sendungen als Favorit markiert.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !searchText.isEmpty, filteredShows.isEmpty {
                 ContentUnavailableView(
                     "Keine Treffer",
@@ -155,7 +179,10 @@ struct ArchiveView: View {
     }
 
     private var archiveListDimmedForPlaceholder: Bool {
-        (searchText.isEmpty && apiClient.shows.isEmpty) || (!searchText.isEmpty && filteredShows.isEmpty)
+        if searchText.isEmpty, apiClient.shows.isEmpty { return true }
+        if !searchText.isEmpty, filteredShows.isEmpty { return true }
+        if favoritesOnly, searchText.isEmpty, filteredShows.isEmpty, !apiClient.shows.isEmpty { return true }
+        return false
     }
 
     @ViewBuilder

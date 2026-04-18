@@ -15,6 +15,7 @@ struct LoginView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 120, height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             
             Text("BiteFM")
                 .font(.largeTitle)

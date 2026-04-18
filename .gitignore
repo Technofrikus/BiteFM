@@ -1,0 +1,7 @@
+# Lokale Signing-Overrides (optional)
+project.local.yml
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/

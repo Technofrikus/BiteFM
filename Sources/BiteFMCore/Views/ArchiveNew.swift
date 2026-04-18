@@ -15,12 +15,50 @@ struct ArchiveNew: View {
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
     @State private var hidePlayed = false
+    @State private var favoritesOnly = false
     
     private var filteredItems: [StoredArchiveItem] {
+        var items = storedItems
         if hidePlayed {
-            return storedItems.filter { !apiClient.isPlayed(broadcastID: $0.terminID) }
+            items = items.filter { !apiClient.isPlayed(broadcastID: $0.terminID) }
         }
-        return storedItems
+        if favoritesOnly {
+            items = items.filter { apiClient.isFavorite(slug: $0.sendungSlug, title: $0.sendungTitel) }
+        }
+        return items
+    }
+    
+    private var emptyFilterUnavailable: (title: String, systemImage: String, description: String) {
+        if hidePlayed && favoritesOnly {
+            let anyFavoriteInList = storedItems.contains { apiClient.isFavorite(slug: $0.sendungSlug, title: $0.sendungTitel) }
+            if !anyFavoriteInList {
+                return (
+                    title: "Keine Favoriten-Sendungen",
+                    systemImage: "heart",
+                    description: "In dieser Liste sind keine Sendungen von als Favorit markierten Sendereihen."
+                )
+            }
+            return (
+                title: "Keine passenden Sendungen",
+                systemImage: "checkmark.circle",
+                description: "Keine ungehörten Sendungen von Favoriten-Sendungen in dieser Liste."
+            )
+        }
+        if hidePlayed {
+            return (
+                title: "Alle Sendungen gehört",
+                systemImage: "checkmark.circle",
+                description: "Du hast alle aktuellen Sendungen in dieser Liste bereits gehört."
+            )
+        }
+        if favoritesOnly {
+            return (
+                title: "Keine Favoriten-Sendungen",
+                systemImage: "heart",
+                description: "In dieser Liste sind keine Sendungen von als Favorit markierten Sendereihen."
+            )
+        }
+        preconditionFailure("emptyFilterUnavailable without active filters")
     }
     
     /// Gruppiert nach Kalendertag (neueste Tage zuerst).
@@ -63,10 +101,11 @@ struct ArchiveNew: View {
             .opacity(filteredItems.isEmpty ? 0 : 1)
             
             if filteredItems.isEmpty && !storedItems.isEmpty {
+                let empty = emptyFilterUnavailable
                 ContentUnavailableView(
-                    "Alle Sendungen gehört",
-                    systemImage: "checkmark.circle",
-                    description: Text("Du hast alle aktuellen Sendungen in dieser Liste bereits gehört.")
+                    empty.title,
+                    systemImage: empty.systemImage,
+                    description: Text(empty.description)
                 )
             }
         }
@@ -81,6 +120,16 @@ struct ArchiveNew: View {
                               systemImage: hidePlayed ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
                     .help(hidePlayed ? "Alle Sendungen anzeigen" : "Gehörte Sendungen ausblenden")
+
+                    Button(action: {
+                        favoritesOnly.toggle()
+                    }) {
+                        Label(
+                            favoritesOnly ? "Alle Sendungen" : "Nur Favoriten-Sendungen",
+                            systemImage: favoritesOnly ? "heart.fill" : "heart"
+                        )
+                    }
+                    .help(favoritesOnly ? "Alle Sendungen anzeigen" : "Nur Sendungen von favorisierten Sendereihen")
 
                     #if os(macOS)
                     Button(action: {

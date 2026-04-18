@@ -16,6 +16,7 @@
 		387EFDA5C7D68E2515F3EF97 /* MacAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B31DEB4DA60B282167D4D44 /* MacAppDelegate.swift */; };
 		440513F9271821872B63953E /* ChangeFavoriteResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD912B8E3F7AD1CC548BD8AA /* ChangeFavoriteResponseTests.swift */; };
 		6AB614125F732D44130767EE /* BiteFMMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD4F8305DA80311B05F07B5 /* BiteFMMacApp.swift */; };
+		75F687D7EF97C48BEFCEB34E /* DownloadsVerificationMatrix.md in Resources */ = {isa = PBXBuildFile; fileRef = 2C7DF603677A94103378198C /* DownloadsVerificationMatrix.md */; };
 		82F22C8A7413B75D18C74DDF /* BiteFMCore in Frameworks */ = {isa = PBXBuildFile; productRef = AED80C76F7243BD65351B3A7 /* BiteFMCore */; };
 		93D106F7122F0E0619EF7590 /* BroadcastDetailTrackMatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */; };
 		C67EE98BF63EFC8F9C4C13DC /* FavoriteTrackItemDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */; };
@@ -36,6 +37,7 @@
 
 /* Begin PBXFileReference section */
 		16C96E3F47CB200D0528DBC5 /* BiteFMiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiteFMiOSApp.swift; sourceTree = "<group>"; };
+		2C7DF603677A94103378198C /* DownloadsVerificationMatrix.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = DownloadsVerificationMatrix.md; sourceTree = "<group>"; };
 		530772E642BED6FE0502FF10 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6FD4885D96A1A79C3D8D9CEF /* BiteFM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BiteFM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B31DEB4DA60B282167D4D44 /* MacAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppDelegate.swift; sourceTree = "<group>"; };
@@ -45,7 +47,7 @@
 		AD912B8E3F7AD1CC548BD8AA /* ChangeFavoriteResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeFavoriteResponseTests.swift; sourceTree = "<group>"; };
 		B2B131EE96867DA1857013B2 /* BiteFM */ = {isa = PBXFileReference; lastKnownFileType = folder; name = BiteFM; path = .; sourceTree = SOURCE_ROOT; };
 		B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTrackItemDecodingTests.swift; sourceTree = "<group>"; };
-		C8D731A890D97D69C6E7427B /* BiteFMMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BiteFMMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C8D731A890D97D69C6E7427B /* BiteFM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BiteFM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailTrackMatchTests.swift; sourceTree = "<group>"; };
 		D24352E7C78FD486BAD3B483 /* BiteFMTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BiteFMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD3E21FC348BAD7B856C85D7 /* MacSpacePlaybackKeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSpacePlaybackKeyMonitor.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 				87A85A2322759B51E65F7523 /* ArchiveSectionHelpersTests.swift */,
 				CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */,
 				AD912B8E3F7AD1CC548BD8AA /* ChangeFavoriteResponseTests.swift */,
+				2C7DF603677A94103378198C /* DownloadsVerificationMatrix.md */,
 				FC3456133ACFB446A45664DE /* FavoriteStateLogicTests.swift */,
 				B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */,
 			);
@@ -118,7 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				6FD4885D96A1A79C3D8D9CEF /* BiteFM.app */,
-				C8D731A890D97D69C6E7427B /* BiteFMMac.app */,
+				C8D731A890D97D69C6E7427B /* BiteFM.app */,
 				D24352E7C78FD486BAD3B483 /* BiteFMTests.xctest */,
 			);
 			name = Products;
@@ -173,7 +176,7 @@
 				4DC56BC922F1C764C1F047A2 /* BiteFMCore */,
 			);
 			productName = BiteFMMac;
-			productReference = C8D731A890D97D69C6E7427B /* BiteFMMac.app */;
+			productReference = C8D731A890D97D69C6E7427B /* BiteFM.app */;
 			productType = "com.apple.product-type.application";
 		};
 		4487D46B839AC58F0CA0BE66 /* BiteFMTests */ = {
@@ -181,6 +184,7 @@
 			buildConfigurationList = D309F1EB3EBF41B75AC30299 /* Build configuration list for PBXNativeTarget "BiteFMTests" */;
 			buildPhases = (
 				57D81E82A3AFB7C21D105987 /* Sources */,
+				748583F6169E3F4777889A90 /* Resources */,
 				9B071573B808338D2ECF673B /* Frameworks */,
 			);
 			buildRules = (
@@ -225,6 +229,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					2714EBE26621EC91F046AB7A = {
+						ProvisioningStyle = Automatic;
+					};
 					4A2FB6E6368FC85D3E1C1663 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -268,6 +275,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				1151CA5373AED850456B97E0 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		748583F6169E3F4777889A90 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				75F687D7EF97C48BEFCEB34E /* DownloadsVerificationMatrix.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -322,14 +337,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = G3B579TTTD;
+				DEVELOPMENT_TEAM = C24WCN78VM;
 				INFOPLIST_FILE = "Info-iOS.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMiOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMiOS;
 				PRODUCT_NAME = BiteFM;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -342,14 +357,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = G3B579TTTD;
+				DEVELOPMENT_TEAM = C24WCN78VM;
 				INFOPLIST_FILE = "Info-iOS.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMiOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMiOS;
 				PRODUCT_NAME = BiteFM;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -361,6 +376,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = C24WCN78VM;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -368,7 +384,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BiteFMMac.app/Contents/MacOS/BiteFMMac";
 			};
@@ -442,14 +458,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = C24WCN78VM;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMMac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMMac;
+				PRODUCT_NAME = BiteFM;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -459,6 +478,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = C24WCN78VM;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -466,7 +486,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BiteFMMac.app/Contents/MacOS/BiteFMMac";
 			};
@@ -476,7 +496,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = C24WCN78VM;
 				ENABLE_DEBUG_DYLIB = NO;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -484,7 +506,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.technofrikus.BiteFMMac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMMac;
+				PRODUCT_NAME = BiteFM;
 				SDKROOT = macosx;
 			};
 			name = Debug;

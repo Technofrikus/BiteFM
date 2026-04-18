@@ -63,6 +63,8 @@ public class APIClient: ObservableObject {
     private var pollingTask: Task<Void, Never>?
     private var archivePollingTask: Task<Void, Never>?
     private var pendingHistoryVerificationShowID: Int?
+    /// Serialisiert `fetchListeningHistory`, damit nicht mehrere gleichzeitige Saves auf demselben Store laufen (vermeidet SwiftData „temporary identifier remapped“ / DefaultStore-Fehler).
+    private var listeningHistoryFetchSerialTask: Task<Void, Never>?
     
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -317,8 +319,8 @@ public class APIClient: ObservableObject {
         // #endregion
         LogManager.shared.log("Syncing listening history after play: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
         
-        if let context = modelContainer.map({ ModelContext($0) }) {
-            await fetchListeningHistory(modelContext: context)
+        if let container = modelContainer {
+            await fetchListeningHistory(modelContext: container.mainContext)
         } else {
             await fetchListeningHistory()
         }
@@ -371,6 +373,16 @@ public class APIClient: ObservableObject {
     }
 
     func fetchListeningHistory(modelContext: ModelContext? = nil) async {
+        let previous = listeningHistoryFetchSerialTask
+        let task = Task { @MainActor in
+            await previous?.value
+            await self.performListeningHistoryFetch(modelContext: modelContext)
+        }
+        listeningHistoryFetchSerialTask = task
+        await task.value
+    }
+
+    private func performListeningHistoryFetch(modelContext: ModelContext? = nil) async {
         guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/listeningHistoryEntries.php") else { return }
         
         var request = URLRequest(url: url)
@@ -465,7 +477,7 @@ public class APIClient: ObservableObject {
             LogManager.shared.log("Failed to fetch listening history: \(error.localizedDescription)", type: .error)
         }
     }
-    
+
     private func syncListeningHistoryWithDatabase(items: [ListeningHistoryEntry], context: ModelContext) async throws {
         // Use a more stable update pattern to avoid SwiftData fatal errors (like "remapped to a temporary identifier")
         let descriptor = FetchDescriptor<StoredListeningHistoryEntry>()
@@ -903,9 +915,9 @@ public class APIClient: ObservableObject {
         listenedShowIDs.removeAll()
         UserDefaults.standard.removeObject(forKey: Self.listeningHistoryLastSuccessKey)
         
-        // Clear favorites and history from database
+        // Clear favorites and history from database (mainContext — gleicher Kontext wie @Query / UI)
         if let container = modelContainer {
-            let context = ModelContext(container)
+            let context = container.mainContext
             if let favorites = try? context.fetch(FetchDescriptor<StoredFavoriteBroadcast>()) {
                 for fav in favorites {
                     context.delete(fav)

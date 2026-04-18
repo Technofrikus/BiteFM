@@ -7,7 +7,7 @@ import AppKit
 public final class LogManager {
     public static let shared = LogManager()
 
-    private let logger = Logger(subsystem: "com.technofrikus.BiteFM", category: "App")
+    private let logger = Logger(subsystem: AppIdentifiers.logSubsystem, category: "App")
     private let logFileURL: URL?
     private let maxLogSize = 1024 * 1024 // 1 MB
 

@@ -44,7 +44,7 @@ Ein nativer Client für den Radiosender [ByteFM](https://www.byte.fm). **Gemeins
 2. Generiere das Projekt: `xcodegen generate`
 3. Öffne `BiteFM.xcodeproj` in Xcode.
 4. Schemes: **BiteFM** (macOS), **BiteFMiOS** (iPhone/iPad). iOS nutzt `Info-iOS.plist` inkl. **Background Audio** (`audio`).
-5. **Echtes iPhone:** Scheme **BiteFMiOS**, Zielgerät wählen. Unter *Signing & Capabilities* für das Target **BiteFMiOS** ein **Team** auswählen (Apple-ID mit kostenloser oder bezahlter Mitgliedschaft). Dauerhaft über `xcodegen generate`: `DEVELOPMENT_TEAM` unter `BiteFMiOS` → `settings` in `project.yml` setzen (siehe `project.local.yml.example`).
+5. **Signing (Apple-Developer-Team):** Team-ID unter [developer.apple.com](https://developer.apple.com/account) → **Membership** → **Team ID** (10 Zeichen). Alle Vorkommen von `XXXXXXXXXX` in [`project.yml`](project.yml) (`DEVELOPMENT_TEAM` unter `BiteFMiOS`, `BiteFMMac`, `BiteFMTests`) durch die echte ID ersetzen, dann `xcodegen generate`. Hinweise: [`project.local.yml.example`](project.local.yml.example). **Bundle-IDs** = `options.bundleIdPrefix` (aktuell `com.Moinboards`) + Suffix (`BiteFMiOS`, `BiteFMMac`, `BiteFMTests`); App-IDs unter Identifiers müssen passen — bei Präfix-Wechsel [`AppIdentifiers.swift`](Sources/BiteFMCore/AppIdentifiers.swift) (Keychain/OSLog) mitpflegen, sonst alte Keychain-Einträge unsichtbar.
 
 ### SwiftPM (nur Core + Mac-CLI)
 

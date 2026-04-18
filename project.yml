@@ -1,6 +1,8 @@
+# Team-ID / Overrides: Platzhalter unten ersetzen oder Inhalt aus project.local.yml.example in diese Datei mergen (kein automatisches include).
 name: BiteFM
 options:
-  bundleIdPrefix: com.technofrikus
+  # App-IDs in App Store Connect / developer.apple.com müssen zu diesen Suffixen passen (BiteFMiOS, BiteFMMac, BiteFMTests).
+  bundleIdPrefix: com.Moinboards
   deploymentTarget:
     macOS: "14.0"
     iOS: "17.0"
@@ -56,10 +58,14 @@ targets:
       - package: BiteFMSPM
         product: BiteFMCore
     settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        # Xcode → Accounts → Team → „Team ID“ (10 Zeichen). Platzhalter ersetzen.
+        DEVELOPMENT_TEAM: XXXXXXXXXX
+        PRODUCT_NAME: BiteFM
       configs:
         Debug:
           ENABLE_DEBUG_DYLIB: NO
-      PRODUCT_NAME: BiteFM
     info:
       path: Info.plist
       properties:
@@ -79,11 +85,11 @@ targets:
       - package: BiteFMSPM
         product: BiteFMCore
     settings:
-      PRODUCT_NAME: BiteFM
-      TARGETED_DEVICE_FAMILY: "1,2"
-      # Echtes Gerät: Unter Target BiteFMiOS → Signing & Capabilities ein Team wählen.
-      # Nach `xcodegen generate` ggf. erneut setzen, solange hier keine DEVELOPMENT_TEAM steht.
-      CODE_SIGN_STYLE: Automatic
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XXXXXXXXXX
+        PRODUCT_NAME: BiteFM
+        TARGETED_DEVICE_FAMILY: "1,2"
     info:
       path: Info-iOS.plist
       properties:
@@ -94,6 +100,17 @@ targets:
         UIBackgroundModes:
           - audio
         UILaunchScreen: {}
+        # Alle Orientierungen (iPhone + iPad) → Validator OK, Multitasking/Split View am iPad ohne UIRequiresFullScreen.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
 
   BiteFMTests:
     type: bundle.unit-test
@@ -106,4 +123,6 @@ targets:
       - package: BiteFMSPM
         product: BiteFMCore
     settings:
-      GENERATE_INFOPLIST_FILE: YES
+      base:
+        DEVELOPMENT_TEAM: XXXXXXXXXX
+        GENERATE_INFOPLIST_FILE: YES

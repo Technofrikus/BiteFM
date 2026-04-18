@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum KeychainHelper {
-    private static let service = "com.technofrikus.BiteFM"
+    private static let service = AppIdentifiers.keychainService
     
     // Toggle this to false for production
     private static let useKeychain = false
