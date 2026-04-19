@@ -1,5 +1,4 @@
 import Foundation
-import os
 import SwiftData
 
 @MainActor
@@ -73,6 +72,7 @@ public class APIClient: ObservableObject {
         return URLSession(configuration: config)
     }()
 
+    #if DEBUG
     private func agentDebugLog(
         runId: String = "initial",
         hypothesisId: String,
@@ -107,6 +107,22 @@ public class APIClient: ObservableObject {
             try? line.write(to: url)
         }
     }
+    #else
+    private func agentDebugLog(
+        runId: String = "initial",
+        hypothesisId: String,
+        location: String,
+        message: String,
+        data: [String: Any]
+    ) {
+        // Intentionally a no-op outside DEBUG builds (avoid filesystem side effects in production).
+        _ = runId
+        _ = hypothesisId
+        _ = location
+        _ = message
+        _ = data
+    }
+    #endif
     
     public init() {
         // Check if we have saved credentials to be "logged in" immediately
@@ -299,8 +315,7 @@ public class APIClient: ObservableObject {
         return listenedShowIDs.contains(broadcastID)
     }
     
-    /// Lädt die Hörhistorie vom Server neu (`listeningHistoryEntries.php`). Die App sendet keinen eigenen „als gehört markieren“-Request;
-    /// `listenedShowIDs` spiegelt nur, was die API zurückgibt (`show_id` = Termin-ID der Ausgabe).
+    /// Server markiert „gehört“ via `GET /api/v1/broadcasts/.../` **ohne** `?listen=no`; danach Hörhistorie (`listeningHistoryEntries.php`) laden — `listenedShowIDs` spiegelt die API (`show_id` = Termin-ID).
     func markAsPlayed(item: ArchiveItem) async {
         pendingHistoryVerificationShowID = item.terminID
         // #region agent log
@@ -317,8 +332,10 @@ public class APIClient: ObservableObject {
             ]
         )
         // #endregion
-        LogManager.shared.log("Syncing listening history after play: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
-        
+        LogManager.shared.log("Notify server + sync listening history after play: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
+
+        _ = await fetchBroadcastDetail(for: item, markAsListened: true)
+
         if let container = modelContainer {
             await fetchListeningHistory(modelContext: container.mainContext)
         } else {
@@ -1123,12 +1140,12 @@ public class APIClient: ObservableObject {
         }
     }
     
-    func fetchBroadcastDetail(for item: ArchiveItem) async -> BroadcastDetail? {
-        if let cached = broadcastDetailsCache[item.id] {
+    func fetchBroadcastDetail(for item: ArchiveItem, markAsListened: Bool = false) async -> BroadcastDetail? {
+        if !markAsListened, let cached = broadcastDetailsCache[item.id] {
             return cached
         }
-        
-        guard let url = makeBroadcastDetailURL(for: item) else {
+
+        guard let url = makeBroadcastDetailURL(for: item, markAsListened: markAsListened) else {
             LogManager.shared.log(
                 "Broadcast detail: keine URL (Offline/ungültig?) terminID=\(item.terminID) datum_de=\(item.datumDe) sendung=\(item.sendungSlug) terminSlug=\(item.terminSlug)",
                 type: .error
@@ -1202,8 +1219,8 @@ public class APIClient: ObservableObject {
     }
     #endif
     
-    /// `GET /api/v1/broadcasts/{sendung_slug}/{datum_de}/{termin_slug}/?listen=no` — erster Pfadsegment = Slug der **Sendung** (wie in der Sendungsliste), nicht immer gleich `sendung_slug` aus dem Archiv-JSON.
-    private func makeBroadcastDetailURL(for item: ArchiveItem) -> URL? {
+    /// `GET /api/v1/broadcasts/{sendung_slug}/{datum_de}/{termin_slug}/` — optional `?listen=no` (keine „gehört“-Markierung beim bloßen Metadaten-Laden). Erster Pfadsegment = Slug der **Sendung** (wie in der Sendungsliste), nicht immer gleich `sendung_slug` aus dem Archiv-JSON.
+    private func makeBroadcastDetailURL(for item: ArchiveItem, markAsListened: Bool = false) -> URL? {
         let dateSegment = item.datumDe.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !dateSegment.isEmpty else { return nil }
         let showSegment = restShowSlugForBroadcastDetailAPI(for: item)
@@ -1211,7 +1228,9 @@ public class APIClient: ObservableObject {
         components.scheme = "https"
         components.host = "www.byte.fm"
         components.path = "/api/v1/broadcasts/\(showSegment)/\(dateSegment)/\(item.terminSlugForBroadcastAPI)/"
-        components.queryItems = [URLQueryItem(name: "listen", value: "no")]
+        if !markAsListened {
+            components.queryItems = [URLQueryItem(name: "listen", value: "no")]
+        }
         return components.url
     }
     

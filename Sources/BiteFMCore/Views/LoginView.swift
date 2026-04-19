@@ -27,9 +27,15 @@ struct LoginView: View {
             VStack(spacing: 12) {
                 TextField("E-Mail / Benutzername", text: $username)
                     .textFieldStyle(.roundedBorder)
+                    .textContentType(.username)
+                    .autocorrectionDisabled(true)
                 
                 SecureField("Passwort", text: $password)
                     .textFieldStyle(.roundedBorder)
+                    .textContentType(.password)
+                    .onSubmit {
+                        submitLogin()
+                    }
 
                 Toggle("Logindaten merken", isOn: $rememberCredentials)
                 
@@ -40,10 +46,7 @@ struct LoginView: View {
                 }
                 
                 Button("Anmelden") {
-                    Task {
-                        await apiClient.login(username: username, password: password)
-                        persistCredentialsIfNeeded()
-                    }
+                    submitLogin()
                 }
                 .buttonStyle(.borderedProminent)
                 .padding(.top, 8)
@@ -82,6 +85,14 @@ struct LoginView: View {
             }
             KeychainHelper.deletePassword(account: username)
             savedUsername = ""
+        }
+    }
+    
+    private func submitLogin() {
+        guard !username.isEmpty, !password.isEmpty else { return }
+        Task {
+            await apiClient.login(username: username, password: password)
+            persistCredentialsIfNeeded()
         }
     }
 }

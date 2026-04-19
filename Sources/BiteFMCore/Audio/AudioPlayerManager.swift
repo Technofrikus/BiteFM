@@ -366,8 +366,9 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 guard pos.isFinite else { return }
                 self.currentTime = pos
                 
-                // „Gehört“: Hörhistorie vom Server laden. Bedingung: Position > 15 s in der Datei
-                // (nicht „15 s lang angehört“), oder kurze Ausgaben (< 15 s Länge): nahe am Ende.
+                // „Gehört“: Server via `markAsPlayed` (Broadcast-GET ohne listen=no) + Hörhistorie. Schwelle: 5 Min. in der Datei;
+                // kürzere Ausgaben (< 5 Min. Länge): nahe am Ende.
+                let listenedThresholdSeconds: Double = 300 // 5 Minuten
                 if !self.isLive, let item = self.currentItem, !self.hasMarkedCurrentItemAsPlayed {
                     let dur: Double = {
                         if self.duration > 0 { return self.duration }
@@ -375,10 +376,10 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                         return 0
                     }()
                     let shouldMark: Bool
-                    if dur > 0, dur < 15 {
+                    if dur > 0, dur < listenedThresholdSeconds {
                         shouldMark = pos >= dur - 1.0
                     } else {
-                        shouldMark = pos > 15.0
+                        shouldMark = pos > listenedThresholdSeconds
                     }
                     if shouldMark {
                         self.hasMarkedCurrentItemAsPlayed = true
