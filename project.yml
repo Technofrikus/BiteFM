@@ -13,6 +13,9 @@ settings:
   configs:
     Debug:
       ENABLE_DEBUG_DYLIB: NO
+  base:
+    MARKETING_VERSION: "0.3"
+    CURRENT_PROJECT_VERSION: "1"
 
 schemes:
   BiteFM:
@@ -69,6 +72,8 @@ targets:
     info:
       path: Info.plist
       properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "14.0"
         NSHighResolutionCapable: true
         NSPrincipalClass: NSApplication
@@ -93,6 +98,8 @@ targets:
     info:
       path: Info-iOS.plist
       properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleDisplayName: "BiteFM"
         LSRequiresIPhoneOS: true
         UIApplicationSceneManifest:

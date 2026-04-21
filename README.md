@@ -36,25 +36,5 @@ Ein nativer Client für den Radiosender [ByteFM](https://www.byte.fm). **Gemeins
 - **MediaPlayer Framework**: Systemweite Integration der Wiedergabesteuerung.
 - **xcodegen**: Xcode-Projekt mit zwei App-Targets (Mac + iOS) und lokalem SPM-Package.
 
-## Installation & Entwicklung
-
-### Xcode (Mac- und iPhone-App)
-
-1. Installiere `xcodegen` (falls nicht vorhanden): `brew install xcodegen`
-2. Generiere das Projekt: `xcodegen generate`
-3. Öffne `BiteFM.xcodeproj` in Xcode.
-4. Schemes: **BiteFM** (macOS), **BiteFMiOS** (iPhone/iPad). iOS nutzt `Info-iOS.plist` inkl. **Background Audio** (`audio`).
-5. **Signing (Apple-Developer-Team):** Team-ID unter [developer.apple.com](https://developer.apple.com/account) → **Membership** → **Team ID** (10 Zeichen). Alle Vorkommen von `XXXXXXXXXX` in [`project.yml`](project.yml) (`DEVELOPMENT_TEAM` unter `BiteFMiOS`, `BiteFMMac`, `BiteFMTests`) durch die echte ID ersetzen, dann `xcodegen generate`. Hinweise: [`project.local.yml.example`](project.local.yml.example). **Bundle-IDs** = `options.bundleIdPrefix` (aktuell `com.Moinboards`) + Suffix (`BiteFMiOS`, `BiteFMMac`, `BiteFMTests`); App-IDs unter Identifiers müssen passen — bei Präfix-Wechsel [`AppIdentifiers.swift`](Sources/BiteFMCore/AppIdentifiers.swift) (Keychain/OSLog) mitpflegen, sonst alte Keychain-Einträge unsichtbar.
-
-### SwiftPM (nur Core + Mac-CLI)
-
-```bash
-swift build
-swift test
-swift run BiteFMMac
-```
-
-Details zu manuellen UI-/Audio-Checks: siehe `TESTING.md`.
-
 ---
 *Hinweis: Dies ist ein inoffizieller Client und steht in keiner direkten Verbindung zur ByteFM GmbH.*
