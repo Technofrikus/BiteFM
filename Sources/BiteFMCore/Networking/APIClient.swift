@@ -62,6 +62,8 @@ public class APIClient: ObservableObject {
     private var pollingTask: Task<Void, Never>?
     private var archivePollingTask: Task<Void, Never>?
     private var pendingHistoryVerificationShowID: Int?
+    /// Basic-Auth-Zugangsdaten für die laufende Session, sobald `login` erfolgreich war — **bevor** `LoginView` sie in UserDefaults/Keychain geschrieben hat (vermeidet 401 auf den ersten API-Calls).
+    private var sessionBasicAuth: (username: String, password: String)?
     /// Serialisiert `fetchListeningHistory`, damit nicht mehrere gleichzeitige Saves auf demselben Store laufen (vermeidet SwiftData „temporary identifier remapped“ / DefaultStore-Fehler).
     private var listeningHistoryFetchSerialTask: Task<Void, Never>?
     
@@ -328,7 +330,7 @@ public class APIClient: ObservableObject {
                 "alreadyInLocalHistory": listenedShowIDs.contains(item.terminID),
                 "isLoggedIn": isLoggedIn,
                 "hasSavedUsername": UserDefaults.standard.string(forKey: "savedUsername") != nil,
-                "hasSavedPassword": UserDefaults.standard.string(forKey: "savedUsername").flatMap { KeychainHelper.readPassword(account: $0) } != nil
+                "hasSavedPassword": resolvedBasicAuthPair() != nil
             ]
         )
         // #endregion
@@ -350,6 +352,24 @@ public class APIClient: ObservableObject {
         let ns = error as NSError
         return ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled
     }
+
+    private func persistedBasicAuthPair() -> (username: String, password: String)? {
+        guard let username = UserDefaults.standard.string(forKey: "savedUsername"),
+              let password = KeychainHelper.readPassword(account: username) else { return nil }
+        return (username, password)
+    }
+
+    /// Basic Auth: zuerst frische Session (direkt nach `login`), sonst gespeicherte Zugangsdaten.
+    private func resolvedBasicAuthPair() -> (username: String, password: String)? {
+        if let sessionBasicAuth { return sessionBasicAuth }
+        return persistedBasicAuthPair()
+    }
+
+    private func applyBasicAuthIfPossible(to request: inout URLRequest) {
+        guard let pair = resolvedBasicAuthPair(),
+              let authData = "\(pair.username):\(pair.password)".data(using: .utf8) else { return }
+        request.setValue("Basic \(authData.base64EncodedString())", forHTTPHeaderField: "Authorization")
+    }
     
     private func performRequest(for request: URLRequest, retryOnAuthFailure: Bool = true) async throws -> (Data, URLResponse) {
         do {
@@ -360,9 +380,7 @@ public class APIClient: ObservableObject {
                retryOnAuthFailure {
                 LogManager.shared.log("Session expired or unauthorized (Code: \(httpResponse.statusCode)). Attempting silent re-login...", type: .error)
                 
-                if let username = UserDefaults.standard.string(forKey: "savedUsername"),
-                   let password = KeychainHelper.readPassword(account: username) {
-                    
+                if let (username, password) = resolvedBasicAuthPair() {
                     let success = await login(username: username, password: password, isAutoLogin: true)
                     if success {
                         LogManager.shared.log("Silent re-login successful. Retrying original request...", type: .info)
@@ -371,10 +389,12 @@ public class APIClient: ObservableObject {
                     } else {
                         LogManager.shared.log("Silent re-login FAILED. User must login manually.", type: .error)
                         isLoggedIn = false
+                        sessionBasicAuth = nil
                     }
                 } else {
                     LogManager.shared.log("No credentials found for silent re-login.", type: .error)
                     isLoggedIn = false
+                    sessionBasicAuth = nil
                 }
             }
             
@@ -406,15 +426,7 @@ public class APIClient: ObservableObject {
         request.httpMethod = "GET"
         request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
         
-        // Add Basic Auth if we have credentials
-        if let username = UserDefaults.standard.string(forKey: "savedUsername"),
-           let password = KeychainHelper.readPassword(account: username) {
-            let authString = "\(username):\(password)"
-            if let authData = authString.data(using: .utf8) {
-                let base64Auth = authData.base64EncodedString()
-                request.setValue("Basic \(base64Auth)", forHTTPHeaderField: "Authorization")
-            }
-        }
+        applyBasicAuthIfPossible(to: &request)
         
         LogManager.shared.log("Fetching listening history from \(url.absoluteString)...", type: .info)
         let trackedShowID = pendingHistoryVerificationShowID
@@ -495,32 +507,48 @@ public class APIClient: ObservableObject {
         }
     }
 
+    /// Die API kann mehrfach dieselbe `show_id` liefern; im Modell ist `showID` **unique**. Ohne Deduplizierung entstehen
+    /// mehrere `insert`-Objekte pro ID → SwiftData meldet u. a. „temporary identifier … remapped … fatal logic error in DefaultStore“.
+    private func deduplicatedListeningHistoryEntries(_ items: [ListeningHistoryEntry]) -> [ListeningHistoryEntry] {
+        var byShowID: [Int: ListeningHistoryEntry] = [:]
+        for item in items {
+            byShowID[item.showID] = item
+        }
+        return Array(byShowID.values)
+    }
+
     private func syncListeningHistoryWithDatabase(items: [ListeningHistoryEntry], context: ModelContext) async throws {
-        // Use a more stable update pattern to avoid SwiftData fatal errors (like "remapped to a temporary identifier")
-        let descriptor = FetchDescriptor<StoredListeningHistoryEntry>()
-        let existingEntries = try context.fetch(descriptor)
-        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.showID, $0) })
-        
-        let newItemIDs = Set(items.map { $0.showID })
-        
-        // 1. Delete entries that are no longer present
-        for (id, entry) in existingMap {
-            if !newItemIDs.contains(id) {
+        let deduped = deduplicatedListeningHistoryEntries(items)
+        if deduped.count != items.count {
+            LogManager.shared.log(
+                "Hörhistorie: \(items.count) API-Zeilen → \(deduped.count) nach Deduplizierung (mehrere Einträge pro show_id).",
+                type: .info
+            )
+        }
+
+        let previousAutosave = context.autosaveEnabled
+        context.autosaveEnabled = false
+        defer { context.autosaveEnabled = previousAutosave }
+
+        try context.transaction {
+            let descriptor = FetchDescriptor<StoredListeningHistoryEntry>()
+            let existingEntries = try context.fetch(descriptor)
+            let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.showID, $0) })
+
+            let newItemIDs = Set(deduped.map { $0.showID })
+
+            for (id, entry) in existingMap where !newItemIDs.contains(id) {
                 context.delete(entry)
             }
-        }
-        
-        // 2. Update existing or insert new entries
-        for item in items {
-            if let existing = existingMap[item.showID] {
-                existing.dateString = item.date
-            } else {
-                let newEntry = StoredListeningHistoryEntry(showID: item.showID, dateString: item.date)
-                context.insert(newEntry)
+
+            for item in deduped {
+                if let existing = existingMap[item.showID] {
+                    existing.dateString = item.date
+                } else {
+                    context.insert(StoredListeningHistoryEntry(showID: item.showID, dateString: item.date))
+                }
             }
         }
-        
-        try context.save()
     }
     
     func fetchFavorites(modelContext: ModelContext? = nil) async {
@@ -530,15 +558,7 @@ public class APIClient: ObservableObject {
         request.httpMethod = "GET"
         request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
         
-        // Add Basic Auth if we have credentials
-        if let username = UserDefaults.standard.string(forKey: "savedUsername"),
-           let password = KeychainHelper.readPassword(account: username) {
-            let authString = "\(username):\(password)"
-            if let authData = authString.data(using: .utf8) {
-                let base64Auth = authData.base64EncodedString()
-                request.setValue("Basic \(base64Auth)", forHTTPHeaderField: "Authorization")
-            }
-        }
+        applyBasicAuthIfPossible(to: &request)
         
         LogManager.shared.log("Fetching favorites from \(url.absoluteString)...", type: .info)
         
@@ -754,14 +774,7 @@ public class APIClient: ObservableObject {
         request.httpMethod = "GET"
         request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
         
-        if let username = UserDefaults.standard.string(forKey: "savedUsername"),
-           let password = KeychainHelper.readPassword(account: username) {
-            let authString = "\(username):\(password)"
-            if let authData = authString.data(using: .utf8) {
-                let base64Auth = authData.base64EncodedString()
-                request.setValue("Basic \(base64Auth)", forHTTPHeaderField: "Authorization")
-            }
-        }
+        applyBasicAuthIfPossible(to: &request)
         
         do {
             let (data, response) = try await performRequest(for: request)
@@ -867,6 +880,7 @@ public class APIClient: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                 // If login succeeds, the session automatically stores cookies.
                 errorMessage = nil
+                sessionBasicAuth = (username, password)
                 
                 // Switch the UI immediately after successful credential verification.
                 isLoggedIn = true
@@ -917,6 +931,7 @@ public class APIClient: ObservableObject {
     }
     
     func logout() {
+        sessionBasicAuth = nil
         if let username = UserDefaults.standard.string(forKey: "savedUsername") {
             KeychainHelper.deletePassword(account: username)
         }
@@ -976,6 +991,7 @@ public class APIClient: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
+        applyBasicAuthIfPossible(to: &request)
         
         do {
             let (data, response) = try await performRequest(for: request)
@@ -1066,6 +1082,7 @@ public class APIClient: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
+        applyBasicAuthIfPossible(to: &request)
         
         do {
             let (data, response) = try await performRequest(for: request)
@@ -1162,18 +1179,10 @@ public class APIClient: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
-        
-        if let username = UserDefaults.standard.string(forKey: "savedUsername"),
-           let password = KeychainHelper.readPassword(account: username) {
-            let authString = "\(username):\(password)"
-            if let authData = authString.data(using: .utf8) {
-                let base64Auth = authData.base64EncodedString()
-                request.setValue("Basic \(base64Auth)", forHTTPHeaderField: "Authorization")
-            }
-        }
+        applyBasicAuthIfPossible(to: &request)
         
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await performRequest(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             guard (200...299).contains(status) else {
                 let preview = String(data: data.prefix(400), encoding: .utf8) ?? ""

@@ -37,7 +37,25 @@ struct LoginView: View {
                         submitLogin()
                     }
 
-                Toggle("Logindaten merken", isOn: $rememberCredentials)
+                // Kein UISwitch: neben SecureField/Tastatur/Passwort-Autofill triggert der System-`Toggle` oft
+                // „Gesture: System gesture gate timed out“. Checkbox per Button vermeidet den Konflikt.
+                Button {
+                    rememberCredentials.toggle()
+                } label: {
+                    HStack(alignment: .center, spacing: 10) {
+                        Image(systemName: rememberCredentials ? "checkmark.square.fill" : "square")
+                            .font(.title3)
+                            .foregroundStyle(rememberCredentials ? Color.accentColor : Color.secondary)
+                        Text("Logindaten merken")
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Logindaten merken")
+                .accessibilityValue(rememberCredentials ? "Ein" : "Aus")
+                .accessibilityAddTraits(rememberCredentials ? [.isSelected] : [])
                 
                 if let errorMessage = apiClient.errorMessage {
                     Text(errorMessage)

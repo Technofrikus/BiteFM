@@ -3,9 +3,13 @@ import Security
 
 enum KeychainHelper {
     private static let service = AppIdentifiers.keychainService
-    
-    // Toggle this to false for production
+
+    /// DEBUG: Passwort in UserDefaults (nur lokal, unsicher). RELEASE: Keychain.
+    #if DEBUG
     private static let useKeychain = false
+    #else
+    private static let useKeychain = true
+    #endif
 
     static func savePassword(_ password: String, account: String) {
         if !useKeychain {
