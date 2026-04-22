@@ -2,6 +2,19 @@
 
 Ein nativer Client für den Radiosender [ByteFM](https://www.byte.fm). **Gemeinsame Logik** (`BiteFMCore`), mit schlanken App-Hüllen für **macOS** (`BiteFMMac`) und **iOS** (`BiteFMiOS`): adaptive Navigation (`NavigationSplitView` vs. `TabView`), kompakte Layouts auf dem iPhone und macOS-Menü/Hotkeys nur auf dem Mac.
 
+**HINWEIS: IN ENTWICKLUNG! Der Client funktioniert grundsätzlich, aber ist noch in Entwicklung. Bitte erstmal nur zu Testzwecken nutzen.**
+
+## Screenshots v0.3
+
+### macOS
+![BiteFM macOS Archiv](Screenshots/v0.3/Mac1.png)
+![BiteFM macOS Live](Screenshots/v0.3/Mac2.png)
+
+### iOS
+![BiteFM iOS Live](Screenshots/v0.3/iOS1.PNG)
+![BiteFM iOS Neu](Screenshots/v0.3/iOS2.PNG)
+![BiteFM iOS Downloads](Screenshots/v0.3/iOS3.PNG)
+
 ## Hauptmerkmale
 
 ### 🎙 Live-Streaming
