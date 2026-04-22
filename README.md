@@ -11,9 +11,7 @@ Ein nativer Client für den Radiosender [ByteFM](https://www.byte.fm). **Gemeins
 ![BiteFM macOS Live](Screenshots/v0.3/Mac2.png)
 
 ### iOS
-![BiteFM iOS Live](Screenshots/v0.3/iOS1.PNG)
-![BiteFM iOS Neu](Screenshots/v0.3/iOS2.PNG)
-![BiteFM iOS Downloads](Screenshots/v0.3/iOS3.PNG)
+<img src="Screenshots/v0.3/iOS1.PNG" width="300"> <img src="Screenshots/v0.3/iOS2.PNG" width="300"> <img src="Screenshots/v0.3/iOS3.PNG" width="300">
 
 ## Hauptmerkmale
 
