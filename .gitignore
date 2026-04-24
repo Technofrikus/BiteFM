@@ -5,3 +5,4 @@ project.local.yml
 xcuserdata/
 *.xcuserstate
 DerivedData/
+/.DS_Store
