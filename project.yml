@@ -18,7 +18,7 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
 
 schemes:
-  BiteFM:
+  BiteFMMac:
     build:
       targets:
         BiteFMMac: [run, test, profile, analyze, archive]
@@ -65,6 +65,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         # Xcode → Accounts → Team → „Team ID“ (10 Zeichen). Platzhalter ersetzen.
         DEVELOPMENT_TEAM: XXXXXXXXXX
+        CODE_SIGN_ENTITLEMENTS: BiteFMMac.entitlements
         PRODUCT_NAME: BiteFM
       configs:
         Debug:
@@ -78,6 +79,7 @@ targets:
         NSHighResolutionCapable: true
         NSPrincipalClass: NSApplication
         CFBundleDisplayName: "BiteFM"
+        LSApplicationCategoryType: public.app-category.music
 
   BiteFMiOS:
     type: application
