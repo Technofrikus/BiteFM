@@ -27,6 +27,23 @@ struct ArchiveNew: View {
         }
         return items
     }
+
+    /// Gruppiert nach Kalendertag (neueste Tage zuerst). Als Funktion, damit `body` die gefilterte Liste nur einmal auswertet.
+    private func daySections(from items: [StoredArchiveItem]) -> [(dayStart: Date, header: String, items: [StoredArchiveItem])] {
+        let cal = Calendar.current
+        let byDay = Dictionary(grouping: items) { cal.startOfDay(for: $0.broadcastDate) }
+        let days = byDay.keys.sorted(by: >)
+        return days.map { day in
+            let rowItems = (byDay[day] ?? []).sorted { lhs, rhs in
+                if lhs.startTime != rhs.startTime {
+                    return lhs.startTime > rhs.startTime
+                }
+                return lhs.terminID > rhs.terminID
+            }
+            let header = ArchiveSectionHelpers.newArchiveDaySectionHeader(for: day)
+            return (dayStart: day, header: header, items: rowItems)
+        }
+    }
     
     private var emptyFilterUnavailable: (title: String, systemImage: String, description: String) {
         if hidePlayed && favoritesOnly {
@@ -61,28 +78,12 @@ struct ArchiveNew: View {
         preconditionFailure("emptyFilterUnavailable without active filters")
     }
     
-    /// Gruppiert nach Kalendertag (neueste Tage zuerst).
-    private var daySections: [(dayStart: Date, header: String, items: [StoredArchiveItem])] {
-        let cal = Calendar.current
-        let items = filteredItems
-        let byDay = Dictionary(grouping: items) { cal.startOfDay(for: $0.broadcastDate) }
-        let days = byDay.keys.sorted(by: >)
-        return days.map { day in
-            let rowItems = (byDay[day] ?? []).sorted { lhs, rhs in
-                if lhs.startTime != rhs.startTime {
-                    return lhs.startTime > rhs.startTime
-                }
-                return lhs.terminID > rhs.terminID
-            }
-            let header = ArchiveSectionHelpers.newArchiveDaySectionHeader(for: day)
-            return (dayStart: day, header: header, items: rowItems)
-        }
-    }
-    
     var body: some View {
+        let filtered = filteredItems
+        let sections = daySections(from: filtered)
         ZStack {
             List {
-                ForEach(daySections, id: \.dayStart) { section in
+                ForEach(sections, id: \.dayStart) { section in
                     Section(header: Text(section.header)) {
                         ForEach(section.items) { storedItem in
                             let item = storedItem.toArchiveItem()
@@ -106,9 +107,9 @@ struct ArchiveNew: View {
             #else
             .listStyle(.inset)
             #endif
-            .opacity(filteredItems.isEmpty ? 0 : 1)
+            .opacity(filtered.isEmpty ? 0 : 1)
             
-            if filteredItems.isEmpty && !storedItems.isEmpty {
+            if filtered.isEmpty && !storedItems.isEmpty {
                 let empty = emptyFilterUnavailable
                 ContentUnavailableView {
                     Label(empty.title, systemImage: empty.systemImage)

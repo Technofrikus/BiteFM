@@ -97,7 +97,7 @@ public class APIClient: ObservableObject {
     
     private static let listeningHistoryLastSuccessKey = "listeningHistoryLastFetchSuccessAt"
     
-    private var broadcastDetailsCache: [Int: BroadcastDetail] = [:]
+    private var broadcastDetailsCache = BroadcastDetailLRUCache(capacity: 50)
     private var pollingTask: Task<Void, Never>?
     private var archivePollingTask: Task<Void, Never>?
     private var pendingHistoryVerificationShowID: Int?
@@ -955,6 +955,7 @@ public class APIClient: ObservableObject {
         lastListRefreshFailedWithoutNetwork = false
         stopLiveMetadataPolling()
         stopArchivePolling()
+        broadcastDetailsCache.clear()
         favoritesPollingTask?.cancel()
         favoritesPollingTask = nil
         historyPollingTask?.cancel()
@@ -1219,7 +1220,7 @@ public class APIClient: ObservableObject {
     }
     
     func fetchBroadcastDetail(for item: ArchiveItem, markAsListened: Bool = false) async -> BroadcastDetail? {
-        if !markAsListened, let cached = broadcastDetailsCache[item.id] {
+        if !markAsListened, let cached = broadcastDetailsCache.value(for: item.id) {
             return cached
         }
 
@@ -1231,7 +1232,7 @@ public class APIClient: ObservableObject {
             )
             #if os(iOS)
             if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
-                broadcastDetailsCache[item.id] = offline
+                broadcastDetailsCache.set(item.id, detail: offline)
                 return offline
             }
             #endif
@@ -1260,7 +1261,7 @@ public class APIClient: ObservableObject {
                 let detail = try await Task.detached(priority: .userInitiated) {
                     try JSONDecoder().decode(BroadcastDetail.self, from: data)
                 }.value
-                broadcastDetailsCache[item.id] = detail
+                broadcastDetailsCache.set(item.id, detail: detail)
                 return detail
             } catch {
                 lastFailure = (url, "\(error)")
@@ -1278,7 +1279,7 @@ public class APIClient: ObservableObject {
         }
         #if os(iOS)
         if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
-            broadcastDetailsCache[item.id] = offline
+            broadcastDetailsCache.set(item.id, detail: offline)
             return offline
         }
         #endif

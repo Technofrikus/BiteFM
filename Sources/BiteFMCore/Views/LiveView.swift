@@ -98,7 +98,8 @@ struct LiveView: View {
                         if history.count > 1 {
                             let tail = Array(history.dropFirst())
                             VStack(spacing: 0) {
-                                ForEach(Array(tail.enumerated()), id: \.offset) { index, track in
+                                // `id: \.self` statt Index: bei API-Polls wechselt die Reihenfolge weniger „Zellen-Identität“ als bei `id: \.offset`.
+                                ForEach(tail, id: \.self) { track in
                                     HStack {
                                         Text(track.decodedBasicHTMLEntities)
                                             .font(.body)
@@ -107,7 +108,7 @@ struct LiveView: View {
                                     .padding(.vertical, horizontalSizeClass == .compact ? 6 : 8)
                                     .padding(.horizontal)
 
-                                    if index < tail.count - 1 {
+                                    if track != tail.last {
                                         Divider().padding(.leading)
                                     }
                                 }

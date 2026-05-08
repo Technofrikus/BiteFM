@@ -263,6 +263,12 @@ private struct ExpandedLiveNowPlayingContent: View {
         .onAppear {
             apiClient.startLiveMetadataPolling()
         }
+        .onDisappear {
+            // Live-Stream läuft weiter (Mini-Player / andere UI): Metadaten-Polling nicht beenden.
+            if !playerManager.isLive {
+                apiClient.stopLiveMetadataPolling()
+            }
+        }
     }
 
     private var fallbackCoverIcon: some View {
