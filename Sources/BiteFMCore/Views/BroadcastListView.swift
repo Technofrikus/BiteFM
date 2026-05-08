@@ -81,18 +81,35 @@ struct BroadcastListView: View {
                         description: Text("Du bist offline oder das Netzwerk ist nicht erreichbar. Ausgaben dieser Sendung können jetzt nicht geladen werden.")
                     )
                 } else {
-                    ContentUnavailableView(
-                        hidePlayed ? "Keine ungehörten Sendungen" : "Keine Sendungen gefunden",
-                        systemImage: hidePlayed ? "checkmark.circle" : "archivebox",
-                        description: Text(hidePlayed ? "Alle Sendungen dieser Sendung wurden bereits gehört." : "")
-                    )
+                    if hidePlayed {
+                        ContentUnavailableView {
+                            Label("Keine ungehörten Sendungen", systemImage: "checkmark.circle")
+                        } description: {
+                            Text("Alle Sendungen dieser Sendung wurden bereits gehört.")
+                        } actions: {
+                            Button("Gehörte einblenden") {
+                                hidePlayed = false
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            "Keine Sendungen gefunden",
+                            systemImage: "archivebox"
+                        )
+                    }
                 }
             } else if !filteredBroadcasts.isEmpty && displayedBroadcasts.isEmpty {
-                ContentUnavailableView(
-                    "Keine Treffer",
-                    systemImage: "magnifyingglass",
-                    description: Text("Keine Ausgabe passt zur Suche.")
-                )
+                ContentUnavailableView {
+                    Label("Keine Treffer", systemImage: "magnifyingglass")
+                } description: {
+                    Text("Keine Ausgabe passt zur Suche.")
+                } actions: {
+                    Button("Suche löschen") {
+                        searchText = ""
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
         }
         .searchable(text: $searchText, prompt: "Ausgabe suchen…")
@@ -100,38 +117,38 @@ struct BroadcastListView: View {
         .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                HStack {
+                Menu {
                     Button(action: {
                         Task { await apiClient.toggleFavoriteBroadcast(slug: show.slug, displayTitle: show.titel) }
                     }) {
-                        Image(systemName: apiClient.isFavorite(show: show) ? "heart.fill" : "heart")
-                            .foregroundColor(apiClient.isFavorite(show: show) ? .red : .primary)
+                        Label(
+                            apiClient.isFavorite(show: show) ? "Sendung aus Favoriten entfernen" : "Sendung als Favorit speichern",
+                            systemImage: apiClient.isFavorite(show: show) ? "heart.slash" : "heart"
+                        )
                     }
-                    .help(apiClient.isFavorite(show: show) ? "Sendung aus Favoriten entfernen" : "Sendung als Favorit speichern")
                     .disabled(!apiClient.isLoggedIn)
-                    
+
                     Button(action: {
                         hidePlayed.toggle()
                         if hidePlayed {
-                            Task {
-                                await loadMoreUntilVisible()
-                            }
+                            Task { await loadMoreUntilVisible() }
                         }
                     }) {
-                        Label(hidePlayed ? "Alle anzeigen" : "Gehörte ausblenden", 
-                              systemImage: hidePlayed ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        Label(
+                            hidePlayed ? "Gehörte einblenden" : "Gehörte ausblenden",
+                            systemImage: hidePlayed ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                        )
                     }
-                    .help(hidePlayed ? "Alle Sendungen anzeigen" : "Gehörte Sendungen ausblenden")
 
                     #if os(macOS)
-                    Button(action: {
-                        isInspectorPresented.toggle()
-                    }) {
-                        Label("Details anzeigen", systemImage: "sidebar.right")
+                    Button(action: { isInspectorPresented.toggle() }) {
+                        Label(isInspectorPresented ? "Details ausblenden" : "Details anzeigen", systemImage: "sidebar.right")
                     }
-                    .help("Info ein-/ausblenden")
                     #endif
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
                 }
+                .help("Optionen")
             }
         }
         .task {

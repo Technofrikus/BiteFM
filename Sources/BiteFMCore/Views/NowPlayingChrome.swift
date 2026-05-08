@@ -37,13 +37,16 @@ struct MiniPlayerBarView: View {
 
     private var miniRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            // `Button` in `tabViewBottomAccessory` + häufige SwiftUI-Updates kann Taps schlucken — explizite Tap-Geste.
-            VStack(alignment: .leading, spacing: 4) {
-                PlayerBarMetadataBlock()
+            Button(action: onExpand) {
+                VStack(alignment: .leading, spacing: 4) {
+                    PlayerBarMetadataBlock()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onExpand)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Wiedergabe öffnen")
+            .accessibilityHint("Zeigt die aktuelle Wiedergabe mit Details und Steuerung.")
 
             Button(action: { playerManager.togglePlayPause() }) {
                 let imageName: String = {

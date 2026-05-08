@@ -80,13 +80,10 @@ struct BroadcastDetailView: View {
                                             Image(systemName: primaryPlayIconName)
                                             Text(primaryPlayLabel)
                                         }
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(Color.accentColor)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(8)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.accentColor)
+                                    .controlSize(.large)
 
                                     Divider()
                                 }
@@ -159,14 +156,10 @@ struct BroadcastDetailView: View {
                 Image(systemName: primaryPlayIconName)
                 Text(primaryPlayLabel)
             }
-            .font(.callout.weight(.semibold))
-            .padding(.vertical, 8)
-            .padding(.horizontal, 22)
-            .background(Color.accentColor)
-            .foregroundColor(.white)
-            .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.borderedProminent)
+        .tint(.accentColor)
+        .controlSize(.large)
     }
     #endif
 

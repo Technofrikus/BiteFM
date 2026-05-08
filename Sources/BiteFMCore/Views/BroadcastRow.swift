@@ -27,8 +27,16 @@ struct BroadcastRow: View {
         horizontalSizeClass == .compact
     }
 
-    /// Visual weight aligned with the download control (`.body` SF Symbol in a fixed hit target).
-    private let rowAccessoryBox: CGFloat = 22
+    /// Visible icon size stays small; the hit target remains wider than the glyph.
+    private let rowAccessoryBox: CGFloat = 18
+
+    private var rowAccessoryHitBox: CGFloat {
+        #if os(iOS)
+        return 28
+        #else
+        return 28
+        #endif
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -61,54 +69,71 @@ struct BroadcastRow: View {
         .listRowInsets(EdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 12))
     }
 
-    /// Icons, Datum und optionale Größe in **einer** Zeile (Datum rechts, vor dem Info-Button); Titel darunter volle Breite.
+    /// Datum und optionale Größe bleiben oben; kompakte Status-/Aktionsicons sitzen rechts in derselben Zeile.
     private var playbackTapArea: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .center, spacing: 6) {
-                #if os(iOS)
-                downloadLeadingControl
-                #endif
-                heartControl
-                if !isPlaying && apiClient.isPlayed(item: item) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+            HStack(alignment: .center, spacing: 4) {
+                Button(action: playAndRevealIfNeeded) {
+                    HStack(spacing: 6) {
+                        Text(dateLineString)
+                            .multilineTextAlignment(.leading)
+                        if let extra = resolvedMetaLineSizeSuffix {
+                            Text(extra)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .font(.caption)
+                    .foregroundColor(isPlaying ? .accentColor.opacity(0.75) : .secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .contentShape(Rectangle())
                 }
-                HStack(spacing: 6) {
-                    Text(dateLineString)
+                .buttonStyle(.plain)
+                .accessibilityHint("Spielt diese Ausgabe ab.")
+
+                inlineStatusControls
+            }
+
+            Button(action: playAndRevealIfNeeded) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text((showShowTitle ? item.sendungTitel : item.subtitle).bitefm_sanitizedDisplayLine)
+                        .font(.headline)
+                        .foregroundColor(isPlaying ? .accentColor : .primary)
                         .multilineTextAlignment(.leading)
-                    if let extra = resolvedMetaLineSizeSuffix {
-                        Text(extra)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if showShowTitle {
+                        Text(item.subtitle)
+                            .font(.subheadline)
+                            .foregroundColor(isPlaying ? .accentColor.opacity(0.8) : .secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .font(.caption)
-                .foregroundColor(isPlaying ? .accentColor.opacity(0.75) : .secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            Text((showShowTitle ? item.sendungTitel : item.subtitle).bitefm_sanitizedDisplayLine)
-                .font(.headline)
-                .foregroundColor(isPlaying ? .accentColor : .primary)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-            if showShowTitle {
-                Text(item.subtitle)
-                    .font(.subheadline)
-                    .foregroundColor(isPlaying ? .accentColor.opacity(0.8) : .secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Spielt diese Ausgabe ab.")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
         .opacity(apiClient.isPlayed(item: item) && !isPlaying ? 0.65 : 1.0)
-        .onTapGesture {
-            playerManager.play(item: item)
-            if isInspectorPresented {
-                selectedItemForDetail = item
+    }
+
+    private var inlineStatusControls: some View {
+        HStack(alignment: .center, spacing: 2) {
+            if !isPlaying && apiClient.isPlayed(item: item) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    .accessibilityLabel("Bereits gehört")
             }
+            #if os(iOS)
+            downloadLeadingControl
+            #endif
+            heartControl
         }
+        .frame(height: rowAccessoryHitBox, alignment: .center)
     }
 
     private var dateLineString: String {
@@ -148,7 +173,7 @@ struct BroadcastRow: View {
             Image(systemName: "info.circle")
                 .font(.system(size: 18))
                 .foregroundStyle(isSelected ? Color.white : Color.accentColor)
-                .frame(width: 40, height: 40)
+                .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                 .background(isSelected ? Color.accentColor : Color.clear)
                 .clipShape(Circle())
         }
@@ -164,18 +189,22 @@ struct BroadcastRow: View {
                 Button(action: onFavoriteTap) {
                     Image(systemName: isFav ? "heart.fill" : "heart")
                         .font(.body)
-                        .foregroundColor(isFav ? .red : .secondary)
+                        .foregroundStyle(isFav ? Color.pink : Color.secondary)
                         .frame(width: rowAccessoryBox, height: rowAccessoryBox)
                 }
                 .buttonStyle(.plain)
+                .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                .accessibilityLabel(isFav ? "Favorit entfernen" : "Als Favorit speichern")
                 #if os(macOS)
                 .help(isFav ? "Favorit entfernen" : "Als Favorit speichern")
                 #endif
             } else if isFav {
                 Image(systemName: "heart.fill")
                     .font(.body)
-                    .foregroundColor(.red)
+                    .foregroundStyle(.pink)
                     .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    .accessibilityLabel("Favorit")
             }
         }
     }
@@ -187,6 +216,13 @@ struct BroadcastRow: View {
         } else {
             selectedItemForDetail = item
             isInspectorPresented = true
+        }
+    }
+
+    private func playAndRevealIfNeeded() {
+        playerManager.play(item: item)
+        if isInspectorPresented {
+            selectedItemForDetail = item
         }
     }
 
@@ -204,18 +240,21 @@ struct BroadcastRow: View {
                     } label: {
                         Image(systemName: "play.circle.fill")
                             .font(.body)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color.accentColor)
                             .frame(width: rowAccessoryBox, height: rowAccessoryBox)
                     }
                     .buttonStyle(.plain)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                     .accessibilityLabel("Lokal abspielen")
                 case .downloading:
                     downloadRingProgress(progress: snap.progress)
                         .accessibilityLabel("Wird heruntergeladen")
+                        .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                 case .queued, .preparing:
                     ProgressView()
                         .controlSize(.small)
                         .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+                        .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                         .accessibilityLabel("Download wird vorbereitet")
                 case .failed:
                     Button {
@@ -227,6 +266,7 @@ struct BroadcastRow: View {
                             .frame(width: rowAccessoryBox, height: rowAccessoryBox)
                     }
                     .buttonStyle(.plain)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                     .accessibilityLabel("Download erneut versuchen")
                 }
             } else {
@@ -239,6 +279,7 @@ struct BroadcastRow: View {
                         .frame(width: rowAccessoryBox, height: rowAccessoryBox)
                 }
                 .buttonStyle(.plain)
+                .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                 .accessibilityLabel("Herunterladen")
             }
         }

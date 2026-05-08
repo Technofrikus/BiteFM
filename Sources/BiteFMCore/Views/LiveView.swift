@@ -16,38 +16,19 @@ struct LiveView: View {
     }
 
     private var artworkSide: CGFloat {
-        horizontalSizeClass == .compact ? 180 : 250
+        horizontalSizeClass == .compact ? 150 : 250
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: horizontalSizeClass == .compact ? 16 : 24) {
+            VStack(spacing: horizontalSizeClass == .compact ? 10 : 24) {
                 if showsMetadataUI {
-                    VStack(spacing: horizontalSizeClass == .compact ? 12 : 16) {
+                    VStack(spacing: horizontalSizeClass == .compact ? 8 : 16) {
                         if showsArtwork {
-                            ZStack {
-                                fallbackCoverIcon
-
-                                if let imageURL = apiClient.liveMetadata?.artistImageURL[selectedStream.rawValue],
-                                   !imageURL.isEmpty,
-                                   !imageURL.lowercased().contains("blank.png"),
-                                   let url = URL(string: imageURL) {
-                                    AsyncImage(url: url) { phase in
-                                        if let image = phase.image {
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                                .frame(width: artworkSide, height: artworkSide)
-                                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                .shadow(radius: 5)
-                                        }
-                                    }
-                                    .frame(width: artworkSide, height: artworkSide)
-                                }
-                            }
+                            currentArtwork
                         }
 
-                        VStack(spacing: 6) {
+                        VStack(spacing: horizontalSizeClass == .compact ? 4 : 6) {
                             if let currentTrack = apiClient.liveMetadata?.tracks[selectedStream.rawValue]?.first {
                                 Text(currentTrack.decodedBasicHTMLEntities)
                                     .font(.title2)
@@ -74,10 +55,10 @@ struct LiveView: View {
                                     .foregroundColor(.secondary.opacity(0.8))
                             }
                         }
-                        // Feste Mindesthöhe verhindert, dass Stream-Picker und „Stream starten“ bei „nur Musik“ nach oben springen.
-                        .frame(minHeight: horizontalSizeClass == .compact ? 128 : 144, alignment: .top)
+                        // Keep compact phones stable without reserving so much space that history is pushed offscreen.
+                        .frame(minHeight: horizontalSizeClass == .compact ? 84 : 144, alignment: .top)
                     }
-                    .padding(.top)
+                    .padding(.top, horizontalSizeClass == .compact ? 4 : 16)
                 }
 
                 // Stream picker directly above the play button for easy one-handed access.
@@ -102,14 +83,10 @@ struct LiveView: View {
                         Image(systemName: playerManager.isLive && playerManager.isPlaying && playerManager.currentStreamType == selectedStream ? "stop.fill" : "play.fill")
                         Text(playerManager.isLive && playerManager.isPlaying && playerManager.currentStreamType == selectedStream ? "Stream stoppen" : "Stream starten")
                     }
-                    .font(.body.weight(.semibold))
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 32)
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
+                .controlSize(.large)
 
                 if showsMetadataUI {
                     VStack(alignment: .leading, spacing: 12) {
@@ -127,7 +104,7 @@ struct LiveView: View {
                                             .font(.body)
                                         Spacer()
                                     }
-                                    .padding(.vertical, 8)
+                                    .padding(.vertical, horizontalSizeClass == .compact ? 6 : 8)
                                     .padding(.horizontal)
 
                                     if index < tail.count - 1 {
@@ -171,16 +148,39 @@ struct LiveView: View {
     
     private var fallbackCoverIcon: some View {
         let iconSize: CGFloat = horizontalSizeClass == .compact ? 56 : 80
-        let pad: CGFloat = horizontalSizeClass == .compact ? 62 : 85
         return Image(systemName: "music.note.list")
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: iconSize, height: iconSize)
             .foregroundColor(.secondary)
-            .padding(pad)
-            .background(Color.secondary.opacity(0.15))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
             .frame(width: artworkSide, height: artworkSide)
+    }
+
+    @ViewBuilder
+    private var currentArtwork: some View {
+        if let imageURL = apiClient.liveMetadata?.artistImageURL[selectedStream.rawValue],
+           !imageURL.isEmpty,
+           !imageURL.lowercased().contains("blank.png"),
+           let url = URL(string: imageURL) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: artworkSide, height: artworkSide)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(radius: 5)
+                case .empty, .failure:
+                    fallbackCoverIcon
+                @unknown default:
+                    fallbackCoverIcon
+                }
+            }
+            .frame(width: artworkSide, height: artworkSide)
+        } else {
+            fallbackCoverIcon
+        }
     }
 }
 

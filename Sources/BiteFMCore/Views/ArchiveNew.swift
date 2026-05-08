@@ -102,44 +102,46 @@ struct ArchiveNew: View {
             
             if filteredItems.isEmpty && !storedItems.isEmpty {
                 let empty = emptyFilterUnavailable
-                ContentUnavailableView(
-                    empty.title,
-                    systemImage: empty.systemImage,
-                    description: Text(empty.description)
-                )
+                ContentUnavailableView {
+                    Label(empty.title, systemImage: empty.systemImage)
+                } description: {
+                    Text(empty.description)
+                } actions: {
+                    Button("Filter zurücksetzen") {
+                        hidePlayed = false
+                        favoritesOnly = false
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
         }
         .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                HStack {
-                    Button(action: {
-                        hidePlayed.toggle()
-                    }) {
-                        Label(hidePlayed ? "Alle anzeigen" : "Gehörte ausblenden", 
-                              systemImage: hidePlayed ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                Menu {
+                    Button(action: { hidePlayed.toggle() }) {
+                        Label(
+                            hidePlayed ? "Gehörte einblenden" : "Gehörte ausblenden",
+                            systemImage: hidePlayed ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                        )
                     }
-                    .help(hidePlayed ? "Alle Sendungen anzeigen" : "Gehörte Sendungen ausblenden")
 
-                    Button(action: {
-                        favoritesOnly.toggle()
-                    }) {
+                    Button(action: { favoritesOnly.toggle() }) {
                         Label(
                             favoritesOnly ? "Alle Sendungen" : "Nur Favoriten-Sendungen",
                             systemImage: favoritesOnly ? "heart.fill" : "heart"
                         )
                     }
-                    .help(favoritesOnly ? "Alle Sendungen anzeigen" : "Nur Sendungen von favorisierten Sendereihen")
 
                     #if os(macOS)
-                    Button(action: {
-                        isInspectorPresented.toggle()
-                    }) {
-                        Label("Details anzeigen", systemImage: "sidebar.right")
+                    Button(action: { isInspectorPresented.toggle() }) {
+                        Label(isInspectorPresented ? "Details ausblenden" : "Details anzeigen", systemImage: "sidebar.right")
                     }
-                    .help("Info ein-/ausblenden")
                     #endif
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
                 }
+                .help("Optionen")
             }
         }
         .task {

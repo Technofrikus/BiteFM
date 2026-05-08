@@ -51,11 +51,16 @@ struct DownloadsView: View {
     var body: some View {
         Group {
             if listRows.isEmpty {
-                ContentUnavailableView(
-                    "Keine Downloads",
-                    systemImage: "arrow.down.circle",
-                    description: Text("Lade Sendungen aus dem Archiv oder den Favoriten herunter, um sie offline anzuhören.")
-                )
+                ContentUnavailableView {
+                    Label("Keine Downloads", systemImage: "arrow.down.circle")
+                } description: {
+                    Text("Lade Sendungen aus dem Archiv oder den Favoriten herunter, um sie offline anzuhören.")
+                } actions: {
+                    Button("Download-Einstellungen") {
+                        showSettings = true
+                    }
+                    .buttonStyle(.bordered)
+                }
             } else {
                 List(selection: $selection) {
                     Section {
@@ -101,7 +106,7 @@ struct DownloadsView: View {
             }
         }
         .navigationTitle("Downloads")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {

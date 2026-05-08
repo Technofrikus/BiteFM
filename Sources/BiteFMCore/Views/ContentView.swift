@@ -221,7 +221,7 @@ private struct LoggedInRootView: View {
                             }
                         }
                         .navigationTitle("Live")
-                        .navigationBarTitleDisplayMode(.inline)
+                        .navigationBarTitleDisplayMode(.large)
                     }
                 }
 
@@ -233,7 +233,7 @@ private struct LoggedInRootView: View {
                             }
                         }
                         .navigationTitle("Neu im Archiv")
-                        .navigationBarTitleDisplayMode(.inline)
+                        .navigationBarTitleDisplayMode(.large)
                     }
                 }
 
@@ -255,7 +255,7 @@ private struct LoggedInRootView: View {
                             }
                         }
                         .navigationTitle("Favoriten")
-                        .navigationBarTitleDisplayMode(.inline)
+                        .navigationBarTitleDisplayMode(.large)
                     }
                 }
 
@@ -294,7 +294,7 @@ private struct LoggedInRootView: View {
                         }
                     }
                     .navigationTitle("Live")
-                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarTitleDisplayMode(.large)
                 }
                 .tabItem { Label("Live", systemImage: "radio") }
                 .tag(MainTab.live)
@@ -306,7 +306,7 @@ private struct LoggedInRootView: View {
                         }
                     }
                     .navigationTitle("Neu im Archiv")
-                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarTitleDisplayMode(.large)
                 }
                 .tabItem { Label("Neu", systemImage: "clock") }
                 .tag(MainTab.archiveNew)
@@ -328,7 +328,7 @@ private struct LoggedInRootView: View {
                         }
                     }
                     .navigationTitle("Favoriten")
-                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarTitleDisplayMode(.large)
                 }
                 .tabItem { Label("Favoriten", systemImage: "heart.fill") }
                 .tag(MainTab.favorites)
@@ -382,7 +382,6 @@ private struct LoggedInRootView: View {
                             Text("Favoriten: Ausgaben")
                         } icon: {
                             Image(systemName: "heart.fill")
-                                .foregroundStyle(.white)
                         }
                     }
                     NavigationLink(value: SidebarItem.favoriteTracks) {
@@ -390,7 +389,6 @@ private struct LoggedInRootView: View {
                             Text("Favoriten: Tracks")
                         } icon: {
                             Image(systemName: "heart.fill")
-                                .foregroundStyle(.white)
                         }
                     }
 
@@ -410,7 +408,6 @@ private struct LoggedInRootView: View {
                 .navigationTitle("BiteFM")
                 .listStyle(.sidebar)
                 .navigationSplitViewColumnWidth(min: 115, ideal: 165, max: 250)
-                .toolbar(removing: .sidebarToggle)
             } detail: {
                 Group {
                     switch selection {
@@ -435,18 +432,6 @@ private struct LoggedInRootView: View {
                             .navigationTitle("Live")
                     }
                 }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: {
-                    withAnimation {
-                        columnVisibility = columnVisibility == .all ? .detailOnly : .all
-                    }
-                }) {
-                    Label("Seitenleiste", systemImage: "sidebar.left")
-                }
-                .help("Seitenleiste ein-/ausblenden")
             }
         }
     }
@@ -485,9 +470,6 @@ private struct FavoritesHubView: View {
             }
         }
         .navigationTitle("Favoriten")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
     }
 }
 

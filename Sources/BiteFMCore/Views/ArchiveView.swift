@@ -9,12 +9,26 @@ struct ArchiveView: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var searchText = ""
     @State private var hoveredIndexSymbol: String?
+    @State private var lastIndexDragSymbol: String?
     @State private var favoritesOnly = false
 
     private var showLetterIndexStrip: Bool {
-        horizontalSizeClass != .compact
+        #if os(macOS)
+        return true
+        #else
+        return !dynamicTypeSize.isAccessibilitySize
+        #endif
+    }
+
+    private var usesOverlayLetterIndex: Bool {
+        #if os(macOS)
+        return false
+        #else
+        return horizontalSizeClass == .compact
+        #endif
     }
     
     private var filteredShows: [Show] {
@@ -62,6 +76,11 @@ struct ArchiveView: View {
     /// Index: **#** zuerst, dann A–Z, dann weitere Buchstaben (Ä, Ö, …).
     private var indexStripSymbols: [String] {
         let available = availableSectionIDs
+        #if os(iOS)
+        if usesOverlayLetterIndex {
+            return letterSections.map(\.letter)
+        }
+        #endif
         let lettersAZ = (65...90).map { String(UnicodeScalar($0)!) }
         var rows: [String] = ["#"]
         rows.append(contentsOf: lettersAZ)
@@ -78,12 +97,20 @@ struct ArchiveView: View {
             ScrollViewReader { proxy in
                 Group {
                     if showLetterIndexStrip {
-                        HStack(alignment: .top, spacing: 0) {
-                            archiveIndexStrip(proxy: proxy)
-
-                            Divider()
-
+                        if usesOverlayLetterIndex {
                             archiveScrollContent
+                                .overlay(alignment: .trailing) {
+                                    archiveIndexStrip(proxy: proxy)
+                                        .padding(.trailing, 4)
+                                }
+                        } else {
+                            HStack(alignment: .top, spacing: 0) {
+                                archiveIndexStrip(proxy: proxy)
+
+                                Divider()
+
+                                archiveScrollContent
+                            }
                         }
                     } else {
                         archiveScrollContent
@@ -91,20 +118,22 @@ struct ArchiveView: View {
                 }
                 .navigationTitle("Archiv")
                 #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.large)
                 #endif
                 .searchable(text: $searchText, prompt: "Sendung suchen...")
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            favoritesOnly.toggle()
+                        Menu {
+                            Button(action: { favoritesOnly.toggle() }) {
+                                Label(
+                                    favoritesOnly ? "Alle Sendungen" : "Nur Favoriten",
+                                    systemImage: favoritesOnly ? "heart.fill" : "heart"
+                                )
+                            }
                         } label: {
-                            Label(
-                                favoritesOnly ? "Alle Sendungen" : "Nur Favoriten",
-                                systemImage: favoritesOnly ? "heart.fill" : "heart"
-                            )
+                            Image(systemName: "slider.horizontal.3")
                         }
-                        .help(favoritesOnly ? "Alle Sendungen anzeigen" : "Nur favorisierte Sendungen anzeigen")
+                        .help("Optionen")
                     }
                 }
                 .task {
@@ -161,18 +190,28 @@ struct ArchiveView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if favoritesOnly, searchText.isEmpty, filteredShows.isEmpty, !apiClient.shows.isEmpty {
-                ContentUnavailableView(
-                    "Keine Favoriten-Sendungen",
-                    systemImage: "heart",
-                    description: Text("Du hast noch keine Sendungen als Favorit markiert.")
-                )
+                ContentUnavailableView {
+                    Label("Keine Favoriten-Sendungen", systemImage: "heart")
+                } description: {
+                    Text("Du hast noch keine Sendungen als Favorit markiert.")
+                } actions: {
+                    Button("Alle Sendungen anzeigen") {
+                        favoritesOnly = false
+                    }
+                    .buttonStyle(.bordered)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !searchText.isEmpty, filteredShows.isEmpty {
-                ContentUnavailableView(
-                    "Keine Treffer",
-                    systemImage: "magnifyingglass",
-                    description: Text("Keine Sendung passt zur Suche.")
-                )
+                ContentUnavailableView {
+                    Label("Keine Treffer", systemImage: "magnifyingglass")
+                } description: {
+                    Text("Keine Sendung passt zur Suche.")
+                } actions: {
+                    Button("Suche löschen") {
+                        searchText = ""
+                    }
+                    .buttonStyle(.bordered)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -228,17 +267,21 @@ struct ArchiveView: View {
     }
     
     /// Schriftgröße des Index (~25 % größer als zuvor 10 pt).
-    private var indexFontSize: CGFloat { 12.5 }
+    private var indexFontSize: CGFloat { usesOverlayLetterIndex ? 10.5 : 12.5 }
     
     /// Breite der Index-Spalte (~20 % mehr als zuvor 34 pt).
-    private var indexColumnWidth: CGFloat { 41 }
+    private var indexColumnWidth: CGFloat { usesOverlayLetterIndex ? 28 : 41 }
     
     /// Feste Zeilenhöhe, damit Hover-Hintergrund die Index-Spalte nicht neu misst und die Liste nicht mitzieht.
-    private var indexRowHeight: CGFloat { 22 }
+    private var indexRowHeight: CGFloat { usesOverlayLetterIndex ? 16 : 22 }
+
+    private var indexRowSpacing: CGFloat { 2 }
+
+    private var indexVerticalPadding: CGFloat { usesOverlayLetterIndex ? 6 : 4 }
     
     private func archiveIndexStrip(proxy: ScrollViewProxy) -> some View {
         let available = availableSectionIDs
-        return VStack(spacing: 2) {
+        return VStack(spacing: indexRowSpacing) {
             ForEach(indexStripSymbols, id: \.self) { symbol in
                 let isActive = available.contains(symbol)
                 let isHovered = hoveredIndexSymbol == symbol
@@ -259,6 +302,12 @@ struct ArchiveView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(indexForeground(isActive: isActive, isHovered: isHovered))
                 .contentShape(Rectangle())
+                .accessibilityLabel(isActive
+                    ? "Zu \(ArchiveSectionHelpers.archiveLetterSectionLabel(symbol))"
+                    : "\(ArchiveSectionHelpers.archiveLetterSectionLabel(symbol)) nicht verfügbar"
+                )
+                .accessibilityHint(isActive ? "Springt zu dieser Buchstabengruppe." : "Keine Sendungen in dieser Gruppe.")
+                .accessibilityAddTraits(.isButton)
                 #if os(macOS)
                 .onHover { hovering in
                     hoveredIndexSymbol = hovering ? symbol : nil
@@ -267,22 +316,26 @@ struct ArchiveView: View {
                 #endif
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, indexVerticalPadding)
         .padding(.horizontal, 2)
         .frame(width: indexColumnWidth)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(indexStripBackground)
+        .clipShape(RoundedRectangle(cornerRadius: usesOverlayLetterIndex ? 12 : 0, style: .continuous))
+        .simultaneousGesture(indexDragGesture(proxy: proxy))
         // Gleicher Grund wie beim ScrollView: kein Layout-Flattern beim Hover.
         .animation(nil, value: hoveredIndexSymbol)
     }
     
-    private func jumpToSection(_ id: String, proxy: ScrollViewProxy) {
-        let animation = Animation.easeInOut(duration: 0.45)
-        
+    private func jumpToSection(_ id: String, proxy: ScrollViewProxy, animated: Bool = true) {
         DispatchQueue.main.async {
             // Mit VStack (statt LazyVStack) sind alle Höhen sofort bekannt.
             // Ein einziger animierter Pass reicht nun aus.
-            withAnimation(animation) {
+            if animated {
+                withAnimation(.easeInOut(duration: 0.45)) {
+                    proxy.scrollTo(id, anchor: .top)
+                }
+            } else {
                 proxy.scrollTo(id, anchor: .top)
             }
             
@@ -294,6 +347,36 @@ struct ArchiveView: View {
             }
             #endif
         }
+    }
+
+    private func indexDragGesture(proxy: ScrollViewProxy) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard let symbol = indexSymbol(atY: value.location.y) else { return }
+                guard availableSectionIDs.contains(symbol) else { return }
+                guard lastIndexDragSymbol != symbol else { return }
+
+                lastIndexDragSymbol = symbol
+                hoveredIndexSymbol = symbol
+                jumpToSection(symbol, proxy: proxy, animated: false)
+            }
+            .onEnded { _ in
+                lastIndexDragSymbol = nil
+                #if os(iOS)
+                hoveredIndexSymbol = nil
+                #endif
+            }
+    }
+
+    private func indexSymbol(atY y: CGFloat) -> String? {
+        let symbols = indexStripSymbols
+        guard !symbols.isEmpty else { return nil }
+
+        let adjustedY = y - indexVerticalPadding
+        let rowStride = indexRowHeight + indexRowSpacing
+        let rawIndex = Int((adjustedY / rowStride).rounded(.down))
+        let clampedIndex = min(max(rawIndex, 0), symbols.count - 1)
+        return symbols[clampedIndex]
     }
     
     private func indexForeground(isActive: Bool, isHovered: Bool) -> Color {
@@ -327,20 +410,21 @@ struct ArchiveView: View {
         NavigationLink(destination: BroadcastListView(show: show)) {
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(show.titel)
+                            .font(.headline)
+                            .foregroundColor(isPlaying ? .accentColor : .primary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .layoutPriority(1)
                         if apiClient.isFavorite(show: show) {
                             Image(systemName: "heart.fill")
-                                .foregroundColor(.red)
+                                .foregroundStyle(.pink)
                                 .font(.body)
                                 .frame(width: accessoryBox, height: accessoryBox)
+                                .accessibilityLabel("Favorit")
                         }
-                        Spacer(minLength: 0)
                     }
-                    Text(show.titel)
-                        .font(.headline)
-                        .foregroundColor(isPlaying ? .accentColor : .primary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
                     if !show.untertitel.isEmpty {
                         Text(show.untertitel)
                             .font(.subheadline)

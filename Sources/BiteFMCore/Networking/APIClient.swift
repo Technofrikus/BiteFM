@@ -66,6 +66,8 @@ public class APIClient: ObservableObject {
     private var sessionBasicAuth: (username: String, password: String)?
     /// Serialisiert `fetchListeningHistory`, damit nicht mehrere gleichzeitige Saves auf demselben Store laufen (vermeidet SwiftData „temporary identifier remapped“ / DefaultStore-Fehler).
     private var listeningHistoryFetchSerialTask: Task<Void, Never>?
+    /// Serialisiert `fetchArchive`, damit nicht mehrere gleichzeitige Saves auf demselben Store laufen.
+    private var archiveFetchSerialTask: Task<Void, Never>?
     
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -186,6 +188,7 @@ public class APIClient: ObservableObject {
             // Archive stays on-demand in ArchiveNew instead of loading at app start.
             startFavoritesPolling()
             startHistoryPolling()
+            startArchivePolling()
         }
     }
     
@@ -233,6 +236,8 @@ public class APIClient: ObservableObject {
         favoritesPollingTask = nil
         historyPollingTask?.cancel()
         historyPollingTask = nil
+        archivePollingTask?.cancel()
+        archivePollingTask = nil
     }
 
     /// Erst nach echtem Background → Foreground: Polling neu starten und Favoriten/Historie einmal refreshen.
@@ -243,11 +248,13 @@ public class APIClient: ObservableObject {
         shouldRestartDeferredPollingAfterReturningFromBackground = false
         startFavoritesPolling()
         startHistoryPolling()
+        startArchivePolling()
         guard isLoggedIn else { return }
         Task {
             let ctx = modelContainer?.mainContext
             await fetchFavorites(modelContext: ctx)
             await fetchListeningHistory(modelContext: ctx)
+            await fetchArchive(modelContext: ctx)
         }
     }
     
@@ -818,13 +825,19 @@ public class APIClient: ObservableObject {
         archivePollingTask?.cancel()
         archivePollingTask = Task {
             while !Task.isCancelled {
-                if isLoggedIn {
-                    let context = modelContainer?.mainContext
-                    await fetchArchive(modelContext: context)
-                }
+                // Erst warten: initiale Loads laufen im `setup`-Task bzw. nach Login — vermeidet parallele Doppel-Requests.
                 try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000) // 30 minutes
+                guard !Task.isCancelled else { break }
+                
+                let context = modelContainer?.mainContext
+                await fetchArchive(modelContext: context)
             }
         }
+    }
+    
+    func stopArchivePolling() {
+        archivePollingTask?.cancel()
+        archivePollingTask = nil
     }
     
     func fetchLiveMetadata() async {
@@ -889,6 +902,7 @@ public class APIClient: ObservableObject {
                 // Keep polling aligned with the new authenticated session.
                 startFavoritesPolling()
                 startHistoryPolling()
+                startArchivePolling()
 
                 // Refresh authenticated data in the background so the UI can appear immediately.
                 Task {
@@ -938,6 +952,12 @@ public class APIClient: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "savedUsername")
         isLoggedIn = false
         lastListRefreshFailedWithoutNetwork = false
+        stopLiveMetadataPolling()
+        stopArchivePolling()
+        favoritesPollingTask?.cancel()
+        favoritesPollingTask = nil
+        historyPollingTask?.cancel()
+        historyPollingTask = nil
         // Clear favorites and history
         favoriteSlugs.removeAll()
         favoriteShowIDs.removeAll()
@@ -981,6 +1001,16 @@ public class APIClient: ObservableObject {
     }
     
     func fetchArchive(modelContext: ModelContext? = nil) async {
+        let previous = archiveFetchSerialTask
+        let task = Task { @MainActor in
+            await previous?.value
+            await self.performArchiveFetch(modelContext: modelContext)
+        }
+        archiveFetchSerialTask = task
+        await task.value
+    }
+
+    private func performArchiveFetch(modelContext: ModelContext? = nil) async {
         guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/archiveSendungenNew.php") else { 
             LogManager.shared.log("Invalid Archive URL", type: .error)
             return 
