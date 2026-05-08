@@ -73,7 +73,7 @@ struct BroadcastRow: View {
 
     /// Datum und optionale Größe bleiben oben; kompakte Status-/Aktionsicons sitzen rechts in derselben Zeile.
     private var playbackTapArea: some View {
-        Button(action: playAndRevealIfNeeded) {
+        HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 // Zeile 1: Datum & Meta
                 HStack(spacing: 6) {
@@ -82,7 +82,6 @@ struct BroadcastRow: View {
                     if let extra = resolvedMetaLineSizeSuffix {
                         Text(extra)
                     }
-                    Spacer(minLength: 80) // Platz für Icons rechts (Overlay)
                 }
                 .font(.caption)
                 .foregroundColor(isPlaying ? .accentColor.opacity(0.75) : .secondary)
@@ -106,10 +105,10 @@ struct BroadcastRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Spielt diese Ausgabe ab.")
-        .overlay(alignment: .topTrailing) {
+            .onTapGesture(perform: playAndRevealIfNeeded)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Spielt diese Ausgabe ab.")
+
             inlineStatusControls
                 .offset(y: -5) // Zentrierung der 28pt Icons zur ~14pt Caption-Zeile
         }
@@ -245,15 +244,25 @@ struct BroadcastRow: View {
                     .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                     .accessibilityLabel("Lokal abspielen")
                 case .downloading:
-                    downloadRingProgress(progress: snap.progress)
-                        .accessibilityLabel("Wird heruntergeladen")
-                        .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    Button {
+                        downloadManager.removeDownload(for: item.terminID)
+                    } label: {
+                        downloadRingProgress(progress: snap.progress)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    .accessibilityLabel("Download abbrechen")
                 case .queued, .preparing:
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: rowAccessoryBox, height: rowAccessoryBox)
-                        .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
-                        .accessibilityLabel("Download wird vorbereitet")
+                    Button {
+                        downloadManager.removeDownload(for: item.terminID)
+                    } label: {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    .accessibilityLabel("Download abbrechen")
                 case .failed:
                     Button {
                         Task { await downloadManager.startDownload(for: item) }

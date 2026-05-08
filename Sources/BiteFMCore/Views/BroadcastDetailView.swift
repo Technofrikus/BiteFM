@@ -237,11 +237,22 @@ private struct BroadcastDetailDownloadGlyphColumn: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Lokal abspielen")
                 case .downloading:
-                    downloadRing(progress: row.progress)
-                        .accessibilityLabel("Wird heruntergeladen")
+                    Button {
+                        IOSDownloadManager.shared.removeDownload(for: item.terminID)
+                    } label: {
+                        downloadRing(progress: row.progress)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Download abbrechen")
                 case .queued, .preparing:
-                    ProgressView()
-                        .controlSize(.regular)
+                    Button {
+                        IOSDownloadManager.shared.removeDownload(for: item.terminID)
+                    } label: {
+                        ProgressView()
+                            .controlSize(.regular)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Download abbrechen")
                 case .failed:
                     Button {
                         Task { await IOSDownloadManager.shared.startDownload(for: item, preloadedDetail: detail) }
@@ -304,15 +315,31 @@ private struct BroadcastDetailDownloadBar: View {
                     Label("Heruntergeladen", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 case .downloading:
-                    ProgressView(value: row.progress)
-                    Text("Wird heruntergeladen …")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Button {
+                        IOSDownloadManager.shared.removeDownload(for: item.terminID)
+                    } label: {
+                        HStack(spacing: 12) {
+                            ProgressView(value: row.progress)
+                            Text("Wird heruntergeladen … (zum Abbrechen tippen)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Download abbrechen")
                 case .queued, .preparing:
-                    ProgressView()
-                    Text("Download wird vorbereitet …")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Button {
+                        IOSDownloadManager.shared.removeDownload(for: item.terminID)
+                    } label: {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text("Download wird vorbereitet … (zum Abbrechen tippen)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Download abbrechen")
                 case .failed:
                     Button {
                         Task { await IOSDownloadManager.shared.startDownload(for: item, preloadedDetail: detail) }

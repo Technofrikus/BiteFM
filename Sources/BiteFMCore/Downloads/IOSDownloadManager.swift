@@ -289,27 +289,25 @@ public final class IOSDownloadManager: ObservableObject {
         await enqueueDownloadTask(remoteURL: remoteURL, item: item, context: context, row: row)
     }
 
-    public func cancelDownload(for terminID: Int) {
-        guard let tid = terminIDToTask[terminID], let session = urlSession else { return }
-        session.getAllTasks { tasks in
-            tasks.filter { $0.taskIdentifier == tid }.forEach { $0.cancel() }
-        }
-        Task { @MainActor in
-            terminIDToTask[terminID] = nil
+    /// Bricht einen laufenden/wartenden Download ab und entfernt die Zeile vollständig (inkl. Dateien & Offline-Detail).
+    /// Für `.downloaded`-Zeilen wirkt sie wie ein normales Löschen — gleiche Semantik wie `deleteDownloadedEpisode`.
+    public func removeDownload(for terminID: Int) {
+        if let tid = terminIDToTask[terminID] {
+            urlSession?.getAllTasks { tasks in
+                tasks.filter { $0.taskIdentifier == tid }.forEach { $0.cancel() }
+            }
+            terminIDToTask.removeValue(forKey: terminID)
             taskToTerminID.removeValue(forKey: tid)
             taskToRemoteURL.removeValue(forKey: tid)
-            if let container = modelContainer {
-                let ctx = ModelContext(container)
-                let fd = FetchDescriptor<StoredDownloadedEpisode>(
-                    predicate: #Predicate<StoredDownloadedEpisode> { $0.terminID == terminID }
-                )
-                if let row = try? ctx.fetch(fd).first, row.status != .downloaded {
-                    row.status = .failed
-                    row.errorMessage = "Abgebrochen."
-                    try? ctx.save()
-                }
-            }
+        }
+        if let container = modelContainer {
+            let ctx = ModelContext(container)
+            try? Self.deleteDownloadedEpisode(terminID: terminID, context: ctx)
+        }
+        snapshotByTerminID.removeValue(forKey: terminID)
+        Task { @MainActor in
             await refreshSnapshotFromStore()
+            await processDownloadQueue()
         }
     }
 
@@ -572,6 +570,17 @@ public final class IOSDownloadManager: ObservableObject {
         row: StoredDownloadedEpisode
     ) async {
         guard let session = urlSession else { return }
+        // Falls der Nutzer während `.preparing` (HEAD-Probe / Budget-Check) den Download abgebrochen hat,
+        // wurde die Zeile bereits aus der DB entfernt — dann keinen neuen URL-Task starten.
+        let itemTerminID = item.terminID
+        let stillExistsFd = FetchDescriptor<StoredDownloadedEpisode>(
+            predicate: #Predicate<StoredDownloadedEpisode> { $0.terminID == itemTerminID }
+        )
+        guard (try? context.fetch(stillExistsFd).first) != nil else {
+            snapshotByTerminID.removeValue(forKey: itemTerminID)
+            await refreshSnapshotFromStore()
+            return
+        }
         if terminIDToTask.count >= maxConcurrentDownloads {
             row.status = .queued
             row.progress = 0

@@ -76,8 +76,7 @@ struct DownloadsView: View {
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
                                     selection.remove(row.terminID)
-                                    try? IOSDownloadManager.deleteDownloadedEpisode(terminID: row.terminID, context: modelContext)
-                                    Task { await downloadManager.refreshSnapshotFromStore() }
+                                    downloadManager.removeDownload(for: row.terminID)
                                 } label: {
                                     Label("Löschen", systemImage: "trash")
                                 }
@@ -131,13 +130,12 @@ struct DownloadsView: View {
                     if editMode == .active, !selection.isEmpty {
                         Button("Löschen (\(selection.count))", role: .destructive) {
                             for id in selection {
-                                try? IOSDownloadManager.deleteDownloadedEpisode(terminID: id, context: modelContext)
+                                downloadManager.removeDownload(for: id)
                             }
                             selection.removeAll()
                             withAnimation {
                                 editMode = .inactive
                             }
-                            Task { await downloadManager.refreshSnapshotFromStore() }
                         }
                     }
                     Button {
@@ -178,9 +176,8 @@ struct DownloadsView: View {
         guard let rows = try? modelContext.fetch(fd) else { return }
         let ids = rows.map(\.terminID)
         for id in ids {
-            try? IOSDownloadManager.deleteDownloadedEpisode(terminID: id, context: modelContext)
+            downloadManager.removeDownload(for: id)
         }
-        Task { await downloadManager.refreshSnapshotFromStore() }
     }
 
     /// MB-Anzeige: fertig = messen aus Datei; unterwegs = erwartete Größe aus HEAD.
