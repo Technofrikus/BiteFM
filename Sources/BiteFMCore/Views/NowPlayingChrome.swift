@@ -17,20 +17,40 @@ struct MiniPlayerBarView: View {
     /// Prefer labeling at call sites: `MiniPlayerBarView(chrome: .tabAccessory, onExpand: { … })` (avoids trailing-closure ambiguity with `chrome:`).
     var onExpand: () -> Void
     var chrome: MiniPlayerBarChrome = .safeAreaInsetRow
+    var namespace: Namespace.ID? = nil
 
     var body: some View {
+        let cornerRadius: CGFloat = chrome == .tabAccessory ? 18 : 16
         switch chrome {
         case .tabAccessory:
             miniRow
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
+                .background {
+                    NowPlayingMatchedSurfaceBackground(
+                        namespace: namespace,
+                        cornerRadius: cornerRadius,
+                        // `tabViewBottomAccessory` dupliziert die View intern (Layout/Transitions).
+                        // Zusammen mit matchedGeometry kann das zu "multiple isSource: true" Warnungen führen.
+                        // Für die Accessory-Variante lassen wir daher matched-geometry als Source aus.
+                        isMatchedGeometrySource: false,
+                        materialFallback: nil
+                    )
+                }
         case .safeAreaInsetRow:
             VStack(spacing: 0) {
                 Divider()
                 miniRow
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Material.bar)
+                    .background {
+                        NowPlayingMatchedSurfaceBackground(
+                            namespace: namespace,
+                            cornerRadius: cornerRadius,
+                            isMatchedGeometrySource: true,
+                            materialFallback: AnyView(Rectangle().fill(Material.bar))
+                        )
+                    }
             }
         }
     }
@@ -73,34 +93,83 @@ struct ExpandedNowPlayingView: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @EnvironmentObject private var apiClient: APIClient
     @Environment(\.dismiss) private var dismiss
+    var onClose: (() -> Void)? = nil
+    var namespace: Namespace.ID? = nil
+    var allowsSwipeToDismiss: Bool = false
+    /// Bewusst `@State` (statt `@GestureState`): beim Loslassen einer erfolgreichen Dismiss-Geste soll
+    /// der Offset NICHT auf 0 zurückspringen — der `fullScreenCover`-Dismiss läuft dann von der
+    /// aktuellen Position weiter, sodass es keine sichtbare Doppel-Animation gibt.
+    @State private var dismissDragTranslation: CGFloat = 0
+    /// Wird einmalig beim Start jeder Drag-Geste festgelegt. Verhindert, dass die Dismiss-Geste
+    /// mitten im Scrollen aktiv wird, sobald der Inhalt seinen Top-Anschlag erreicht.
+    @State private var dismissEligibility: DismissEligibility = .undecided
+    @State private var isPrimaryScrollAtTop: Bool = true
+
+    private enum DismissEligibility {
+        case undecided
+        case eligible
+        case ineligible
+    }
 
     /// Größere Steuerung im Sheet „Wiedergabe“ (+35 % gegenüber Player-Leiste).
     private static let expandedTransportIconScale: CGFloat = 1.35
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if playerManager.currentItem != nil {
-                    expandedArchiveBody
-                } else if playerManager.isLive {
-                    expandedLiveBody
-                } else {
-                    ContentUnavailableView(
-                        "Nichts in Wiedergabe",
-                        systemImage: "music.note",
-                        description: Text("Starten Sie eine Sendung oder einen Livestream.")
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                Rectangle()
+                    .fill(overlayBackgroundColor)
+                    .ignoresSafeArea()
+
+                NowPlayingMatchedSurfaceBackground(
+                    namespace: namespace,
+                    cornerRadius: presentationCornerRadius,
+                    isMatchedGeometrySource: false,
+                    materialFallback: AnyView(
+                        Rectangle().fill(isOverlayMode ? overlayBackgroundColor : Color.clear)
                     )
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                NavigationStack {
+                    Group {
+                        if playerManager.currentItem != nil {
+                            expandedArchiveBody
+                        } else if playerManager.isLive {
+                            expandedLiveBody
+                        } else {
+                            ContentUnavailableView(
+                                "Nichts in Wiedergabe",
+                                systemImage: "music.note",
+                                description: Text("Starten Sie eine Sendung oder einen Livestream.")
+                            )
+                        }
+                    }
+                    .navigationTitle("Wiedergabe")
+                    #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Fertig") { close() }
+                        }
+                    }
                 }
+                // Den Clip nur anwenden, wenn wir wirklich gerundete Ecken brauchen (iPad-Sheet etc.).
+                // Bei `presentationCornerRadius == 0` (iPhone-Vollbild) würde `RoundedRectangle(cornerRadius: 0)`
+                // den Stack auf seine Content-Frame clippen — und damit den per `.ignoresSafeArea(.bottom)`
+                // erweiterten Steuerungs-Hintergrund im Home-Indikator-Bereich abschneiden, was als harte
+                // Kante zwischen Buttonbereich und dem schmalen Streifen darunter sichtbar wird.
+                .modifier(NowPlayingPresentationClip(cornerRadius: presentationCornerRadius))
             }
-            .navigationTitle("Wiedergabe")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .contentShape(RoundedRectangle(cornerRadius: presentationCornerRadius, style: .continuous))
+            .offset(y: overlayDismissOffset)
+            .simultaneousGesture(
+                dismissDragGesture(containerHeight: proxy.size.height),
+                including: allowsSwipeToDismiss ? .gesture : .none
+            )
             #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Fertig") { dismiss() }
-                }
-            }
         }
         .onChange(of: playerManager.currentItem?.id) { _, _ in
             dismissIfNothingToShow()
@@ -112,14 +181,104 @@ struct ExpandedNowPlayingView: View {
 
     private func dismissIfNothingToShow() {
         if playerManager.currentItem == nil && !playerManager.isLive {
+            close()
+        }
+    }
+
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
             dismiss()
         }
+    }
+
+    // Top-edge swipe-down dismiss for full-screen iPhone presentation.
+    // The gesture only starts near the top to avoid conflicts with vertical scrolling in content.
+    #if os(iOS)
+    private var overlayDismissOffset: CGFloat {
+        guard allowsSwipeToDismiss else { return 0 }
+        return max(0, dismissDragTranslation)
+    }
+
+    private func dismissDragGesture(containerHeight: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .onChanged { value in
+                guard allowsSwipeToDismiss else { return }
+                // Eligibility wird genau einmal pro Geste festgelegt — am Geste-Start.
+                // Dadurch kann sich „durchscrollen bis zum Top und dann weiter wischen“ NICHT mittendrin
+                // in einen Dismiss verwandeln. Erst die nächste, neu gestartete Geste am Top dismissed.
+                if dismissEligibility == .undecided {
+                    dismissEligibility = canStartDismissGesture(
+                        startY: value.startLocation.y,
+                        containerHeight: containerHeight
+                    ) ? .eligible : .ineligible
+                }
+                guard dismissEligibility == .eligible else { return }
+                dismissDragTranslation = max(0, value.translation.height)
+            }
+            .onEnded { value in
+                let wasEligible = dismissEligibility == .eligible
+                dismissEligibility = .undecided
+                guard allowsSwipeToDismiss, wasEligible else {
+                    resetDismissTranslation()
+                    return
+                }
+                let translation = value.translation.height
+                let lateral = abs(value.translation.width)
+                if translation > 110, lateral < 90 {
+                    // Offset bewusst NICHT zurücksetzen: Der `fullScreenCover`-Dismiss läuft jetzt
+                    // von der aktuellen, nach unten verschobenen Position weiter — eine durchgehende
+                    // Animation, kein Sprung-zurück + zweite Slide-Animation.
+                    close()
+                } else {
+                    resetDismissTranslation()
+                }
+            }
+    }
+
+    private func resetDismissTranslation() {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+            dismissDragTranslation = 0
+        }
+    }
+
+    /// Dismiss-Geste soll im oberen Bereich (Sendungsdetails) NIE starten, damit dort ausschließlich
+    /// gescrollt wird. Im unteren Bereich (Buttons) darf die Dismiss-Geste starten.
+    private func canStartDismissGesture(startY: CGFloat, containerHeight: CGFloat) -> Bool {
+        let controlsRegionStartY = max(0, containerHeight - Self.expandedBottomBarDismissRegionHeight)
+        return startY >= controlsRegionStartY
+    }
+    #endif
+
+    private var isOverlayMode: Bool {
+        onClose != nil
+    }
+
+    private var presentationCornerRadius: CGFloat {
+        (isOverlayMode || allowsSwipeToDismiss) ? 0 : 22
+    }
+
+    private var overlayBackgroundColor: Color {
+        #if os(iOS)
+        Color(uiColor: .systemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(.systemBackground)
+        #endif
     }
 
     @ViewBuilder
     private var expandedArchiveBody: some View {
         if let item = playerManager.currentItem {
-            BroadcastDetailView(item: item, showsPrimaryPlayAction: false)
+            BroadcastDetailView(
+                item: item,
+                showsPrimaryPlayAction: false,
+                scrollAtTop: $isPrimaryScrollAtTop
+            )
+            // Controls als echtes Safe-Area-Inset, damit die Details nicht hinter den Buttons verschwinden
+            // und der Gradient nur im Controls-Bereich beginnt.
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     expandedControlsChrome(live: false)
                 }
@@ -127,7 +286,7 @@ struct ExpandedNowPlayingView: View {
     }
 
     private var expandedLiveBody: some View {
-        ExpandedLiveNowPlayingContent()
+        ExpandedLiveNowPlayingContent(scrollAtTop: $isPrimaryScrollAtTop)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 expandedControlsChrome(live: true)
             }
@@ -160,23 +319,107 @@ struct ExpandedNowPlayingView: View {
         .background { expandedBottomBarBackground(live: live) }
     }
 
+    /// Dismiss-Region am unteren Bildschirmrand (Buttons + Seekbar + Padding).
+    private static let expandedBottomBarDismissRegionHeight: CGFloat = 190
+
+    /// Visuelle Größe des Play/Pause Icons im Expanded Sheet.
+    /// Basiswert aus `PlaybackTransportButtons` (play/pause): 28pt, skaliert im Expanded Sheet.
+    private static var expandedPlayButtonIconSide: CGFloat { 28 * expandedTransportIconScale }
+
+    /// Höhe des Gradients am oberen Rand der Controls-Bar.
+    /// Soll ungefähr der visuellen Größe des Play Buttons entsprechen.
+    private static var expandedBottomBarFadeHeight: CGFloat { expandedPlayButtonIconSide }
+
     @ViewBuilder
     private func expandedBottomBarBackground(live: Bool) -> some View {
 #if os(iOS)
-        Group {
-            if live {
-                Rectangle()
-                    .fill(Color(uiColor: .systemBackground))
-            } else {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-            }
-        }
-        .ignoresSafeArea(edges: .bottom)
+        // Liquid Glass:
+        // - Hintergrund (Material) ist bis unten voll deckend, inkl. Home-Indikator-Bereich.
+        // - Maske blendet nur im oberen Bereich weich ein, so dass Details „hineinlaufen“ können.
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .mask(expandedBottomBarMask)
+            .ignoresSafeArea(edges: .bottom)
 #else
         Rectangle()
             .fill(Material.bar)
 #endif
+    }
+
+#if os(iOS)
+    private var expandedBottomBarMask: some View {
+        VStack(spacing: 0) {
+            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                .frame(height: Self.expandedBottomBarFadeHeight)
+            Rectangle().fill(Color.black)
+        }
+    }
+#endif
+}
+
+/// Wendet `RoundedRectangle`-Clip nur an, wenn ein Radius > 0 erforderlich ist.
+/// Bei Radius 0 würde das Clip den NavigationStack auf seine Content-Frame begrenzen
+/// und damit per `ignoresSafeArea` erweiterte Hintergründe (z. B. die Steuerungsleiste im
+/// Home-Indikator-Bereich) abschneiden.
+private struct NowPlayingPresentationClip: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if cornerRadius > 0 {
+            content.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        } else {
+            content
+        }
+    }
+}
+
+private struct NowPlayingSurfaceMatchModifier: ViewModifier {
+    let namespace: Namespace.ID?
+    let cornerRadius: CGFloat
+    let isSource: Bool
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content
+                .matchedGeometryEffect(
+                    id: NowPlayingSurfaceMatchID.surface,
+                    in: namespace,
+                    isSource: isSource
+                )
+        } else {
+            content
+        }
+    }
+}
+
+private enum NowPlayingSurfaceMatchID {
+    static let surface: String = "NowPlayingSurface"
+}
+
+private struct NowPlayingMatchedSurfaceBackground: View {
+    let namespace: Namespace.ID?
+    let cornerRadius: CGFloat
+    let isMatchedGeometrySource: Bool
+    let materialFallback: AnyView?
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        Group {
+            if let materialFallback {
+                materialFallback
+                    .clipShape(shape)
+            } else {
+                Color.clear
+                    .clipShape(shape)
+            }
+        }
+        .modifier(
+            NowPlayingSurfaceMatchModifier(
+                namespace: namespace,
+                cornerRadius: cornerRadius,
+                isSource: isMatchedGeometrySource
+            )
+        )
     }
 }
 
@@ -186,12 +429,14 @@ private struct ExpandedLiveNowPlayingContent: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    var scrollAtTop: Binding<Bool>? = nil
 
     private var artworkSide: CGFloat { horizontalSizeClass == .compact ? 200 : 260 }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                topScrollMarker
                 ZStack {
                     fallbackCoverIcon
 
@@ -260,6 +505,10 @@ private struct ExpandedLiveNowPlayingContent: View {
             .padding(.vertical, 24)
             .frame(maxWidth: .infinity)
         }
+        .coordinateSpace(name: "ExpandedLiveScrollSpace")
+        .onPreferenceChange(ScrollTopOffsetPreferenceKey.self) { minY in
+            scrollAtTop?.wrappedValue = minY >= -6
+        }
         .onAppear {
             apiClient.startLiveMetadataPolling()
         }
@@ -269,6 +518,20 @@ private struct ExpandedLiveNowPlayingContent: View {
                 apiClient.stopLiveMetadataPolling()
             }
         }
+    }
+
+    private var topScrollMarker: some View {
+        Color.clear
+            .frame(height: 0)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: ScrollTopOffsetPreferenceKey.self,
+                            value: proxy.frame(in: .named("ExpandedLiveScrollSpace")).minY
+                        )
+                }
+            )
     }
 
     private var fallbackCoverIcon: some View {
@@ -281,5 +544,13 @@ private struct ExpandedLiveNowPlayingContent: View {
             .background(Color.secondary.opacity(0.15))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .frame(width: artworkSide, height: artworkSide)
+    }
+}
+
+private struct ScrollTopOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

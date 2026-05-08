@@ -10,6 +10,7 @@ struct BroadcastDetailView: View {
     let item: ArchiveItem
     /// When embedded in Now Playing, the primary play banner is redundant (transport bar handles playback).
     var showsPrimaryPlayAction: Bool = true
+    var scrollAtTop: Binding<Bool>? = nil
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
     #if os(iOS)
@@ -30,6 +31,7 @@ struct BroadcastDetailView: View {
             } else if let detail = detail {
                 ScrollView {
                             VStack(alignment: .leading, spacing: 12) {
+                                topScrollMarker
                                 // Header
                                 VStack(alignment: .leading, spacing: 16) {
                                     moderatorAvatar(detail: detail)
@@ -107,6 +109,10 @@ struct BroadcastDetailView: View {
                             }
                             .padding()
                 }
+                .coordinateSpace(name: "BroadcastDetailScrollSpace")
+                .onPreferenceChange(BroadcastDetailScrollTopOffsetPreferenceKey.self) { minY in
+                    scrollAtTop?.wrappedValue = minY >= -6
+                }
                 .textSelection(.enabled)
             } else {
                 Text("Details konnten nicht geladen werden.")
@@ -130,6 +136,20 @@ struct BroadcastDetailView: View {
             #endif
             isLoading = false
         }
+    }
+
+    private var topScrollMarker: some View {
+        Color.clear
+            .frame(height: 0)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: BroadcastDetailScrollTopOffsetPreferenceKey.self,
+                            value: proxy.frame(in: .named("BroadcastDetailScrollSpace")).minY
+                        )
+                }
+            )
     }
 
     private var primaryPlayLabel: String {
@@ -197,6 +217,14 @@ struct BroadcastDetailView: View {
             }
         }
         #endif
+    }
+}
+
+private struct BroadcastDetailScrollTopOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

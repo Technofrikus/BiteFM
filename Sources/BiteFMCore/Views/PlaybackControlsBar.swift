@@ -23,6 +23,34 @@ struct PlaybackTransportButtons: View {
 
     var body: some View {
         let s = iconScale
+        #if os(iOS)
+        HStack(spacing: 18 * s) {
+            if playerManager.currentItem != nil {
+                NowPlayingTransportButton(
+                    systemName: "backward.fill",
+                    iconSide: 18 * s,
+                    hitSide: 44 * s
+                ) { playerManager.skipPrevious() }
+                .disabled(playerManager.currentPlaylist == nil)
+            }
+
+            NowPlayingTransportButton(
+                systemName: playPauseSystemName,
+                iconSide: 28 * s,
+                hitSide: 56 * s,
+                isPrimary: true
+            ) { playerManager.togglePlayPause() }
+
+            if playerManager.currentItem != nil {
+                NowPlayingTransportButton(
+                    systemName: "forward.fill",
+                    iconSide: 18 * s,
+                    hitSide: 44 * s
+                ) { playerManager.skipNext() }
+                .disabled(playerManager.currentPlaylist == nil)
+            }
+        }
+        #else
         HStack(spacing: 20 * s) {
             if playerManager.currentItem != nil {
                 Button(action: { playerManager.skipPrevious() }) {
@@ -52,10 +80,8 @@ struct PlaybackTransportButtons: View {
                     .symbolRenderingMode(.monochrome)
             }
             .buttonStyle(.plain)
-            #if os(macOS)
             .modifier(SpaceBarPlayShortcut(enabled: useKeyboardShortcut))
             .help(playerManager.isPlaying ? "Pause (Leertaste)" : "Abspielen (Leertaste)")
-            #endif
 
             if playerManager.currentItem != nil {
                 Button(action: { playerManager.skipNext() }) {
@@ -70,6 +96,14 @@ struct PlaybackTransportButtons: View {
                 .disabled(playerManager.currentPlaylist == nil)
             }
         }
+        #endif
+    }
+
+    private var playPauseSystemName: String {
+        if playerManager.isPlaying {
+            return playerManager.isLive ? "stop.fill" : "pause.fill"
+        }
+        return "play.fill"
     }
 }
 
@@ -186,6 +220,52 @@ private struct AirPlayRoutePickerRepresentable: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
+
+private struct NowPlayingTransportButton: View {
+    let systemName: String
+    let iconSide: CGFloat
+    let hitSide: CGFloat
+    var isPrimary: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: iconSide, weight: .semibold, design: .default))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(isPrimary ? Color.primary : Color.secondary)
+                .frame(width: hitSide, height: hitSide)
+                .contentShape(Circle())
+                .background {
+                    Circle()
+                        .fill(.thinMaterial)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+                        }
+                        .modifier(NowPlayingGlassIfAvailable(isInteractive: true))
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+private struct NowPlayingGlassIfAvailable: ViewModifier {
+    let isInteractive: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            if isInteractive {
+                content.glassEffect(.regular.interactive(), in: .circle)
+            } else {
+                content.glassEffect(.regular, in: .circle)
+            }
+        } else {
+            content
+        }
+    }
 }
 #endif
 

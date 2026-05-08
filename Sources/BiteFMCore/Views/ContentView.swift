@@ -114,6 +114,7 @@ private struct LoggedInRootView: View {
     @State private var didApplyRestoredFavoritesPath: Bool = false
     #if os(iOS)
     @State private var didApplyOfflineLaunchTab = false
+    @Namespace private var nowPlayingNamespace
     #endif
 
     private var useCompactRoot: Bool {
@@ -128,12 +129,14 @@ private struct LoggedInRootView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if useCompactRoot {
-                compactTabShell
-            } else {
-                splitShell
-                PlayerBarView()
+        ZStack {
+            VStack(spacing: 0) {
+                if useCompactRoot {
+                    compactTabShell
+                } else {
+                    splitShell
+                    PlayerBarView()
+                }
             }
         }
         .task {
@@ -203,11 +206,24 @@ private struct LoggedInRootView: View {
         } message: {
             Text(downloadManager.deviceSpaceError ?? "")
         }
-        .sheet(isPresented: $isNowPlayingExpanded) {
+        // iPhone: Now Playing is an animated overlay (see above).
+        // iPad: keep the default sheet presentation.
+        .sheet(isPresented: Binding(
+            get: { isNowPlayingExpanded && !useCompactRoot },
+            set: { isNowPlayingExpanded = $0 }
+        )) {
             ExpandedNowPlayingView()
                 .environmentObject(apiClient)
                 .environmentObject(playerManager)
                 .presentationDragIndicator(.visible)
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { isNowPlayingExpanded && useCompactRoot },
+            set: { isNowPlayingExpanded = $0 }
+        )) {
+            ExpandedNowPlayingView(allowsSwipeToDismiss: true)
+                .environmentObject(apiClient)
+                .environmentObject(playerManager)
         }
         #endif
     }
@@ -222,13 +238,15 @@ private struct LoggedInRootView: View {
             IPhoneTabShellWithBottomAccessory(
                 selectedTab: $selectedTab,
                 isNowPlayingExpanded: $isNowPlayingExpanded,
-                favoritesPath: $favoritesPath
+                favoritesPath: $favoritesPath,
+                namespace: nowPlayingNamespace
             )
         } else {
             IPhoneTabShellLegacyInset(
                 selectedTab: $selectedTab,
                 isNowPlayingExpanded: $isNowPlayingExpanded,
-                favoritesPath: $favoritesPath
+                favoritesPath: $favoritesPath,
+                namespace: nowPlayingNamespace
             )
         }
     }
@@ -240,6 +258,7 @@ private struct LoggedInRootView: View {
         @Binding var selectedTab: MainTab
         @Binding var isNowPlayingExpanded: Bool
         @Binding var favoritesPath: [AppRestorationState.DeepRoute]
+        let namespace: Namespace.ID
 
         var body: some View {
             let miniActive = playerManager.currentItem != nil || playerManager.isLive
@@ -285,10 +304,18 @@ private struct LoggedInRootView: View {
             }
             .tabBarMinimizeBehavior(.automatic)
             .tabViewBottomAccessory(isEnabled: miniActive) {
-                MiniPlayerBarView(onExpand: {
-                    isNowPlayingExpanded = true
-                }, chrome: .tabAccessory)
+                MiniPlayerBarView(
+                    onExpand: { expandNowPlaying() },
+                    chrome: .tabAccessory,
+                    namespace: namespace
+                )
                 .environmentObject(playerManager)
+            }
+        }
+
+        private func expandNowPlaying() {
+            withAnimation(.spring(response: 0.48, dampingFraction: 0.86)) {
+                isNowPlayingExpanded = true
             }
         }
     }
@@ -299,6 +326,7 @@ private struct LoggedInRootView: View {
         @Binding var selectedTab: MainTab
         @Binding var isNowPlayingExpanded: Bool
         @Binding var favoritesPath: [AppRestorationState.DeepRoute]
+        let namespace: Namespace.ID
 
         var body: some View {
             TabView(selection: $selectedTab) {
@@ -343,10 +371,18 @@ private struct LoggedInRootView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if playerManager.currentItem != nil || playerManager.isLive {
-                    MiniPlayerBarView(onExpand: {
-                        isNowPlayingExpanded = true
-                    }, chrome: .safeAreaInsetRow)
+                    MiniPlayerBarView(
+                        onExpand: { expandNowPlaying() },
+                        chrome: .safeAreaInsetRow,
+                        namespace: namespace
+                    )
                 }
+            }
+        }
+
+        private func expandNowPlaying() {
+            withAnimation(.spring(response: 0.48, dampingFraction: 0.86)) {
+                isNowPlayingExpanded = true
             }
         }
     }
