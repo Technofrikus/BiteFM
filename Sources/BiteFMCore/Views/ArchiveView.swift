@@ -95,27 +95,7 @@ struct ArchiveView: View {
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
-                Group {
-                    if showLetterIndexStrip {
-                        if usesOverlayLetterIndex {
-                            archiveScrollContent
-                                .overlay(alignment: .trailing) {
-                                    archiveIndexStrip(proxy: proxy)
-                                        .padding(.trailing, 4)
-                                }
-                        } else {
-                            HStack(alignment: .top, spacing: 0) {
-                                archiveIndexStrip(proxy: proxy)
-
-                                Divider()
-
-                                archiveScrollContent
-                            }
-                        }
-                    } else {
-                        archiveScrollContent
-                    }
-                }
+                archiveContainer(proxy: proxy)
                 .navigationTitle("Archiv")
                 #if os(iOS)
                 .navigationBarTitleDisplayMode(.large)
@@ -138,35 +118,70 @@ struct ArchiveView: View {
                 }
                 .task {
                     if apiClient.shows.isEmpty {
-                        await apiClient.fetchShows(modelContext: modelContext)
+                        await apiClient.fetchShows()
                     }
                 }
                 .refreshable {
-                    await apiClient.fetchShows(modelContext: modelContext)
+                    await apiClient.fetchShows()
                 }
             }
         }
     }
 
-    private var archiveScrollContent: some View {
-        ZStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(letterSections, id: \.letter) { section in
-                        archiveLetterSectionBlock(section: section)
+    @ViewBuilder
+    private func archiveContainer(proxy: ScrollViewProxy) -> some View {
+        if showLetterIndexStrip {
+            if usesOverlayLetterIndex {
+                archiveList(proxy: proxy)
+                    .overlay(alignment: .trailing) {
+                        archiveIndexStrip(proxy: proxy)
+                            // Avoid visual collision with the list's rounded cards.
+                            .padding(.trailing, 8)
+                            .padding(.top, 8)
+                            .padding(.bottom, 8)
                     }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    #if os(macOS)
-                    ArchiveScrollClampHostViewRepresentable()
-                        .allowsHitTesting(false)
-                    #endif
+            } else {
+                HStack(alignment: .top, spacing: 0) {
+                    archiveIndexStrip(proxy: proxy)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    Divider()
+                    archiveList(proxy: proxy)
                 }
             }
+        } else {
+            archiveList(proxy: proxy)
+        }
+    }
+
+    private func archiveList(proxy: ScrollViewProxy) -> some View {
+        ZStack {
+            List {
+                ForEach(letterSections, id: \.letter) { section in
+                    Section {
+                        ForEach(section.shows) { show in
+                            showRow(for: show)
+                        }
+                    } header: {
+                        archiveSectionHeader(letter: section.letter)
+                            .id(section.letter)
+                    }
+                }
+            }
+            #if os(iOS)
+            .listStyle(.insetGrouped)
+            .modifier(ArchiveListSectionSpacingModifier())
+            #else
+            .listStyle(.inset)
+            #endif
             .animation(nil, value: hoveredIndexSymbol)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .opacity(archiveListDimmedForPlaceholder ? 0.35 : 1)
+            .background {
+                #if os(macOS)
+                ArchiveScrollClampHostViewRepresentable()
+                    .allowsHitTesting(false)
+                #endif
+            }
 
             if searchText.isEmpty, apiClient.shows.isEmpty {
                 Group {
@@ -223,31 +238,26 @@ struct ArchiveView: View {
         if favoritesOnly, searchText.isEmpty, filteredShows.isEmpty, !apiClient.shows.isEmpty { return true }
         return false
     }
-
-    @ViewBuilder
-    private func archiveLetterSectionBlock(section: (letter: String, shows: [Show])) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            archiveSectionHeader(letter: section.letter)
-                .id(section.letter)
-            
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(section.shows) { show in
-                    showRow(for: show)
-                    Divider()
-                        .padding(.leading, 8)
-                }
-            }
-        }
-    }
     
+    @ViewBuilder
     private func archiveSectionHeader(letter: String) -> some View {
-        Text(ArchiveSectionHelpers.archiveLetterSectionLabel(letter))
+        let label = ArchiveSectionHelpers.archiveLetterSectionLabel(letter)
+        #if os(iOS)
+        // iOS List headers should look system-native (no custom boxed background).
+        Text(label)
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(.secondary)
+            .textCase(nil)
+        #else
+        Text(label)
             .font(.headline)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(sectionHeaderBackground)
+        #endif
     }
 
     private var sectionHeaderBackground: some View {
@@ -258,8 +268,12 @@ struct ArchiveView: View {
         #endif
     }
 
+    @ViewBuilder
     private var indexStripBackground: some View {
-        #if os(macOS)
+        #if os(iOS)
+        // Material reads more native than a flat gray block.
+        Rectangle().fill(.thinMaterial)
+        #elseif os(macOS)
         Color(nsColor: .controlBackgroundColor).opacity(0.95)
         #else
         Color.secondary.opacity(0.08)
@@ -319,9 +333,9 @@ struct ArchiveView: View {
         .padding(.vertical, indexVerticalPadding)
         .padding(.horizontal, 2)
         .frame(width: indexColumnWidth)
-        .frame(maxHeight: .infinity, alignment: .top)
+        // Don't stretch to full height: keep background only around actual symbols.
         .background(indexStripBackground)
-        .clipShape(RoundedRectangle(cornerRadius: usesOverlayLetterIndex ? 12 : 0, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .simultaneousGesture(indexDragGesture(proxy: proxy))
         // Gleicher Grund wie beim ScrollView: kein Layout-Flattern beim Hover.
         .animation(nil, value: hoveredIndexSymbol)
@@ -329,8 +343,6 @@ struct ArchiveView: View {
     
     private func jumpToSection(_ id: String, proxy: ScrollViewProxy, animated: Bool = true) {
         DispatchQueue.main.async {
-            // Mit VStack (statt LazyVStack) sind alle Höhen sofort bekannt.
-            // Ein einziger animierter Pass reicht nun aus.
             if animated {
                 withAnimation(.easeInOut(duration: 0.45)) {
                     proxy.scrollTo(id, anchor: .top)
@@ -409,7 +421,7 @@ struct ArchiveView: View {
 
         NavigationLink(destination: BroadcastListView(show: show)) {
             HStack(alignment: .top, spacing: 0) {
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(show.titel)
                             .font(.headline)
@@ -440,8 +452,9 @@ struct ArchiveView: View {
                         .frame(width: accessoryBox, height: accessoryBox)
                 }
             }
+            // Slightly denser than default while keeping comfortable tap targets.
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.vertical, 0)
             .contentShape(Rectangle())
             .background(isPlaying ? Color.accentColor.opacity(0.1) : Color.clear)
         }
@@ -514,5 +527,18 @@ private struct ArchiveScrollClampHostViewRepresentable: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {}
+}
+#endif
+
+#if os(iOS)
+/// `insetGrouped` can be very airy; keep sections a bit tighter for long lists.
+private struct ArchiveListSectionSpacingModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.listSectionSpacing(.compact)
+        } else {
+            content
+        }
+    }
 }
 #endif

@@ -470,6 +470,9 @@ private struct FavoritesHubView: View {
             }
         }
         .navigationTitle("Favoriten")
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
     }
 }
 

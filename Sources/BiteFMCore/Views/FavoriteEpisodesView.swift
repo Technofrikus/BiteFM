@@ -80,6 +80,11 @@ struct FavoriteEpisodesView: View {
                         )
                     }
                 }
+                #if os(iOS)
+                .listStyle(.insetGrouped)
+                #else
+                .listStyle(.inset)
+                #endif
             }
         }
         .navigationTitle("Favoriten: Ausgaben")
@@ -122,11 +127,7 @@ struct FavoriteEpisodesView: View {
         .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
         .refreshable {
             guard !isInspectorPresented else { return }
-            if let ctx = apiClient.modelContainer?.mainContext {
-                await apiClient.fetchFavorites(modelContext: ctx)
-            } else {
-                await apiClient.fetchFavorites()
-            }
+            await apiClient.fetchFavorites()
         }
     }
 }

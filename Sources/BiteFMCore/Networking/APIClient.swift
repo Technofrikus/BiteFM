@@ -1,6 +1,45 @@
 import Foundation
 import SwiftData
 
+enum BroadcastDetailEndpoint {
+    static func urls(showSegment: String, dateSegment: String, terminSlug: String, markAsListened: Bool) -> [URL] {
+        let showSegment = showSegment.trimmingCharacters(in: .whitespacesAndNewlines)
+        let dateSegment = dateSegment.trimmingCharacters(in: .whitespacesAndNewlines)
+        let terminSlug = normalizedTerminSlug(terminSlug)
+        guard !showSegment.isEmpty, !dateSegment.isEmpty else { return [] }
+
+        var urls: [URL] = []
+        if let url = makeURL(path: "/api/v1/broadcasts/\(showSegment)/\(dateSegment)/", markAsListened: markAsListened) {
+            urls.append(url)
+        }
+        if !terminSlug.isEmpty,
+           let url = makeURL(path: "/api/v1/broadcasts/\(showSegment)/\(dateSegment)/\(terminSlug)/", markAsListened: markAsListened),
+           !urls.contains(url) {
+            urls.append(url)
+        }
+        return urls
+    }
+
+    private static func makeURL(path: String, markAsListened: Bool) -> URL? {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "www.byte.fm"
+        components.path = path
+        if !markAsListened {
+            components.queryItems = [URLQueryItem(name: "listen", value: "no")]
+        }
+        return components.url
+    }
+
+    private static func normalizedTerminSlug(_ terminSlug: String) -> String {
+        terminSlug
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\u{2013}", with: "-")
+            .replacingOccurrences(of: "\u{2014}", with: "-")
+            .replacingOccurrences(of: "\u{2212}", with: "-")
+    }
+}
+
 @MainActor
 public class APIClient: ObservableObject {
     public static let shared = APIClient()
@@ -180,8 +219,8 @@ public class APIClient: ObservableObject {
             // Remote refresh runs in the background so startup stays responsive.
             if isLoggedIn {
                 Task {
-                    await fetchFavorites(modelContext: context)
-                    await fetchListeningHistory(modelContext: context)
+                    await fetchFavorites()
+                    await fetchListeningHistory()
                 }
             }
 
@@ -206,8 +245,7 @@ public class APIClient: ObservableObject {
                 try? await Task.sleep(nanoseconds: 60 * 60 * 1_000_000_000)
                 guard !Task.isCancelled else { break }
                 if isLoggedIn {
-                    let context = modelContainer?.mainContext
-                    await fetchFavorites(modelContext: context)
+                    await fetchFavorites()
                 }
             }
         }
@@ -220,8 +258,7 @@ public class APIClient: ObservableObject {
                 try? await Task.sleep(nanoseconds: 3 * 60 * 60 * 1_000_000_000)
                 guard !Task.isCancelled else { break }
                 if isLoggedIn {
-                    let context = modelContainer?.mainContext
-                    await fetchHistory(modelContext: context)
+                    await fetchHistory()
                 }
             }
         }
@@ -251,10 +288,9 @@ public class APIClient: ObservableObject {
         startArchivePolling()
         guard isLoggedIn else { return }
         Task {
-            let ctx = modelContainer?.mainContext
-            await fetchFavorites(modelContext: ctx)
-            await fetchListeningHistory(modelContext: ctx)
-            await fetchArchive(modelContext: ctx)
+            await fetchFavorites()
+            await fetchListeningHistory()
+            await fetchArchive()
         }
     }
     
@@ -275,13 +311,12 @@ public class APIClient: ObservableObject {
            now.timeIntervalSince(last) < listeningHistoryPlaybackStaleInterval {
             return
         }
-        let context = modelContainer?.mainContext
-        await fetchListeningHistory(modelContext: context)
+        await fetchListeningHistory()
     }
     
     // Helper to call fetchListeningHistory with correct naming
-    private func fetchHistory(modelContext: ModelContext? = nil) async {
-        await fetchListeningHistory(modelContext: modelContext)
+    private func fetchHistory() async {
+        await fetchListeningHistory()
     }
     
     func isFavorite(item: ArchiveItem) -> Bool {
@@ -345,11 +380,7 @@ public class APIClient: ObservableObject {
 
         _ = await fetchBroadcastDetail(for: item, markAsListened: true)
 
-        if let container = modelContainer {
-            await fetchListeningHistory(modelContext: container.mainContext)
-        } else {
-            await fetchListeningHistory()
-        }
+        await fetchListeningHistory()
     }
     
     /// Task or URLSession cancellation (e.g. polling task cancelled on scene changes) must not surface as a user-facing failure.
@@ -416,17 +447,17 @@ public class APIClient: ObservableObject {
         }
     }
 
-    func fetchListeningHistory(modelContext: ModelContext? = nil) async {
+    func fetchListeningHistory() async {
         let previous = listeningHistoryFetchSerialTask
         let task = Task { @MainActor in
             await previous?.value
-            await self.performListeningHistoryFetch(modelContext: modelContext)
+            await self.performListeningHistoryFetch()
         }
         listeningHistoryFetchSerialTask = task
         await task.value
     }
 
-    private func performListeningHistoryFetch(modelContext: ModelContext? = nil) async {
+    private func performListeningHistoryFetch() async {
         guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/listeningHistoryEntries.php") else { return }
         
         var request = URLRequest(url: url)
@@ -437,19 +468,6 @@ public class APIClient: ObservableObject {
         
         LogManager.shared.log("Fetching listening history from \(url.absoluteString)...", type: .info)
         let trackedShowID = pendingHistoryVerificationShowID
-        // #region agent log
-        agentDebugLog(
-            hypothesisId: "H1",
-            location: "APIClient.swift:351",
-            message: "listening_history_request_started",
-            data: [
-                "method": request.httpMethod ?? "",
-                "url": url.absoluteString,
-                "hasAuthorization": request.value(forHTTPHeaderField: "Authorization") != nil,
-                "trackedShowID": trackedShowID ?? -1
-            ]
-        )
-        // #endregion
         
         do {
             let (data, response) = try await performRequest(for: request)
@@ -458,37 +476,31 @@ public class APIClient: ObservableObject {
                 LogManager.shared.log("History response status code: \(httpResponse.statusCode)", type: .debug)
                 
                 if httpResponse.statusCode == 200 {
-                    let decoder = JSONDecoder()
-                    do {
-                        let historyResponse = try decoder.decode(ListeningHistoryResponse.self, from: data)
-                        LogManager.shared.log("Successfully decoded history: \(historyResponse.data.count) entries", type: .info)
-                        
-                        let ids = Set(historyResponse.data.map { $0.showID })
-                        self.listenedShowIDs = ids
-                        self.recordListeningHistoryFetchSuccess()
-                        // #region agent log
-                        agentDebugLog(
-                            hypothesisId: trackedShowID == nil ? "H1" : "H4",
-                            location: "APIClient.swift:370",
-                            message: "listening_history_response_decoded",
-                            data: [
-                                "statusCode": httpResponse.statusCode,
-                                "responseCount": historyResponse.data.count,
-                                "trackedShowID": trackedShowID ?? -1,
-                                "containsTrackedShow": trackedShowID.map(ids.contains) ?? false
-                            ]
-                        )
-                        // #endregion
-                        if trackedShowID != nil {
-                            pendingHistoryVerificationShowID = nil
+                    let container = self.modelContainer
+                    await Task.detached(priority: .userInitiated) {
+                        let decoder = JSONDecoder()
+                        do {
+                            let historyResponse = try decoder.decode(ListeningHistoryResponse.self, from: data)
+                            
+                            let ids = Set(historyResponse.data.map { $0.showID })
+                            
+                            await MainActor.run {
+                                self.listenedShowIDs = ids
+                                self.recordListeningHistoryFetchSuccess()
+                                LogManager.shared.log("Successfully decoded history: \(historyResponse.data.count) entries", type: .info)
+                                
+                                if trackedShowID != nil {
+                                    self.pendingHistoryVerificationShowID = nil
+                                }
+                            }
+                            
+                            if let container {
+                                try await self.syncListeningHistoryWithDatabase(items: historyResponse.data, container: container)
+                            }
+                        } catch {
+                            LogManager.shared.log("FAILED to decode or sync listening history: \(error)", type: .error)
                         }
-                        
-                        if let context = modelContext {
-                            try await syncListeningHistoryWithDatabase(items: historyResponse.data, context: context)
-                        }
-                    } catch {
-                        LogManager.shared.log("FAILED to decode listening history: \(error)", type: .error)
-                    }
+                    }.value
                 }
             }
         } catch {
@@ -496,17 +508,6 @@ public class APIClient: ObservableObject {
                 LogManager.shared.log("Listening history fetch cancelled", type: .debug)
                 return
             }
-            // #region agent log
-            agentDebugLog(
-                hypothesisId: trackedShowID == nil ? "H1" : "H4",
-                location: "APIClient.swift:393",
-                message: "listening_history_request_failed",
-                data: [
-                    "trackedShowID": trackedShowID ?? -1,
-                    "error": error.localizedDescription
-                ]
-            )
-            // #endregion
             if trackedShowID != nil {
                 pendingHistoryVerificationShowID = nil
             }
@@ -516,7 +517,7 @@ public class APIClient: ObservableObject {
 
     /// Die API kann mehrfach dieselbe `show_id` liefern; im Modell ist `showID` **unique**. Ohne Deduplizierung entstehen
     /// mehrere `insert`-Objekte pro ID → SwiftData meldet u. a. „temporary identifier … remapped … fatal logic error in DefaultStore“.
-    private func deduplicatedListeningHistoryEntries(_ items: [ListeningHistoryEntry]) -> [ListeningHistoryEntry] {
+    nonisolated private static func deduplicatedListeningHistoryEntries(_ items: [ListeningHistoryEntry]) -> [ListeningHistoryEntry] {
         var byShowID: [Int: ListeningHistoryEntry] = [:]
         for item in items {
             byShowID[item.showID] = item
@@ -524,8 +525,9 @@ public class APIClient: ObservableObject {
         return Array(byShowID.values)
     }
 
-    private func syncListeningHistoryWithDatabase(items: [ListeningHistoryEntry], context: ModelContext) async throws {
-        let deduped = deduplicatedListeningHistoryEntries(items)
+    nonisolated private func syncListeningHistoryWithDatabase(items: [ListeningHistoryEntry], container: ModelContainer) async throws {
+        let context = ModelContext(container)
+        let deduped = Self.deduplicatedListeningHistoryEntries(items)
         if deduped.count != items.count {
             LogManager.shared.log(
                 "Hörhistorie: \(items.count) API-Zeilen → \(deduped.count) nach Deduplizierung (mehrere Einträge pro show_id).",
@@ -558,7 +560,7 @@ public class APIClient: ObservableObject {
         }
     }
     
-    func fetchFavorites(modelContext: ModelContext? = nil) async {
+    func fetchFavorites() async {
         guard let url = URL(string: "https://www.byte.fm/api/v1/friends/get_favorites/") else { return }
         
         var request = URLRequest(url: url)
@@ -576,49 +578,61 @@ public class APIClient: ObservableObject {
                 LogManager.shared.log("Favorites response status code: \(httpResponse.statusCode)", type: .debug)
                 
                 if httpResponse.statusCode == 200 {
-                    let decoder = JSONDecoder()
-                    
-                    do {
-                        let favoritesResponse = try decoder.decode(FavoritesResponse.self, from: data)
-                        LogManager.shared.log("Successfully decoded FavoritesResponse. Shows: \(favoritesResponse.shows.count), tracks: \(favoritesResponse.tracks.count)", type: .info)
-                        lastListRefreshFailedWithoutNetwork = false
-
-                        // Extract all broadcast slugs and titles (Sendungen)
-                        var slugs = Set<String>()
-                        var syncItems: [FavoriteBroadcast] = []
+                    let container = self.modelContainer
+                    await Task.detached(priority: .userInitiated) {
+                        let decoder = JSONDecoder()
                         
-                        let addBroadcast = { (info: BroadcastInfo) in
-                            let slug = info.slug.lowercased()
-                            slugs.insert(slug)
-                            slugs.insert(info.title)
+                        do {
+                            let favoritesResponse = try decoder.decode(FavoritesResponse.self, from: data)
                             
-                            if !syncItems.contains(where: { $0.sendungSlug == slug }) {
-                                syncItems.append(FavoriteBroadcast(sendungTitel: info.title, sendungSlug: slug))
+                            // Extract all broadcast slugs and titles (Sendungen)
+                            var slugs = Set<String>()
+                            var syncItems: [FavoriteBroadcast] = []
+                            
+                            let addBroadcast = { (info: BroadcastInfo) in
+                                let slug = info.slug.lowercased()
+                                slugs.insert(slug)
+                                slugs.insert(info.title)
+                                
+                                if !syncItems.contains(where: { $0.sendungSlug == slug }) {
+                                    syncItems.append(FavoriteBroadcast(sendungTitel: info.title, sendungSlug: slug))
+                                }
                             }
+                            
+                            for item in favoritesResponse.broadcasts { addBroadcast(item.broadcast) }
+                            for item in favoritesResponse.shows { addBroadcast(item.broadcast) }
+                            for item in favoritesResponse.tracks {
+                                if let broadcastInfo = item.broadcast { addBroadcast(broadcastInfo) }
+                            }
+                            
+                            let episodeIDs = Set(favoritesResponse.shows.map { $0.show.id })
+                            let finalSlugs = slugs
+                            
+                            await MainActor.run {
+                                self.lastListRefreshFailedWithoutNetwork = false
+                                self.favoriteSlugs = finalSlugs
+                                self.favoriteShowIDs = episodeIDs
+                                self.favoriteShowItems = favoritesResponse.shows
+                                self.favoriteTrackItems = favoritesResponse.tracks
+                                LogManager.shared.log("Successfully decoded FavoritesResponse. Shows: \(favoritesResponse.shows.count), tracks: \(favoritesResponse.tracks.count)", type: .info)
+                            }
+                            
+                            if let container {
+                                try await self.syncFavoritesWithDatabase(items: syncItems, container: container)
+                                try await self.syncFavoriteShowsWithDatabase(showItems: favoritesResponse.shows, container: container)
+                                
+                                let backgroundContext = ModelContext(container)
+                                let rows = try backgroundContext.fetch(FetchDescriptor<StoredFavoriteShow>())
+                                let favoritedAtMap = Dictionary(uniqueKeysWithValues: rows.map { ($0.showID, $0.createdAt) })
+                                
+                                await MainActor.run {
+                                    self.favoriteShowFavoritedAt = favoritedAtMap
+                                }
+                            }
+                        } catch {
+                            LogManager.shared.log("FAILED to decode or sync favorites: \(error)", type: .error)
                         }
-                        
-                        for item in favoritesResponse.broadcasts { addBroadcast(item.broadcast) }
-                        for item in favoritesResponse.shows { addBroadcast(item.broadcast) }
-                        for item in favoritesResponse.tracks {
-                            if let broadcastInfo = item.broadcast { addBroadcast(broadcastInfo) }
-                        }
-                        
-                        let episodeIDs = Set(favoritesResponse.shows.map { $0.show.id })
-                        
-                        self.favoriteSlugs = slugs
-                        self.favoriteShowIDs = episodeIDs
-                        self.favoriteShowItems = favoritesResponse.shows
-                        self.favoriteTrackItems = favoritesResponse.tracks
-                        
-                        if let context = modelContext {
-                            try await syncFavoritesWithDatabase(items: syncItems, context: context)
-                            try await syncFavoriteShowsWithDatabase(showItems: favoritesResponse.shows, context: context)
-                            let rows = try context.fetch(FetchDescriptor<StoredFavoriteShow>())
-                            self.favoriteShowFavoritedAt = Dictionary(uniqueKeysWithValues: rows.map { ($0.showID, $0.createdAt) })
-                        }
-                    } catch {
-                        LogManager.shared.log("FAILED to decode FavoritesResponse: \(error)", type: .error)
-                    }
+                    }.value
                 }
             }
         } catch {
@@ -633,54 +647,56 @@ public class APIClient: ObservableObject {
         }
     }
     
-    private func syncFavoritesWithDatabase(items: [FavoriteBroadcast], context: ModelContext) async throws {
-        // Use a stable update pattern to avoid SwiftData fatal errors
-        let descriptor = FetchDescriptor<StoredFavoriteBroadcast>()
-        let existingEntries = try context.fetch(descriptor)
-        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.sendungSlug, $0) })
-        
-        let newItemSlugs = Set(items.map { $0.sendungSlug })
-        
-        // 1. Delete items no longer in the list
-        for (slug, entry) in existingMap {
-            if !newItemSlugs.contains(slug) {
+    nonisolated private func syncFavoritesWithDatabase(items: [FavoriteBroadcast], container: ModelContainer) async throws {
+        let context = ModelContext(container)
+        try context.transaction {
+            // Use a stable update pattern to avoid SwiftData fatal errors
+            let descriptor = FetchDescriptor<StoredFavoriteBroadcast>()
+            let existingEntries = try context.fetch(descriptor)
+            let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.sendungSlug, $0) })
+            
+            let newItemSlugs = Set(items.map { $0.sendungSlug })
+            
+            // 1. Delete items no longer in the list
+            for (slug, entry) in existingMap {
+                if !newItemSlugs.contains(slug) {
+                    context.delete(entry)
+                }
+            }
+            
+            // 2. Update existing or insert new
+            for item in items {
+                if let existing = existingMap[item.sendungSlug] {
+                    existing.sendungTitel = item.sendungTitel
+                } else {
+                    let newEntry = StoredFavoriteBroadcast(from: item)
+                    context.insert(newEntry)
+                }
+            }
+        }
+    }
+    
+    nonisolated private func syncFavoriteShowsWithDatabase(showItems: [FavoriteShowItem], container: ModelContainer) async throws {
+        let context = ModelContext(container)
+        try context.transaction {
+            let serverIDs = Set(showItems.map { $0.show.id })
+            let descriptor = FetchDescriptor<StoredFavoriteShow>()
+            let existingEntries = try context.fetch(descriptor)
+            let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.showID, $0) })
+            
+            for item in showItems {
+                let sid = item.show.id
+                if existingMap[sid] != nil {
+                    continue
+                }
+                let created = item.favoritedAt ?? Date()
+                context.insert(StoredFavoriteShow(showID: sid, createdAt: created))
+            }
+            
+            for (sid, entry) in existingMap where !serverIDs.contains(sid) {
                 context.delete(entry)
             }
         }
-        
-        // 2. Update existing or insert new
-        for item in items {
-            if let existing = existingMap[item.sendungSlug] {
-                existing.sendungTitel = item.sendungTitel
-            } else {
-                let newEntry = StoredFavoriteBroadcast(from: item)
-                context.insert(newEntry)
-            }
-        }
-        
-        try context.save()
-    }
-    
-    private func syncFavoriteShowsWithDatabase(showItems: [FavoriteShowItem], context: ModelContext) async throws {
-        let serverIDs = Set(showItems.map { $0.show.id })
-        let descriptor = FetchDescriptor<StoredFavoriteShow>()
-        let existingEntries = try context.fetch(descriptor)
-        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.showID, $0) })
-        
-        for item in showItems {
-            let sid = item.show.id
-            if existingMap[sid] != nil {
-                continue
-            }
-            let created = item.favoritedAt ?? Date()
-            context.insert(StoredFavoriteShow(showID: sid, createdAt: created))
-        }
-        
-        for (sid, entry) in existingMap where !serverIDs.contains(sid) {
-            context.delete(entry)
-        }
-        
-        try context.save()
     }
     
     private struct FavoriteUICache {
@@ -794,11 +810,7 @@ public class APIClient: ObservableObject {
                 LogManager.shared.log("change-favorite: error=\(decoded.error) status=\(decoded.status)", type: .error)
                 return false
             }
-            if let container = modelContainer {
-                await fetchFavorites(modelContext: container.mainContext)
-            } else {
-                await fetchFavorites()
-            }
+            await fetchFavorites()
             return true
         } catch {
             LogManager.shared.log("change-favorite failed: \(error.localizedDescription)", type: .error)
@@ -829,8 +841,7 @@ public class APIClient: ObservableObject {
                 try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000) // 30 minutes
                 guard !Task.isCancelled else { break }
                 
-                let context = modelContainer?.mainContext
-                await fetchArchive(modelContext: context)
+                await fetchArchive()
             }
         }
     }
@@ -906,23 +917,13 @@ public class APIClient: ObservableObject {
 
                 // Refresh authenticated data in the background so the UI can appear immediately.
                 Task {
-                    if let container = self.modelContainer {
-                        let context = container.mainContext
-                        await self.fetchFavorites(modelContext: context)
-                        await self.fetchListeningHistory(modelContext: context)
-                    } else {
-                        await self.fetchFavorites()
-                        await self.fetchListeningHistory()
-                    }
+                    await self.fetchFavorites()
+                    await self.fetchListeningHistory()
                 }
 
                 // Fetch shows if empty
                 if shows.isEmpty {
-                    if let container = modelContainer {
-                        await fetchShows(modelContext: container.mainContext)
-                    } else {
-                        await fetchShows()
-                    }
+                    await fetchShows()
                 }
                 return true
             } else {
@@ -1000,17 +1001,17 @@ public class APIClient: ObservableObject {
         session.configuration.httpCookieStorage?.removeCookies(since: .distantPast)
     }
     
-    func fetchArchive(modelContext: ModelContext? = nil) async {
+    func fetchArchive() async {
         let previous = archiveFetchSerialTask
         let task = Task { @MainActor in
             await previous?.value
-            await self.performArchiveFetch(modelContext: modelContext)
+            await self.performArchiveFetch()
         }
         archiveFetchSerialTask = task
         await task.value
     }
 
-    private func performArchiveFetch(modelContext: ModelContext? = nil) async {
+    private func performArchiveFetch() async {
         guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/archiveSendungenNew.php") else { 
             LogManager.shared.log("Invalid Archive URL", type: .error)
             return 
@@ -1029,16 +1030,23 @@ public class APIClient: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse {
                 LogManager.shared.log("Archive response status: \(httpResponse.statusCode)", type: .debug)
                 if httpResponse.statusCode == 200 {
-                    do {
-                        let items = try JSONDecoder().decode([ArchiveItem].self, from: data)
-                        LogManager.shared.log("Successfully fetched \(items.count) archive items.", type: .info)
-                        lastListRefreshFailedWithoutNetwork = false
-                        if let context = modelContext {
-                            try await syncWithDatabase(items: items, context: context)
+                    let container = self.modelContainer
+                    await Task.detached(priority: .userInitiated) {
+                        do {
+                            let items = try JSONDecoder().decode([ArchiveItem].self, from: data)
+                            
+                            await MainActor.run {
+                                self.lastListRefreshFailedWithoutNetwork = false
+                                LogManager.shared.log("Successfully fetched \(items.count) archive items.", type: .info)
+                            }
+                            
+                            if let container {
+                                try await self.syncWithDatabase(items: items, container: container)
+                            }
+                        } catch {
+                            LogManager.shared.log("FAILED to decode or sync archive: \(error)", type: .error)
                         }
-                    } catch {
-                        LogManager.shared.log("FAILED to decode archive: \(error)", type: .error)
-                    }
+                    }.value
                 } else {
                     LogManager.shared.log("Archive request failed with status code: \(httpResponse.statusCode)", type: .error)
                 }
@@ -1056,57 +1064,69 @@ public class APIClient: ObservableObject {
         }
     }
 
-    private func syncWithDatabase(items: [ArchiveItem], context: ModelContext) async throws {
-        // Use a stable update pattern to avoid SwiftData fatal errors
-        let descriptor = FetchDescriptor<StoredArchiveItem>()
-        let existingEntries = try context.fetch(descriptor)
-        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.terminID, $0) })
+    nonisolated private func syncWithDatabase(items: [ArchiveItem], container: ModelContainer) async throws {
+        let context = ModelContext(container)
+        // Disable autosave for the background context to control the save point
+        context.autosaveEnabled = false
         
-        LogManager.shared.log("Syncing with database: \(items.count) items from server, \(existingEntries.count) currently in database.", type: .info)
-        
-        // 1. Update existing or insert new items
-        for item in items {
-            if let existing = existingMap[item.terminID] {
-                // Update properties to ensure they're in sync
-                existing.audioFile1 = item.audioFile1
-                existing.audioFile2 = item.audioFile2
-                existing.audioFile3 = item.audioFile3
-                existing.sendungTitel = item.sendungTitel
-                existing.untertitelSendung = item.untertitelSendung
-                existing.terminSlug = item.terminSlug
-                existing.sendungSlug = item.sendungSlug
-                existing.sendungID = item.sendungID
-                existing.datum = item.datum
-                existing.datumDe = item.datumDe
-                existing.startTime = item.startTime
-                existing.endTime = item.endTime
-                existing.untertitelTermin = item.untertitelTermin
-                // CRITICAL: Update broadcastDate so old items don't get deleted if their date was updated
-                existing.broadcastDate = StoredArchiveItem.parseDate(item.datum)
-            } else {
-                let storedItem = StoredArchiveItem(from: item)
-                context.insert(storedItem)
+        try context.transaction {
+            // Use a stable update pattern to avoid SwiftData fatal errors
+            let descriptor = FetchDescriptor<StoredArchiveItem>()
+            let existingEntries = try context.fetch(descriptor)
+            let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.terminID, $0) })
+            
+            LogManager.shared.log("Syncing with database: \(items.count) items from server, \(existingEntries.count) currently in database.", type: .info)
+            
+            // 1. Update existing or insert new items
+            for item in items {
+                if let existing = existingMap[item.terminID] {
+                    func assignIfChanged<Value: Equatable>(
+                        _ keyPath: ReferenceWritableKeyPath<StoredArchiveItem, Value>,
+                        _ newValue: Value
+                    ) {
+                        if existing[keyPath: keyPath] != newValue {
+                            existing[keyPath: keyPath] = newValue
+                        }
+                    }
+
+                    assignIfChanged(\.audioFile1, item.audioFile1)
+                    assignIfChanged(\.audioFile2, item.audioFile2)
+                    assignIfChanged(\.audioFile3, item.audioFile3)
+                    assignIfChanged(\.sendungTitel, item.sendungTitel)
+                    assignIfChanged(\.untertitelSendung, item.untertitelSendung)
+                    assignIfChanged(\.terminSlug, item.terminSlug)
+                    assignIfChanged(\.sendungSlug, item.sendungSlug)
+                    assignIfChanged(\.sendungID, item.sendungID)
+                    assignIfChanged(\.datum, item.datum)
+                    assignIfChanged(\.datumDe, item.datumDe)
+                    assignIfChanged(\.startTime, item.startTime)
+                    assignIfChanged(\.endTime, item.endTime)
+                    assignIfChanged(\.untertitelTermin, item.untertitelTermin)
+                    // Keep cleanup based on the normalized broadcast date without marking unchanged rows dirty.
+                    assignIfChanged(\.broadcastDate, StoredArchiveItem.parseDate(item.datum))
+                } else {
+                    let storedItem = StoredArchiveItem(from: item)
+                    context.insert(storedItem)
+                }
+            }
+            
+            // 2. Cleanup items older than 4 weeks (based on broadcast date)
+            let fourWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -4, to: Date()) ?? Date()
+            
+            // Only cleanup older items that are NOT in the current fetch (to be safe)
+            let newItemIDs = Set(items.map { $0.terminID })
+            let oldItems = existingEntries.filter { $0.broadcastDate < fourWeeksAgo && !newItemIDs.contains($0.terminID) }
+            
+            if !oldItems.isEmpty {
+                LogManager.shared.log("Cleaning up \(oldItems.count) archive items older than 4 weeks (before \(fourWeeksAgo))", type: .info)
+                for oldItem in oldItems {
+                    context.delete(oldItem)
+                }
             }
         }
-        
-        // 2. Cleanup items older than 4 weeks (based on broadcast date)
-        let fourWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -4, to: Date()) ?? Date()
-        
-        // Only cleanup older items that are NOT in the current fetch (to be safe)
-        let newItemIDs = Set(items.map { $0.terminID })
-        let oldItems = existingEntries.filter { $0.broadcastDate < fourWeeksAgo && !newItemIDs.contains($0.terminID) }
-        
-        if !oldItems.isEmpty {
-            LogManager.shared.log("Cleaning up \(oldItems.count) archive items older than 4 weeks (before \(fourWeeksAgo))", type: .info)
-            for oldItem in oldItems {
-                context.delete(oldItem)
-            }
-        }
-        
-        try context.save()
     }
     
-    func fetchShows(modelContext: ModelContext? = nil) async {
+    func fetchShows() async {
         guard let url = URL(string: "https://www.byte.fm/mobile-apps/v2/archiveSendungen.php") else { return }
         
         var request = URLRequest(url: url)
@@ -1118,13 +1138,23 @@ public class APIClient: ObservableObject {
             let (data, response) = try await performRequest(for: request)
             
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                let decodedShows = try JSONDecoder().decode([Show].self, from: data)
-                self.shows = decodedShows
-                lastListRefreshFailedWithoutNetwork = false
+                let container = self.modelContainer
+                await Task.detached(priority: .userInitiated) {
+                    do {
+                        let decodedShows = try JSONDecoder().decode([Show].self, from: data)
+                        
+                        await MainActor.run {
+                            self.shows = decodedShows
+                            self.lastListRefreshFailedWithoutNetwork = false
+                        }
 
-                if let context = modelContext {
-                    try await syncShowsWithDatabase(items: decodedShows, context: context)
-                }
+                        if let container {
+                            try await self.syncShowsWithDatabase(items: decodedShows, container: container)
+                        }
+                    } catch {
+                        LogManager.shared.log("FAILED to decode or sync shows: \(error)", type: .error)
+                    }
+                }.value
             }
         } catch {
             LogManager.shared.log("Failed to fetch shows: \(error.localizedDescription)", type: .error)
@@ -1134,34 +1164,35 @@ public class APIClient: ObservableObject {
         }
     }
     
-    private func syncShowsWithDatabase(items: [Show], context: ModelContext) async throws {
-        // Use a stable update pattern to avoid SwiftData fatal errors
-        let descriptor = FetchDescriptor<StoredShow>()
-        let existingEntries = try context.fetch(descriptor)
-        let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.id, $0) })
-        
-        let newItemIDs = Set(items.map { $0.id })
-        
-        // 1. Delete
-        for (id, entry) in existingMap {
-            if !newItemIDs.contains(id) {
-                context.delete(entry)
+    nonisolated private func syncShowsWithDatabase(items: [Show], container: ModelContainer) async throws {
+        let context = ModelContext(container)
+        try context.transaction {
+            // Use a stable update pattern to avoid SwiftData fatal errors
+            let descriptor = FetchDescriptor<StoredShow>()
+            let existingEntries = try context.fetch(descriptor)
+            let existingMap = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.id, $0) })
+            
+            let newItemIDs = Set(items.map { $0.id })
+            
+            // 1. Delete
+            for (id, entry) in existingMap {
+                if !newItemIDs.contains(id) {
+                    context.delete(entry)
+                }
+            }
+            
+            // 2. Update or insert
+            for item in items {
+                if let existing = existingMap[item.id] {
+                    existing.titel = item.titel
+                    existing.untertitel = item.untertitel
+                    existing.lastUpdated = Date()
+                } else {
+                    let newEntry = StoredShow(from: item)
+                    context.insert(newEntry)
+                }
             }
         }
-        
-        // 2. Update or insert
-        for item in items {
-            if let existing = existingMap[item.id] {
-                existing.titel = item.titel
-                existing.untertitel = item.untertitel
-                existing.lastUpdated = Date()
-            } else {
-                let newEntry = StoredShow(from: item)
-                context.insert(newEntry)
-            }
-        }
-        
-        try context.save()
     }
     
     func fetchBroadcasts(showSlug: String, page: Int = 1) async -> PaginatedBroadcasts? {
@@ -1192,7 +1223,8 @@ public class APIClient: ObservableObject {
             return cached
         }
 
-        guard let url = makeBroadcastDetailURL(for: item, markAsListened: markAsListened) else {
+        let urls = makeBroadcastDetailURLs(for: item, markAsListened: markAsListened)
+        guard !urls.isEmpty else {
             LogManager.shared.log(
                 "Broadcast detail: keine URL (Offline/ungültig?) terminID=\(item.terminID) datum_de=\(item.datumDe) sendung=\(item.sendungSlug) terminSlug=\(item.terminSlug)",
                 type: .error
@@ -1205,45 +1237,52 @@ public class APIClient: ObservableObject {
             #endif
             return nil
         }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
-        applyBasicAuthIfPossible(to: &request)
-        
-        do {
-            let (data, response) = try await performRequest(for: request)
-            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-            guard (200...299).contains(status) else {
-                let preview = String(data: data.prefix(400), encoding: .utf8) ?? ""
-                LogManager.shared.log(
-                    "Broadcast detail HTTP \(status) for \(url.absoluteString) preview=\(preview.prefix(200))",
-                    type: .error
-                )
-                #if os(iOS)
-                if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
-                    broadcastDetailsCache[item.id] = offline
-                    return offline
+
+        var lastFailure: (url: URL, message: String)?
+        for (index, url) in urls.enumerated() {
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
+            applyBasicAuthIfPossible(to: &request)
+
+            do {
+                let (data, response) = try await performRequest(for: request)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                guard (200...299).contains(status) else {
+                    let preview = String(data: data.prefix(400), encoding: .utf8) ?? ""
+                    lastFailure = (url, "HTTP \(status) preview=\(preview.prefix(200))")
+                    if index + 1 < urls.count {
+                        LogManager.shared.log("Broadcast detail fallback after HTTP \(status) for \(url.absoluteString)", type: .debug)
+                    }
+                    continue
                 }
-                #endif
-                return nil
+                // Decode off the MainActor so große JSON-Antworten die UI nicht blockieren.
+                let detail = try await Task.detached(priority: .userInitiated) {
+                    try JSONDecoder().decode(BroadcastDetail.self, from: data)
+                }.value
+                broadcastDetailsCache[item.id] = detail
+                return detail
+            } catch {
+                lastFailure = (url, "\(error)")
+                if index + 1 < urls.count {
+                    LogManager.shared.log("Broadcast detail fallback after failure for \(url.absoluteString): \(error)", type: .debug)
+                }
             }
-            // Decode off the MainActor so große JSON-Antworten die UI nicht blockieren.
-            let detail = try await Task.detached(priority: .userInitiated) {
-                try JSONDecoder().decode(BroadcastDetail.self, from: data)
-            }.value
-            broadcastDetailsCache[item.id] = detail
-            return detail
-        } catch {
-            LogManager.shared.log("Failed to fetch/decode broadcast detail for \(url.absoluteString): \(error)", type: .error)
-            #if os(iOS)
-            if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
-                broadcastDetailsCache[item.id] = offline
-                return offline
-            }
-            #endif
-            return nil
         }
+
+        if let lastFailure {
+            LogManager.shared.log(
+                "Broadcast detail failed for \(lastFailure.url.absoluteString): \(lastFailure.message)",
+                type: .error
+            )
+        }
+        #if os(iOS)
+        if let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
+            broadcastDetailsCache[item.id] = offline
+            return offline
+        }
+        #endif
+        return nil
     }
 
     #if os(iOS)
@@ -1258,21 +1297,17 @@ public class APIClient: ObservableObject {
     }
     #endif
     
-    /// `GET /api/v1/broadcasts/{sendung_slug}/{datum_de}/{termin_slug}/` — optional `?listen=no` (keine „gehört“-Markierung beim bloßen Metadaten-Laden). Erster Pfadsegment = Slug der **Sendung** (wie in der Sendungsliste), nicht immer gleich `sendung_slug` aus dem Archiv-JSON.
-    private func makeBroadcastDetailURL(for item: ArchiveItem, markAsListened: Bool = false) -> URL? {
-        let dateSegment = item.datumDe.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !dateSegment.isEmpty else { return nil }
+    /// `GET /api/v1/broadcasts/{sendung_slug}/{datum_de}/` — optional `?listen=no` (keine „gehört“-Markierung beim bloßen Metadaten-Laden). Der offizielle Client nutzt den Datumspfad ohne Termin-Slug; die alte Termin-Slug-Variante bleibt als Fallback.
+    private func makeBroadcastDetailURLs(for item: ArchiveItem, markAsListened: Bool = false) -> [URL] {
         let showSegment = restShowSlugForBroadcastDetailAPI(for: item)
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "www.byte.fm"
-        components.path = "/api/v1/broadcasts/\(showSegment)/\(dateSegment)/\(item.terminSlugForBroadcastAPI)/"
-        if !markAsListened {
-            components.queryItems = [URLQueryItem(name: "listen", value: "no")]
-        }
-        return components.url
+        return BroadcastDetailEndpoint.urls(
+            showSegment: showSegment,
+            dateSegment: item.datumDe,
+            terminSlug: item.terminSlug,
+            markAsListened: markAsListened
+        )
     }
-    
+
     /// Slug der Sendung für die REST-URL: über `id_sendung` oder Titelabgleich mit der geladenen Sendungsliste, sonst `sendung_slug` aus dem Archiv.
     private func restShowSlugForBroadcastDetailAPI(for item: ArchiveItem) -> String {
         if let sid = item.sendungID,

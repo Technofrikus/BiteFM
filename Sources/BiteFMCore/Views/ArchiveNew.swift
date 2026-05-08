@@ -98,6 +98,14 @@ struct ArchiveNew: View {
                     }
                 }
             }
+            .refreshable {
+                await apiClient.fetchArchive()
+            }
+            #if os(iOS)
+            .listStyle(.insetGrouped)
+            #else
+            .listStyle(.inset)
+            #endif
             .opacity(filteredItems.isEmpty ? 0 : 1)
             
             if filteredItems.isEmpty && !storedItems.isEmpty {
@@ -145,7 +153,7 @@ struct ArchiveNew: View {
             }
         }
         .task {
-            await apiClient.fetchArchive(modelContext: modelContext)
+            await apiClient.fetchArchive()
         }
     }
 }

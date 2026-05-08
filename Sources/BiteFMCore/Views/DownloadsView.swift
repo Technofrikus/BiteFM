@@ -98,6 +98,7 @@ struct DownloadsView: View {
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
                 .environment(\.editMode, $editMode)
                 .onChange(of: listRows.map(\.terminID)) { _, ids in
                     let valid = Set(ids)

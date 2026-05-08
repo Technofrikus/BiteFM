@@ -163,7 +163,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         #if os(iOS)
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])
             try session.setActive(true)
             LogManager.shared.log("AudioSession configured successfully", type: .info)
         } catch {
@@ -444,6 +444,11 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 let durationSeconds = item.duration.seconds
                 if durationSeconds.isFinite, durationSeconds > 0 {
                     self.duration = durationSeconds
+                    
+                    if !self.isLive, self.currentItem != nil {
+                        self.updateNowPlayingForArchive()
+                    }
+                    
                     if !self.isLive, self.currentItem != nil, self.resumeWasFromSavedPositionOnly {
                         let t = self.player?.currentTime().seconds ?? self.currentTime
                         if t >= durationSeconds - self.nearEndPlaybackThreshold {
@@ -481,6 +486,10 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             nowPlayingInfo[MPMediaItemPropertyTitle] = item.sendungTitel
             nowPlayingInfo[MPMediaItemPropertyArtist] = item.subtitle
             lastUpdatedSongId = nil
+        }
+        
+        if duration > 0 {
+            nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         }
         
         if let currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo {
@@ -618,6 +627,12 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         } else {
             player?.replaceCurrentItem(with: playerItem)
         }
+
+        #if os(iOS)
+        // Ensure Apple TV is treated as an audio route (not external video playback).
+        player?.allowsExternalPlayback = false
+        player?.usesExternalPlaybackWhileExternalScreenIsActive = false
+        #endif
         
         // Seek to start position if needed
         if startAt > 0 {
@@ -758,6 +773,11 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         var nowPlayingInfo = [String: Any]()
         nowPlayingInfo[MPMediaItemPropertyTitle] = item.sendungTitel
         nowPlayingInfo[MPMediaItemPropertyArtist] = item.subtitle
+        if duration > 0 {
+            nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
+        }
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         #if os(iOS)
         Self.applyBrandArtworkToNowPlayingInfo(&nowPlayingInfo)
         #endif
@@ -769,6 +789,12 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         guard var nowPlayingInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo else { 
             var newInfo = [String: Any]()
             newInfo[MPNowPlayingInfoPropertyPlaybackRate] = rate
+            if let player {
+                newInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime().seconds
+            }
+            if duration > 0 {
+                newInfo[MPMediaItemPropertyPlaybackDuration] = duration
+            }
             #if os(iOS)
             Self.applyBrandArtworkToNowPlayingInfo(&newInfo)
             #endif
@@ -781,6 +807,9 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = rate
         if let player {
             nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime().seconds
+        }
+        if duration > 0 {
+            nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
         #if os(macOS)

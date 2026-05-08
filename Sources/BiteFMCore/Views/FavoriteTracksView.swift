@@ -46,6 +46,11 @@ struct FavoriteTracksView: View {
                         favoriteTrackRow(entry: entry)
                     }
                 }
+                #if os(iOS)
+                .listStyle(.insetGrouped)
+                #else
+                .listStyle(.inset)
+                #endif
             }
         }
         .navigationTitle("Favoriten: Tracks")
@@ -59,11 +64,7 @@ struct FavoriteTracksView: View {
             loadingTimeoutTask = nil
         }
         .refreshable {
-            if let ctx = apiClient.modelContainer?.mainContext {
-                await apiClient.fetchFavorites(modelContext: ctx)
-            } else {
-                await apiClient.fetchFavorites()
-            }
+            await apiClient.fetchFavorites()
         }
     }
     

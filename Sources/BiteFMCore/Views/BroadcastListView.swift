@@ -73,6 +73,11 @@ struct BroadcastListView: View {
                         .padding()
                     }
                 }
+                #if os(iOS)
+                .listStyle(.insetGrouped)
+                #else
+                .listStyle(.inset)
+                #endif
             } else if filteredBroadcasts.isEmpty && !isLoading {
                 if apiClient.lastListRefreshFailedWithoutNetwork {
                     ContentUnavailableView(
