@@ -11,6 +11,10 @@ public final class AppRestorationStore: ObservableObject {
 
     @Published public private(set) var state: AppRestorationState
 
+    /// Tracks which restoration keys (e.g. scroll anchors, deep routes) have been "consumed" during this app session.
+    /// Non-persisted, resets on every cold launch.
+    private var consumedRestorationKeys = Set<String>()
+
     /// Zeitspanne, ab der ein gespeicherter Snapshot als veraltet gilt. Vermeidet das Wiederbeleben monatealter Zustände
     /// (z. B. Sendungen, die im API nicht mehr existieren oder für den Nutzer keinen Bezug mehr haben).
     public let maxSnapshotAge: TimeInterval = 60 * 60 * 24 * 30
@@ -155,6 +159,19 @@ public final class AppRestorationStore: ObservableObject {
     /// Verwirft den gespeicherten Wiedergabe-Snapshot (z. B. wenn die Ausgabe das Ende erreicht hat).
     public func clearLastPlaybackSession() {
         setLastPlaybackSession(nil)
+    }
+
+    // MARK: - Session-only restoration tracking
+
+    /// Returns true if the given key has not been consumed yet in this app session.
+    /// Used to ensure that "jumpy" restorations like scroll positions only happen once after a cold launch.
+    public func shouldRestore(key: String) -> Bool {
+        !consumedRestorationKeys.contains(key)
+    }
+
+    /// Marks a restoration key as consumed for the remainder of this app session.
+    public func markRestored(key: String) {
+        consumedRestorationKeys.insert(key)
     }
 
     // MARK: - Persistence

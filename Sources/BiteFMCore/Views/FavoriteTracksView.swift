@@ -75,53 +75,35 @@ struct FavoriteTracksView: View {
         let isPlaying = item.map { playerManager.currentItem?.id == $0.id && playerManager.isPlaying } ?? false
         let isLoading = terminID.map { loadingTerminID == $0 } ?? false
         let highlight = isPlaying || isLoading
+        let compactRowSpacing: CGFloat = 6
+        let rowPaddingV: CGFloat = 5
+        let accessoryBox: CGFloat = 44
 
         if horizontalSizeClass == .compact {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .top, spacing: compactRowSpacing) {
                     Button {
-                        Task { await apiClient.toggleFavoriteTrack(trackID: entry.id, cachedItem: entry) }
+                        playTrack(entry)
                     } label: {
-                        Image(systemName: apiClient.isFavoriteTrackRow(id: entry.id) ? "heart.fill" : "heart")
-                            .foregroundColor(apiClient.isFavoriteTrackRow(id: entry.id) ? .red : .secondary)
-                            .font(.caption)
+                        trackTextBlock(entry: entry, isPlaying: isPlaying, isLoading: isLoading)
                     }
                     .buttonStyle(.plain)
-                    #if os(macOS)
-                    .help(apiClient.isFavoriteTrackRow(id: entry.id) ? "Favorit entfernen" : "Als Favorit speichern")
-                    #endif
-                    .disabled(!apiClient.isLoggedIn)
-                    trackStatusIcon(isLoading: isLoading, isPlaying: isPlaying)
+                    .disabled(item == nil)
+
+                    Spacer(minLength: 8)
+
+                    trackAccessoryStrip(entry: entry, isLoading: isLoading, isPlaying: isPlaying)
+                        .frame(width: accessoryBox, height: accessoryBox, alignment: .center)
                 }
-                Button {
-                    playTrack(entry)
-                } label: {
-                    trackTextBlock(entry: entry, isPlaying: isPlaying, isLoading: isLoading)
-                }
-                .buttonStyle(.plain)
-                .disabled(item == nil)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, rowPaddingV)
             .padding(.horizontal, 8)
             .background(highlight ? Color.accentColor.opacity(0.1) : Color.clear)
             .cornerRadius(8)
+            .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 12))
         } else {
             HStack(spacing: 0) {
                 Button {
-                    Task { await apiClient.toggleFavoriteTrack(trackID: entry.id, cachedItem: entry) }
-                } label: {
-                    Image(systemName: apiClient.isFavoriteTrackRow(id: entry.id) ? "heart.fill" : "heart")
-                        .foregroundColor(apiClient.isFavoriteTrackRow(id: entry.id) ? .red : .secondary)
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-                #if os(macOS)
-                .help(apiClient.isFavoriteTrackRow(id: entry.id) ? "Favorit entfernen" : "Als Favorit speichern")
-                #endif
-                .disabled(!apiClient.isLoggedIn)
-                .padding(.trailing, 4)
-
-                Button {
                     playTrack(entry)
                 } label: {
                     trackTextBlock(entry: entry, isPlaying: isPlaying, isLoading: isLoading)
@@ -129,17 +111,41 @@ struct FavoriteTracksView: View {
                 .buttonStyle(.plain)
                 .disabled(item == nil)
 
-                Divider()
-                    .frame(height: 30)
-                    .padding(.horizontal, 4)
+                Spacer(minLength: 8)
 
-                trackStatusIcon(isLoading: isLoading, isPlaying: isPlaying)
+                trackAccessoryStrip(entry: entry, isLoading: isLoading, isPlaying: isPlaying)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, rowPaddingV)
             .padding(.horizontal, 8)
             .background(highlight ? Color.accentColor.opacity(0.1) : Color.clear)
             .cornerRadius(8)
+            .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 12))
         }
+    }
+
+    private func trackAccessoryStrip(entry: FavoriteTrackItem, isLoading: Bool, isPlaying: Bool) -> some View {
+        HStack(spacing: 2) {
+            trackStatusIcon(isLoading: isLoading, isPlaying: isPlaying)
+            trackHeartButton(entry: entry)
+        }
+    }
+
+    private func trackHeartButton(entry: FavoriteTrackItem) -> some View {
+        let isFav = apiClient.isFavoriteTrackRow(id: entry.id)
+        return Button {
+            Task { await apiClient.toggleFavoriteTrack(trackID: entry.id, cachedItem: entry) }
+        } label: {
+            Image(systemName: isFav ? "heart.fill" : "heart")
+                .font(.body)
+                .foregroundStyle(isFav ? Color.pink : Color.secondary)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .disabled(!apiClient.isLoggedIn)
+        #if os(macOS)
+        .help(isFav ? "Favorit entfernen" : "Als Favorit speichern")
+        #endif
+        .accessibilityLabel(isFav ? "Favorit entfernen" : "Als Favorit speichern")
     }
 
     @ViewBuilder
@@ -189,7 +195,7 @@ struct FavoriteTracksView: View {
     
     @ViewBuilder
     private func trackTextBlock(entry: FavoriteTrackItem, isPlaying: Bool, isLoading: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(entry.title)
                     .font(.headline)

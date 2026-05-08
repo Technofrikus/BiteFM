@@ -42,7 +42,11 @@ struct BroadcastListView: View {
         ZStack {
             if listShowsEpisodes {
                 List {
-                    ForEach(displayedBroadcasts) { broadcast in
+                    ForEach(Array(displayedBroadcasts.enumerated()), id: \.element.id) { idx, broadcast in
+                        let isFirst = idx == 0
+                        let isLastEpisodeRow = idx == displayedBroadcasts.count - 1
+                        let top: CGFloat = isFirst ? 12 : 4
+                        let bottom: CGFloat = isLastEpisodeRow && !isLoading ? 12 : 4
                         let item = broadcast.toArchiveItem(showTitle: show.titel, showSlug: show.slug, sendungID: show.id)
                         BroadcastRow(
                             item: item,
@@ -54,6 +58,7 @@ struct BroadcastListView: View {
                             selectedItemForDetail: $selectedItemForDetail,
                             isInspectorPresented: $isInspectorPresented
                         )
+                        .listRowInsets(EdgeInsets(top: top, leading: 10, bottom: bottom, trailing: 12))
                         .onAppear {
                             // Pagination: Ende der geladenen (ungefilterten) Liste erreicht
                             if broadcast.id == filteredBroadcasts.last?.id && hasMorePages && !isLoading {
@@ -71,6 +76,7 @@ struct BroadcastListView: View {
                             Spacer()
                         }
                         .padding()
+                        .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 12, trailing: 12))
                     }
                 }
                 #if os(iOS)

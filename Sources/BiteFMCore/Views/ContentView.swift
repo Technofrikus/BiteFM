@@ -246,11 +246,7 @@ private struct LoggedInRootView: View {
             TabView(selection: $selectedTab) {
                 Tab("Live", systemImage: "radio", value: MainTab.live) {
                     NavigationStack {
-                        Group {
-                            if selectedTab == .live {
-                                LiveView()
-                            }
-                        }
+                        LiveView()
                         .navigationTitle("Live")
                         .navigationBarTitleDisplayMode(.large)
                     }
@@ -258,11 +254,7 @@ private struct LoggedInRootView: View {
 
                 Tab("Neu", systemImage: "clock", value: MainTab.archiveNew) {
                     NavigationStack {
-                        Group {
-                            if selectedTab == .archiveNew {
-                                ArchiveNew()
-                            }
-                        }
+                        ArchiveNew()
                         .navigationTitle("Neu im Archiv")
                         .navigationBarTitleDisplayMode(.large)
                     }
@@ -270,21 +262,13 @@ private struct LoggedInRootView: View {
 
                 Tab("Archiv", systemImage: "archivebox", value: MainTab.archive) {
                     NavigationStack {
-                        Group {
-                            if selectedTab == .archive {
-                                ArchiveView()
-                            }
-                        }
+                        ArchiveView()
                     }
                 }
 
                 Tab("Favoriten", systemImage: "heart.fill", value: MainTab.favorites) {
                     NavigationStack(path: $favoritesPath) {
-                        Group {
-                            if selectedTab == .favorites {
-                                FavoritesHubView()
-                            }
-                        }
+                        FavoritesHubView()
                         .navigationTitle("Favoriten")
                         .navigationBarTitleDisplayMode(.large)
                         .navigationDestination(for: AppRestorationState.DeepRoute.self) { route in
@@ -295,11 +279,7 @@ private struct LoggedInRootView: View {
 
                 Tab("Downloads", systemImage: "arrow.down.circle", value: MainTab.downloads) {
                     NavigationStack {
-                        Group {
-                            if selectedTab == .downloads {
-                                DownloadsView()
-                            }
-                        }
+                        DownloadsView()
                     }
                 }
             }
@@ -323,11 +303,7 @@ private struct LoggedInRootView: View {
         var body: some View {
             TabView(selection: $selectedTab) {
                 NavigationStack {
-                    Group {
-                        if selectedTab == .live {
-                            LiveView()
-                        }
-                    }
+                    LiveView()
                     .navigationTitle("Live")
                     .navigationBarTitleDisplayMode(.large)
                 }
@@ -335,11 +311,7 @@ private struct LoggedInRootView: View {
                 .tag(MainTab.live)
 
                 NavigationStack {
-                    Group {
-                        if selectedTab == .archiveNew {
-                            ArchiveNew()
-                        }
-                    }
+                    ArchiveNew()
                     .navigationTitle("Neu im Archiv")
                     .navigationBarTitleDisplayMode(.large)
                 }
@@ -347,21 +319,13 @@ private struct LoggedInRootView: View {
                 .tag(MainTab.archiveNew)
 
                 NavigationStack {
-                    Group {
-                        if selectedTab == .archive {
-                            ArchiveView()
-                        }
-                    }
+                    ArchiveView()
                 }
                 .tabItem { Label("Archiv", systemImage: "archivebox") }
                 .tag(MainTab.archive)
 
                 NavigationStack(path: $favoritesPath) {
-                    Group {
-                        if selectedTab == .favorites {
-                            FavoritesHubView()
-                        }
-                    }
+                    FavoritesHubView()
                     .navigationTitle("Favoriten")
                     .navigationBarTitleDisplayMode(.large)
                     .navigationDestination(for: AppRestorationState.DeepRoute.self) { route in
@@ -372,11 +336,7 @@ private struct LoggedInRootView: View {
                 .tag(MainTab.favorites)
 
                 NavigationStack {
-                    Group {
-                        if selectedTab == .downloads {
-                            DownloadsView()
-                        }
-                    }
+                    DownloadsView()
                 }
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
                 .tag(MainTab.downloads)

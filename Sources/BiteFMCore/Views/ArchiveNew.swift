@@ -92,8 +92,14 @@ struct ArchiveNew: View {
                 List {
                     ForEach(sections, id: \.dayStart) { section in
                         Section(header: Text(section.header)) {
-                            ForEach(section.items) { storedItem in
+                            let rows = section.items
+                            ForEach(Array(rows.enumerated()), id: \.element.terminID) { idx, storedItem in
+                                let isFirst = idx == 0
+                                let isLast = idx == rows.count - 1
+                                let top: CGFloat = isFirst ? 12 : 4
+                                let bottom: CGFloat = isLast ? 12 : 4
                                 let item = storedItem.toArchiveItem()
+
                                 BroadcastRow(
                                     item: item,
                                     onFavoriteTap: apiClient.isLoggedIn
@@ -102,6 +108,9 @@ struct ArchiveNew: View {
                                     selectedItemForDetail: $selectedItemForDetail,
                                     isInspectorPresented: $isInspectorPresented
                                 )
+                                // Erste/letzte echte Row schaffen die Section-Luft; keine extra
+                                // Spacer-Zeile, da `List` sonst eine Mindesthöhe erzwingt.
+                                .listRowInsets(EdgeInsets(top: top, leading: 10, bottom: bottom, trailing: 12))
                                 .id(storedItem.terminID)
                                 .onAppear {
                                     // Letzter „angekommener“ Termin = grobe Schätzung der aktuellen Scroll-Position.
@@ -193,13 +202,16 @@ struct ArchiveNew: View {
     }
 
     private func restoreScrollAnchorIfPossible(proxy: ScrollViewProxy, items: [StoredArchiveItem]) {
-        guard !didRestoreScrollAnchor else { return }
+        let sessionKey = "ArchiveNew.scrollAnchor"
+        guard !didRestoreScrollAnchor, restorationStore.shouldRestore(key: sessionKey) else { return }
         guard let id = restorationStore.validScrollAnchors.archiveNewTerminID else {
             didRestoreScrollAnchor = true
+            restorationStore.markRestored(key: sessionKey)
             return
         }
         guard items.contains(where: { $0.terminID == id }) else { return }
         didRestoreScrollAnchor = true
+        restorationStore.markRestored(key: sessionKey)
         // `scrollTo` ohne Animation, damit der Restore nicht als sichtbares Springen erscheint.
         proxy.scrollTo(id, anchor: .top)
     }

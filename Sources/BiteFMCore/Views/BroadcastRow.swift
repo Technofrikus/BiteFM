@@ -38,6 +38,8 @@ struct BroadcastRow: View {
         #endif
     }
 
+    private var contentVerticalPadding: CGFloat { 6 }
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             if isPlaying {
@@ -63,58 +65,54 @@ struct BroadcastRow: View {
                     }
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, contentVerticalPadding)
             .padding(.horizontal, 8)
         }
-        .listRowInsets(EdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 12))
+        .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 12))
     }
 
     /// Datum und optionale Größe bleiben oben; kompakte Status-/Aktionsicons sitzen rechts in derselben Zeile.
     private var playbackTapArea: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .center, spacing: 4) {
-                Button(action: playAndRevealIfNeeded) {
-                    HStack(spacing: 6) {
-                        Text(dateLineString)
-                            .multilineTextAlignment(.leading)
-                        if let extra = resolvedMetaLineSizeSuffix {
-                            Text(extra)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .font(.caption)
-                    .foregroundColor(isPlaying ? .accentColor.opacity(0.75) : .secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Spielt diese Ausgabe ab.")
-
-                inlineStatusControls
-            }
-
-            Button(action: playAndRevealIfNeeded) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text((showShowTitle ? item.sendungTitel : item.subtitle).bitefm_sanitizedDisplayLine)
-                        .font(.headline)
-                        .foregroundColor(isPlaying ? .accentColor : .primary)
+        Button(action: playAndRevealIfNeeded) {
+            VStack(alignment: .leading, spacing: 2) {
+                // Zeile 1: Datum & Meta
+                HStack(spacing: 6) {
+                    Text(dateLineString)
                         .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if showShowTitle {
-                        Text(item.subtitle)
-                            .font(.subheadline)
-                            .foregroundColor(isPlaying ? .accentColor.opacity(0.8) : .secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                    if let extra = resolvedMetaLineSizeSuffix {
+                        Text(extra)
                     }
+                    Spacer(minLength: 80) // Platz für Icons rechts (Overlay)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                .font(.caption)
+                .foregroundColor(isPlaying ? .accentColor.opacity(0.75) : .secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+                // Zeile 2: Titel
+                Text((showShowTitle ? item.sendungTitel : item.subtitle).bitefm_sanitizedDisplayLine)
+                    .font(.headline)
+                    .foregroundColor(isPlaying ? .accentColor : .primary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Zeile 3: Untertitel (optional)
+                if showShowTitle {
+                    Text(item.subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(isPlaying ? .accentColor.opacity(0.8) : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Spielt diese Ausgabe ab.")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
+        .accessibilityHint("Spielt diese Ausgabe ab.")
+        .overlay(alignment: .topTrailing) {
+            inlineStatusControls
+                .offset(y: -5) // Zentrierung der 28pt Icons zur ~14pt Caption-Zeile
+        }
         .opacity(apiClient.isPlayed(item: item) && !isPlaying ? 0.65 : 1.0)
     }
 

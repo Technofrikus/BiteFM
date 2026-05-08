@@ -165,13 +165,16 @@ struct FavoriteEpisodesView: View {
     }
 
     private func restoreScrollAnchorIfPossible(proxy: ScrollViewProxy) {
-        guard !didRestoreScrollAnchor else { return }
+        let sessionKey = "FavoriteEpisodesView.scrollAnchor"
+        guard !didRestoreScrollAnchor, restorationStore.shouldRestore(key: sessionKey) else { return }
         guard let id = restorationStore.validScrollAnchors.favoriteEpisodesTerminID else {
             didRestoreScrollAnchor = true
+            restorationStore.markRestored(key: sessionKey)
             return
         }
         guard apiClient.favoriteShowItems.contains(where: { $0.id == id }) else { return }
         didRestoreScrollAnchor = true
+        restorationStore.markRestored(key: sessionKey)
         proxy.scrollTo(id, anchor: .top)
     }
 }

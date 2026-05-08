@@ -142,9 +142,11 @@ struct ArchiveView: View {
         if showLetterIndexStrip {
             if usesOverlayLetterIndex {
                 archiveList(proxy: proxy)
+                    // iOS compact: Index soll über der Liste "schweben" (overlay),
+                    // aber ohne die Chevron-Pfeile zu überdecken. Das lösen wir über
+                    // größeren `trailing`-Inset der Zeilen, solange der Overlay-Index aktiv ist.
                     .overlay(alignment: .trailing) {
                         archiveIndexStrip(proxy: proxy)
-                            // Avoid visual collision with the list's rounded cards.
                             .padding(.trailing, 8)
                             .padding(.top, 8)
                             .padding(.bottom, 8)
@@ -167,8 +169,23 @@ struct ArchiveView: View {
             List {
                 ForEach(letterSections, id: \.letter) { section in
                     Section {
-                        ForEach(section.shows) { show in
-                            showRow(for: show)
+                        let shows = section.shows
+                        ForEach(Array(shows.enumerated()), id: \.element.id) { idx, show in
+                            let isFirst = idx == 0
+                            let isLast = idx == shows.count - 1
+                            let top: CGFloat = isFirst ? 18 : 4
+                            let bottom: CGFloat = isLast ? 18 : 4
+
+                            // Wenn der Index als Overlay "schwebt", reservieren wir rechts Platz,
+                            // damit der NavigationLink-Chevron nicht verdeckt wird.
+                            let reservedOverlayTrailing: CGFloat = usesOverlayLetterIndex
+                                ? max(12, 12 + indexColumnWidth - 8) // etwas weniger Reserve → Chevron weiter rechts
+                                : 12
+
+                            showRow(
+                                for: show,
+                                rowInsets: EdgeInsets(top: top, leading: 10, bottom: bottom, trailing: reservedOverlayTrailing)
+                            )
                         }
                     } header: {
                         archiveSectionHeader(letter: section.letter)
@@ -374,13 +391,16 @@ struct ArchiveView: View {
 
     /// Wendet einen gespeicherten Letter-Anker einmalig an, sobald passende Sektionen existieren.
     private func restoreLetterAnchorIfPossible(proxy: ScrollViewProxy) {
-        guard !didRestoreLetterAnchor else { return }
+        let sessionKey = "ArchiveView.scrollAnchor"
+        guard !didRestoreLetterAnchor, restorationStore.shouldRestore(key: sessionKey) else { return }
         guard let letter = restorationStore.validScrollAnchors.archiveLetter else {
             didRestoreLetterAnchor = true
+            restorationStore.markRestored(key: sessionKey)
             return
         }
         guard availableSectionIDs.contains(letter) else { return }
         didRestoreLetterAnchor = true
+        restorationStore.markRestored(key: sessionKey)
         // Ohne Animation, weil der Restore sonst sofort nach dem Erscheinen der Liste sichtbar zappeln würde.
         proxy.scrollTo(letter, anchor: .top)
     }
@@ -439,9 +459,14 @@ struct ArchiveView: View {
     
     /// Typo wie bei „Neu im Archiv“ (`BroadcastRow`: `.headline` / `.subheadline`, Herz `.body`).
     @ViewBuilder
-    private func showRow(for show: Show) -> some View {
+    private func showRow(for show: Show, rowInsets: EdgeInsets) -> some View {
         let isPlaying = playerManager.currentItem?.sendungTitel == show.titel && playerManager.isPlaying
         let accessoryBox: CGFloat = 22
+        #if os(macOS)
+        let rowVerticalPadding: CGFloat = 4
+        #else
+        let rowVerticalPadding: CGFloat = 0
+        #endif
 
         NavigationLink(destination: BroadcastListView(show: show)) {
             HStack(alignment: .top, spacing: 0) {
@@ -476,13 +501,16 @@ struct ArchiveView: View {
                         .frame(width: accessoryBox, height: accessoryBox)
                 }
             }
-            // Slightly denser than default while keeping comfortable tap targets.
-            .padding(.horizontal, 12)
-            .padding(.vertical, 0)
+            // Inneres Padding entspricht `BroadcastRow`; das linke/rechte Listen-Inset
+            // wird unten via `.listRowInsets` gesetzt, damit der Inhalt auf gleicher
+            // X-Position wie in „Neu im Archiv" beginnt.
+            .padding(.horizontal, 8)
+            .padding(.vertical, rowVerticalPadding)
             .contentShape(Rectangle())
             .background(isPlaying ? Color.accentColor.opacity(0.1) : Color.clear)
         }
         .buttonStyle(.plain)
+        .listRowInsets(rowInsets)
     }
 }
 
