@@ -359,18 +359,21 @@ struct ExpandedNowPlayingView: View {
         GeometryReader { proxy in
             let fadeEnd = Self.expandedBottomBarFadeEnd
             let fadeHeight = Self.expandedBottomBarFadeHeight
-            ZStack(alignment: .top) {
-                // Voll deckender Bereich ab `fadeEnd` nach unten.
-                Rectangle()
-                    .fill(Color.black)
-                    .frame(height: max(0, proxy.size.height - fadeEnd))
-                    .offset(y: fadeEnd)
+            let height = max(1, proxy.size.height)
+            let t0 = max(0, min(1, (fadeEnd - fadeHeight) / height))
+            let t1 = max(0, min(1, fadeEnd / height))
 
-                // Langer Gradient, dessen **unteres Ende** exakt bei `fadeEnd` liegt.
-                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                    .frame(height: fadeHeight)
-                    .offset(y: fadeEnd - fadeHeight)
-            }
+            // Single gradient mask to avoid a visible seam where two mask layers meet.
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .clear, location: t0),
+                    .init(color: .black, location: t1),
+                    .init(color: .black, location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
     }
 #endif
