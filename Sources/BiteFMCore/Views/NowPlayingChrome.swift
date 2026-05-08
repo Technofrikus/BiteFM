@@ -320,15 +320,23 @@ struct ExpandedNowPlayingView: View {
     }
 
     /// Dismiss-Region am unteren Bildschirmrand (Buttons + Seekbar + Padding).
-    private static let expandedBottomBarDismissRegionHeight: CGFloat = 190
+    private static let expandedBottomBarDismissRegionHeight: CGFloat = 240
 
     /// Visuelle Größe des Play/Pause Icons im Expanded Sheet.
     /// Basiswert aus `PlaybackTransportButtons` (play/pause): 28pt, skaliert im Expanded Sheet.
     private static var expandedPlayButtonIconSide: CGFloat { 28 * expandedTransportIconScale }
 
-    /// Höhe des Gradients am oberen Rand der Controls-Bar.
-    /// Soll ungefähr der visuellen Größe des Play Buttons entsprechen.
-    private static var expandedBottomBarFadeHeight: CGFloat { expandedPlayButtonIconSide }
+    /// Untere Kante des Gradients (ab hier ist die Bar voll deckend).
+    /// Soll **oberhalb** des Play-Buttons enden.
+    private static var expandedBottomBarFadeEnd: CGFloat {
+        // Play/Pause Hit-Area (56*s) + top padding (10) -> grob: bis knapp oberhalb der Play-Taste.
+        // Wir nutzen die Icon-Seite als stabilen Proxy, da die Hit-Area intern ist.
+        expandedPlayButtonIconSide + 8
+    }
+
+    /// Höhe des Gradients nach oben. Größer = längerer weicher Übergang,
+    /// ohne die untere Kante (`expandedBottomBarFadeEnd`) zu verschieben.
+    private static var expandedBottomBarFadeHeight: CGFloat { 180 }
 
     @ViewBuilder
     private func expandedBottomBarBackground(live: Bool) -> some View {
@@ -348,10 +356,21 @@ struct ExpandedNowPlayingView: View {
 
 #if os(iOS)
     private var expandedBottomBarMask: some View {
-        VStack(spacing: 0) {
-            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                .frame(height: Self.expandedBottomBarFadeHeight)
-            Rectangle().fill(Color.black)
+        GeometryReader { proxy in
+            let fadeEnd = Self.expandedBottomBarFadeEnd
+            let fadeHeight = Self.expandedBottomBarFadeHeight
+            ZStack(alignment: .top) {
+                // Voll deckender Bereich ab `fadeEnd` nach unten.
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: max(0, proxy.size.height - fadeEnd))
+                    .offset(y: fadeEnd)
+
+                // Langer Gradient, dessen **unteres Ende** exakt bei `fadeEnd` liegt.
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: fadeHeight)
+                    .offset(y: fadeEnd - fadeHeight)
+            }
         }
     }
 #endif
