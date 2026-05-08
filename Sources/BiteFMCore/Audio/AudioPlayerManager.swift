@@ -36,7 +36,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     private var lastMarkedTerminID: Int?
     
     var modelContainer: ModelContainer?
-    
+    /// Wird beim Bootstrap injiziert, damit der Player den letzten App-State (zuletzt aktive Ausgabe) selbst pflegen kann.
+    private var restorationStore: AppRestorationStore?
+
+    /// Marker für „letzter Cold-Launch-Snapshot wurde gerade visuell wiederhergestellt“ — verhindert Auto-Save mit
+    /// position 0, bevor der Nutzer überhaupt einen Play-Tap getätigt hat.
+    private var isRestoredPlaceholder = false
+
     private var timeObserver: Any?
     private var lastUpdatedSongId: String?
     private var lastSavedPosition: Double = 0
@@ -80,10 +86,62 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     
     func setup(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
-        
+
         // Initial cleanup of old playback positions
         Task {
             await cleanupOldPlaybackPositions()
+        }
+    }
+
+    /// Verbindet den Restoration-Store, sodass die zuletzt aktive Ausgabe app-weit persistiert und beim Cold Launch
+    /// rein visuell (ohne Auto-Play) wiederhergestellt werden kann.
+    public func attachRestorationStore(_ store: AppRestorationStore) {
+        self.restorationStore = store
+    }
+
+    /// Stellt die zuletzt aktive Ausgabe als Mini-/Now-Playing-Schnappschuss wieder her, **ohne** Audio zu starten.
+    /// Soll früh nach dem Bootstrap einmalig aufgerufen werden, solange noch nichts läuft.
+    public func restoreLastSessionSnapshotIfNeeded() {
+        guard player == nil, currentItem == nil, !isLive else { return }
+        guard let store = restorationStore, let session = store.validLastPlaybackSession else { return }
+
+        // Nur visuelle Wiederherstellung: `AVPlayer` bleibt nil, isPlaying bleibt false.
+        isLive = false
+        currentStreamType = nil
+        currentItem = session.item
+        currentPlaylist = nil
+        currentTime = session.position
+        duration = session.duration
+        lastSavedPosition = session.position
+        isPlaying = false
+        isStalled = false
+        hasMarkedCurrentItemAsPlayed = lastMarkedTerminID == session.item.terminID
+        isRestoredPlaceholder = true
+
+        setupNowPlaying(item: session.item)
+        updatePlaybackRate(0.0)
+        LogManager.shared.log("Restored last playback snapshot for terminID=\(session.terminID) at \(Int(session.position))s (paused)", type: .info)
+    }
+
+    private func persistRestorationSession(wasPlaying overridePlaying: Bool? = nil) {
+        guard let store = restorationStore else { return }
+        guard let item = currentItem, !isLive else { return }
+        let position = max(0, currentTime)
+        let session = AppRestorationState.PlaybackSession(
+            terminID: item.terminID,
+            position: position,
+            duration: max(0, duration),
+            wasPlaying: overridePlaying ?? isPlaying,
+            savedAt: Date(),
+            item: item
+        )
+        store.setLastPlaybackSession(session)
+    }
+
+    private func clearRestorationSessionIfMatches(terminID: Int) {
+        guard let store = restorationStore else { return }
+        if store.state.lastPlaybackSession?.terminID == terminID {
+            store.clearLastPlaybackSession()
         }
     }
     
@@ -226,11 +284,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         lastUpdatedSongId = nil
         resumeWasFromSavedPositionOnly = false
         hasMarkedCurrentItemAsPlayed = lastMarkedTerminID == item.terminID
-        
+        // Sobald der Nutzer aktiv eine Ausgabe startet, ist der „nur visuell wiederhergestellte“ Modus beendet.
+        isRestoredPlaceholder = false
+
         Task {
             await APIClient.shared.refreshListeningHistoryIfStale()
         }
-        
+
         // Save previous item's position if any
         if let _ = currentItem {
             savePlaybackPosition()
@@ -402,6 +462,15 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 if !self.isLive && self.currentItem != nil && abs(self.currentTime - self.lastSavedPosition) > 10.0 {
                     self.savePlaybackPosition()
                 }
+
+                // App-State (Restoration) ebenfalls drosseln: Position/Status periodisch updaten.
+                if !self.isLive, !self.isRestoredPlaceholder, self.currentItem != nil {
+                    self.restorationStore?.updatePlaybackPosition(
+                        self.currentTime,
+                        duration: self.duration,
+                        wasPlaying: self.isPlaying
+                    )
+                }
             }
         }
     }
@@ -559,6 +628,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         duration = 0
         currentTime = 0
         currentStreamType = streamType
+        isRestoredPlaceholder = false
         guard let url = streamType.streamURL else { return }
 
         play(url: url, startAt: 0)
@@ -652,8 +722,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         player?.play()
         isPlaying = true
         isStalled = false
+
+        // App-weiten Wiedergabe-Snapshot anlegen, sobald eine archivierte Ausgabe gespielt wird (Live wird ausgespart).
+        if !isLive, currentItem != nil {
+            persistRestorationSession(wasPlaying: true)
+        }
     }
-    
+
     @objc private func handlePlaybackError(notification: Notification) {
         if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
             LogManager.shared.log("Playback failed with error: \(error.localizedDescription)", type: .error)
@@ -667,6 +742,9 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         Task { @MainActor in
             guard let item = self.currentItem, !self.isLive else { return }
             self.clearStoredPlaybackPosition(for: item.terminID)
+            // Beim natürlichen Ende den Restoration-Snapshot löschen — er hätte beim Neustart sonst sofort wieder das
+            // Ende der Datei angezeigt und wäre weniger nützlich als gar kein Snapshot.
+            self.clearRestorationSessionIfMatches(terminID: item.terminID)
             self.hasMarkedCurrentItemAsPlayed = true
             self.lastMarkedTerminID = item.terminID
             // Hörhistorie vom Server laden — UI aktualisiert sich über `listenedShowIDs`.
@@ -694,16 +772,30 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         isPlaying = false
         updatePlaybackRate(0.0)
         savePlaybackPosition()
+        if !isLive, currentItem != nil {
+            persistRestorationSession(wasPlaying: false)
+            restorationStore?.flushNow()
+        }
     }
-    
+
     public func togglePlayPause() {
         if isPlaying {
             pause()
         } else {
             userFacingPlaybackError = nil
+            // Aus rein wiederhergestelltem Snapshot heraus muss die Audio-Pipeline erst aufgebaut werden.
+            if isRestoredPlaceholder, let item = currentItem, !isLive {
+                let resumeAt = currentTime
+                isRestoredPlaceholder = false
+                play(item: item, initialPosition: resumeAt)
+                return
+            }
             player?.play()
             isPlaying = true
             updatePlaybackRate(1.0)
+            if !isLive, currentItem != nil {
+                persistRestorationSession(wasPlaying: true)
+            }
         }
     }
     
@@ -720,9 +812,18 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             guard let self else { return .commandFailed }
             Task { @MainActor in
                 self.userFacingPlaybackError = nil
+                if self.isRestoredPlaceholder, let item = self.currentItem, !self.isLive {
+                    let resumeAt = self.currentTime
+                    self.isRestoredPlaceholder = false
+                    self.play(item: item, initialPosition: resumeAt)
+                    return
+                }
                 self.player?.play()
                 self.isPlaying = true
                 self.updatePlaybackRate(1.0)
+                if !self.isLive, self.currentItem != nil {
+                    self.persistRestorationSession(wasPlaying: true)
+                }
             }
             return .success
         }

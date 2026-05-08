@@ -170,13 +170,6 @@ struct BroadcastListView: View {
                 await loadMoreUntilVisible()
             }
         }
-        .refreshable {
-            guard !isInspectorPresented else { return }
-            currentPage = 1
-            broadcasts = []
-            hasMorePages = true
-            await loadMoreUntilVisible()
-        }
     }
     
     /// Liste sichtbar, solange Einträge da sind oder noch nachgeladen wird.

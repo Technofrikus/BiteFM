@@ -5,9 +5,8 @@ import UIKit
 
 public struct ContentView: View {
     @EnvironmentObject private var apiClient: APIClient
-    #if os(iOS)
+    @EnvironmentObject private var restorationStore: AppRestorationStore
     @Environment(\.scenePhase) private var scenePhase
-    #endif
 
     public init() {}
 
@@ -26,27 +25,32 @@ public struct ContentView: View {
                     }
             }
         }
-        #if os(iOS)
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                #if os(iOS)
                 // Defer the resume to the next run loop so scene activation can settle first.
                 Task { @MainActor in
                     await Task.yield()
                     apiClient.resumeDeferredPollingIfConfigured()
-                    #if os(iOS)
                     await IOSDownloadManager.shared.runForegroundMaintenance()
-                    #endif
                 }
+                #endif
             case .background:
+                #if os(iOS)
                 apiClient.pauseDeferredPolling()
+                #endif
+                // Restoration-Snapshot beim Wechsel in den Hintergrund sofort persistieren — auf iOS, weil die App
+                // dort jederzeit terminiert werden kann; auf macOS schadet ein Flush nicht (Quit signalisiert keinen
+                // gesonderten scenePhase-Wechsel zuverlässig vor dem Beenden).
+                restorationStore.flushNow()
             case .inactive:
-                break
+                // iOS: Home-Swipe / App Switcher → vor möglichem Termination noch einmal hart speichern.
+                restorationStore.flushNow()
             @unknown default:
                 break
             }
         }
-        #endif
     }
 }
 
@@ -67,6 +71,7 @@ private struct InitialLoadingView: View {
 private struct LoggedInRootView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var restorationStore: AppRestorationStore
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
     #endif
@@ -83,7 +88,7 @@ private struct LoggedInRootView: View {
         case show(Show)
     }
 
-    private enum MainTab: Hashable {
+    enum MainTab: Hashable {
         case live
         case archiveNew
         case archive
@@ -99,6 +104,14 @@ private struct LoggedInRootView: View {
     @State private var selectedTab: MainTab = .live
     @State private var logoutAlertPresented: Bool = false
     @State private var isNowPlayingExpanded: Bool = false
+    @State private var didApplyRestoredRoot: Bool = false
+    @State private var didRestorePlaybackSnapshot: Bool = false
+    /// Eine Sidebar-`show(...)`-Wiederherstellung kann beim ersten `task` noch nicht greifen, wenn `apiClient.shows`
+    /// gerade nachgeladen wird. Wir versuchen es einmalig, sobald die Sendungsliste gefüllt ist.
+    @State private var pendingShowRestoreSlug: String?
+    /// Tiefe Navigation des iPhone-Favoriten-Tabs. Nur stabile, semantische Routen — keine View-Hierarchie.
+    @State private var favoritesPath: [AppRestorationState.DeepRoute] = []
+    @State private var didApplyRestoredFavoritesPath: Bool = false
     #if os(iOS)
     @State private var didApplyOfflineLaunchTab = false
     #endif
@@ -123,19 +136,28 @@ private struct LoggedInRootView: View {
                 PlayerBarView()
             }
         }
-        #if os(iOS)
         .task {
-            guard !didApplyOfflineLaunchTab else { return }
-            didApplyOfflineLaunchTab = true
-            let online = await NetworkPathProbe.isPathSatisfied()
-            guard !online else { return }
-            if useCompactRoot {
-                selectedTab = .downloads
-            } else {
-                selection = .downloads
-            }
+            applyRestoredRootIfNeeded()
+            restorePlaybackSnapshotIfNeeded()
+            applyRestoredFavoritesPathIfNeeded(shows: apiClient.shows)
+            #if os(iOS)
+            await applyOfflineLaunchOverrideIfNeeded()
+            #endif
         }
-        #endif
+        .onChange(of: apiClient.shows) { _, newShows in
+            // Sidebar-`show(...)`-Eintrag kann erst zugewiesen werden, sobald die Sendungsliste verfügbar ist.
+            applyRestoredShowSelectionIfPending(shows: newShows)
+            applyRestoredFavoritesPathIfNeeded(shows: newShows)
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            persistSelectedTab(newTab)
+        }
+        .onChange(of: selection) { _, newSelection in
+            persistSelectedSidebarItem(newSelection)
+        }
+        .onChange(of: favoritesPath) { _, newPath in
+            persistFavoritesPath(newPath)
+        }
         .alert("Abmelden?", isPresented: $logoutAlertPresented) {
             Button("Abbrechen", role: .cancel) {}
             Button("Abmelden", role: .destructive) {
@@ -197,9 +219,17 @@ private struct LoggedInRootView: View {
     @ViewBuilder
     private var compactTabShell: some View {
         if #available(iOS 26.1, *) {
-            IPhoneTabShellWithBottomAccessory(selectedTab: $selectedTab, isNowPlayingExpanded: $isNowPlayingExpanded)
+            IPhoneTabShellWithBottomAccessory(
+                selectedTab: $selectedTab,
+                isNowPlayingExpanded: $isNowPlayingExpanded,
+                favoritesPath: $favoritesPath
+            )
         } else {
-            IPhoneTabShellLegacyInset(selectedTab: $selectedTab, isNowPlayingExpanded: $isNowPlayingExpanded)
+            IPhoneTabShellLegacyInset(
+                selectedTab: $selectedTab,
+                isNowPlayingExpanded: $isNowPlayingExpanded,
+                favoritesPath: $favoritesPath
+            )
         }
     }
 
@@ -209,6 +239,7 @@ private struct LoggedInRootView: View {
         @EnvironmentObject private var playerManager: AudioPlayerManager
         @Binding var selectedTab: MainTab
         @Binding var isNowPlayingExpanded: Bool
+        @Binding var favoritesPath: [AppRestorationState.DeepRoute]
 
         var body: some View {
             let miniActive = playerManager.currentItem != nil || playerManager.isLive
@@ -248,7 +279,7 @@ private struct LoggedInRootView: View {
                 }
 
                 Tab("Favoriten", systemImage: "heart.fill", value: MainTab.favorites) {
-                    NavigationStack {
+                    NavigationStack(path: $favoritesPath) {
                         Group {
                             if selectedTab == .favorites {
                                 FavoritesHubView()
@@ -256,6 +287,9 @@ private struct LoggedInRootView: View {
                         }
                         .navigationTitle("Favoriten")
                         .navigationBarTitleDisplayMode(.large)
+                        .navigationDestination(for: AppRestorationState.DeepRoute.self) { route in
+                            FavoritesRouteDestination(route: route)
+                        }
                     }
                 }
 
@@ -284,6 +318,7 @@ private struct LoggedInRootView: View {
         @EnvironmentObject private var playerManager: AudioPlayerManager
         @Binding var selectedTab: MainTab
         @Binding var isNowPlayingExpanded: Bool
+        @Binding var favoritesPath: [AppRestorationState.DeepRoute]
 
         var body: some View {
             TabView(selection: $selectedTab) {
@@ -321,7 +356,7 @@ private struct LoggedInRootView: View {
                 .tabItem { Label("Archiv", systemImage: "archivebox") }
                 .tag(MainTab.archive)
 
-                NavigationStack {
+                NavigationStack(path: $favoritesPath) {
                     Group {
                         if selectedTab == .favorites {
                             FavoritesHubView()
@@ -329,6 +364,9 @@ private struct LoggedInRootView: View {
                     }
                     .navigationTitle("Favoriten")
                     .navigationBarTitleDisplayMode(.large)
+                    .navigationDestination(for: AppRestorationState.DeepRoute.self) { route in
+                        FavoritesRouteDestination(route: route)
+                    }
                 }
                 .tabItem { Label("Favoriten", systemImage: "heart.fill") }
                 .tag(MainTab.favorites)
@@ -357,6 +395,178 @@ private struct LoggedInRootView: View {
         EmptyView()
     }
     #endif
+
+    // MARK: - Restoration helpers
+
+    private func applyRestoredRootIfNeeded() {
+        guard !didApplyRestoredRoot else { return }
+        didApplyRestoredRoot = true
+        guard let root = restorationStore.validSelectedRoot else { return }
+
+        if useCompactRoot {
+            if let tab = Self.mainTab(from: root) {
+                selectedTab = tab
+            }
+        } else {
+            if let item = Self.sidebarItem(from: root, shows: apiClient.shows) {
+                selection = item
+            } else if case .show(let slug, _) = root {
+                // Sendungsliste noch nicht geladen — Auswahl per `onChange(of: apiClient.shows)` nachreichen.
+                pendingShowRestoreSlug = slug
+            }
+        }
+    }
+
+    private func applyRestoredShowSelectionIfPending(shows: [Show]) {
+        guard !useCompactRoot else { return }
+        guard let slug = pendingShowRestoreSlug else { return }
+        guard let match = shows.first(where: { $0.slug == slug }) else { return }
+        // Nur einmalig — wenn der Nutzer inzwischen selbst etwas anderes gewählt hat, respektieren wir das.
+        pendingShowRestoreSlug = nil
+        if selection == .live || selection == nil {
+            selection = .show(match)
+        }
+    }
+
+    private func restorePlaybackSnapshotIfNeeded() {
+        guard !didRestorePlaybackSnapshot else { return }
+        didRestorePlaybackSnapshot = true
+        playerManager.restoreLastSessionSnapshotIfNeeded()
+    }
+
+    #if os(iOS)
+    private func applyOfflineLaunchOverrideIfNeeded() async {
+        guard !didApplyOfflineLaunchTab else { return }
+        didApplyOfflineLaunchTab = true
+        let online = await NetworkPathProbe.isPathSatisfied()
+        guard !online else { return }
+        // Offline gewinnt gegen die wiederhergestellte Auswahl: Downloads sind dann der einzig sinnvolle Einstieg.
+        if useCompactRoot {
+            selectedTab = .downloads
+        } else {
+            selection = .downloads
+        }
+    }
+    #endif
+
+    private func applyRestoredFavoritesPathIfNeeded(shows: [Show]) {
+        guard !didApplyRestoredFavoritesPath else { return }
+        // Auf Mac/iPad gibt es keinen iPhone-Tab-`NavigationStack`; in dem Fall überspringen wir die Wiederherstellung,
+        // ohne den Snapshot zu verwerfen — beim nächsten iPhone-Start kann er weiterhin greifen.
+        guard useCompactRoot else { return }
+
+        let raw = restorationStore.validNavigationRoutes.favorites
+        let sanitized = sanitizeFavoritesRoutes(raw, shows: shows)
+
+        // Wenn der Snapshot ungültig wurde (Sendung nicht mehr da) und sich dadurch die Liste verkürzt, sollten wir ihn auch
+        // im Speicher angleichen, damit kein veraltetes Ziel beim nächsten Start erneut probiert wird.
+        if sanitized.count != raw.count {
+            restorationStore.setFavoritesPath(sanitized)
+        }
+
+        didApplyRestoredFavoritesPath = true
+        guard !sanitized.isEmpty else { return }
+
+        // Pfad nur anwenden, wenn der Nutzer den Tab nicht inzwischen selbst weiternavigiert hat.
+        if favoritesPath.isEmpty {
+            favoritesPath = sanitized
+        }
+    }
+
+    private func sanitizeFavoritesRoutes(_ routes: [AppRestorationState.DeepRoute], shows: [Show]) -> [AppRestorationState.DeepRoute] {
+        // Wir entfernen `show(...)`-Routen, deren Sendung wir aktuell nicht (mehr) kennen — entweder weil sie nicht mehr
+        // existiert oder weil die Sendungsliste schlicht noch nicht geladen ist; im zweiten Fall versucht es ein erneutes
+        // `apply` nach dem nächsten `apiClient.shows`-Update.
+        guard !shows.isEmpty else { return [] }
+        return routes.filter { route in
+            switch route {
+            case .favoriteEpisodes, .favoriteTracks:
+                return true
+            case .show(let slug, _, let id):
+                if let id, shows.contains(where: { $0.id == id }) { return true }
+                return shows.contains(where: { $0.slug == slug })
+            }
+        }
+    }
+
+    private func persistFavoritesPath(_ path: [AppRestorationState.DeepRoute]) {
+        // Wir akzeptieren auch das vorgezogene Schreiben vor `didApplyRestoredFavoritesPath`,
+        // damit eine vom System wiederhergestellte Tab-Auswahl nicht den gespeicherten Pfad sofort zurücksetzt:
+        // erst nach erstem Restore wird `favoritesPath` verändert.
+        restorationStore.setFavoritesPath(path)
+    }
+
+    private func persistSelectedTab(_ tab: MainTab) {
+        guard didApplyRestoredRoot else { return }
+        restorationStore.setSelectedRoot(Self.selectedRoot(forTab: tab))
+    }
+
+    private func persistSelectedSidebarItem(_ item: SidebarItem?) {
+        guard didApplyRestoredRoot else { return }
+        guard let item, let root = Self.selectedRoot(forSidebar: item) else { return }
+        restorationStore.setSelectedRoot(root)
+    }
+
+    private static func selectedRoot(forTab tab: MainTab) -> AppRestorationState.SelectedRoot {
+        switch tab {
+        case .live: return .live
+        case .archiveNew: return .archiveNew
+        case .archive: return .archive
+        case .favorites: return .favoritesHub
+        #if os(iOS)
+        case .downloads: return .downloads
+        #endif
+        }
+    }
+
+    private static func mainTab(from root: AppRestorationState.SelectedRoot) -> MainTab? {
+        switch root {
+        case .live: return .live
+        case .archiveNew: return .archiveNew
+        case .archive: return .archive
+        case .favoritesHub, .favoriteEpisodes, .favoriteTracks, .show: return .favorites
+        case .downloads:
+            #if os(iOS)
+            return .downloads
+            #else
+            return nil
+            #endif
+        }
+    }
+
+    private static func selectedRoot(forSidebar item: SidebarItem) -> AppRestorationState.SelectedRoot? {
+        switch item {
+        case .live: return .live
+        case .archiveNew: return .archiveNew
+        case .archive: return .archive
+        case .favoriteEpisodes: return .favoriteEpisodes
+        case .favoriteTracks: return .favoriteTracks
+        case .show(let show): return .show(slug: show.slug, title: show.titel)
+        #if os(iOS)
+        case .downloads: return .downloads
+        #endif
+        }
+    }
+
+    private static func sidebarItem(from root: AppRestorationState.SelectedRoot, shows: [Show]) -> SidebarItem? {
+        switch root {
+        case .live: return .live
+        case .archiveNew: return .archiveNew
+        case .archive: return .archive
+        case .favoriteEpisodes: return .favoriteEpisodes
+        case .favoriteTracks: return .favoriteTracks
+        case .favoritesHub: return nil
+        case .downloads:
+            #if os(iOS)
+            return .downloads
+            #else
+            return nil
+            #endif
+        case .show(let slug, _):
+            if let match = shows.first(where: { $0.slug == slug }) { return .show(match) }
+            return nil
+        }
+    }
 
     private var splitShell: some View {
         VStack(spacing: 0) {
@@ -438,20 +648,19 @@ private struct LoggedInRootView: View {
 }
 
 /// iPhone (compact): hub for favorites instead of sidebar section.
+///
+/// Verwendet typisierte `NavigationLink(value:)`-Routen, damit der iPhone-Favoriten-Tab
+/// seinen aktuellen Pfad serialisiert wiederherstellen kann.
 private struct FavoritesHubView: View {
     @EnvironmentObject private var apiClient: APIClient
 
     var body: some View {
         List {
             Section {
-                NavigationLink {
-                    FavoriteEpisodesView()
-                } label: {
+                NavigationLink(value: AppRestorationState.DeepRoute.favoriteEpisodes) {
                     Label("Favoriten: Ausgaben", systemImage: "heart.text.square")
                 }
-                NavigationLink {
-                    FavoriteTracksView()
-                } label: {
+                NavigationLink(value: AppRestorationState.DeepRoute.favoriteTracks) {
                     Label("Favoriten: Tracks", systemImage: "music.note")
                 }
             }
@@ -460,9 +669,7 @@ private struct FavoritesHubView: View {
             if !favorites.isEmpty {
                 Section("Favoriten-Sendungen") {
                     ForEach(favorites) { show in
-                        NavigationLink {
-                            BroadcastListView(show: show)
-                        } label: {
+                        NavigationLink(value: AppRestorationState.DeepRoute.show(slug: show.slug, title: show.titel, id: show.id)) {
                             Text(show.titel)
                         }
                     }
@@ -473,6 +680,35 @@ private struct FavoritesHubView: View {
         #if os(iOS)
         .listStyle(.insetGrouped)
         #endif
+    }
+}
+
+/// Mapper von `DeepRoute` auf konkrete Detail-Views — wird vom typisierten `NavigationStack`
+/// im Favoriten-Tab über `navigationDestination(for:)` aufgerufen.
+private struct FavoritesRouteDestination: View {
+    @EnvironmentObject private var apiClient: APIClient
+    let route: AppRestorationState.DeepRoute
+
+    var body: some View {
+        switch route {
+        case .favoriteEpisodes:
+            FavoriteEpisodesView()
+        case .favoriteTracks:
+            FavoriteTracksView()
+        case .show(let slug, let title, let id):
+            // Bevorzugt die zur Laufzeit verfügbare `Show`-Instanz; wenn die Sendung nicht mehr existiert,
+            // bauen wir eine minimale Hülle, damit die Detailansicht nicht crasht.
+            if let match = matchingShow(slug: slug, id: id) {
+                BroadcastListView(show: match)
+            } else {
+                BroadcastListView(show: Show(id: id ?? -1, titel: title, untertitel: ""))
+            }
+        }
+    }
+
+    private func matchingShow(slug: String, id: Int?) -> Show? {
+        if let id, let exact = apiClient.shows.first(where: { $0.id == id }) { return exact }
+        return apiClient.shows.first(where: { $0.slug == slug })
     }
 }
 

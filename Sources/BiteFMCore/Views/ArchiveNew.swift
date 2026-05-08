@@ -4,8 +4,10 @@ import SwiftData
 struct ArchiveNew: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var restorationStore: AppRestorationStore
     @Environment(\.modelContext) private var modelContext
-    
+    @Environment(\.scenePhase) private var scenePhase
+
     @Query(sort: [
         SortDescriptor(\StoredArchiveItem.datum, order: .reverse),
         SortDescriptor(\StoredArchiveItem.startTime, order: .reverse)
@@ -16,6 +18,10 @@ struct ArchiveNew: View {
     @State private var isInspectorPresented = false
     @State private var hidePlayed = false
     @State private var favoritesOnly = false
+    /// In-View-Tracking der zuletzt sichtbaren Termin-ID. Wir schreiben sie nicht bei jedem Scroll-Event nach
+    /// `UserDefaults`, sondern nur, wenn die View verschwindet oder die App in den Hintergrund geht.
+    @State private var lastVisibleTerminID: Int?
+    @State private var didRestoreScrollAnchor: Bool = false
     
     private var filteredItems: [StoredArchiveItem] {
         var items = storedItems
@@ -82,32 +88,48 @@ struct ArchiveNew: View {
         let filtered = filteredItems
         let sections = daySections(from: filtered)
         ZStack {
-            List {
-                ForEach(sections, id: \.dayStart) { section in
-                    Section(header: Text(section.header)) {
-                        ForEach(section.items) { storedItem in
-                            let item = storedItem.toArchiveItem()
-                            BroadcastRow(
-                                item: item,
-                                onFavoriteTap: apiClient.isLoggedIn
-                                    ? { Task { await apiClient.toggleFavoriteBroadcast(slug: item.sendungSlug, displayTitle: item.sendungTitel) } }
-                                    : nil,
-                                selectedItemForDetail: $selectedItemForDetail,
-                                isInspectorPresented: $isInspectorPresented
-                            )
+            ScrollViewReader { proxy in
+                List {
+                    ForEach(sections, id: \.dayStart) { section in
+                        Section(header: Text(section.header)) {
+                            ForEach(section.items) { storedItem in
+                                let item = storedItem.toArchiveItem()
+                                BroadcastRow(
+                                    item: item,
+                                    onFavoriteTap: apiClient.isLoggedIn
+                                        ? { Task { await apiClient.toggleFavoriteBroadcast(slug: item.sendungSlug, displayTitle: item.sendungTitel) } }
+                                        : nil,
+                                    selectedItemForDetail: $selectedItemForDetail,
+                                    isInspectorPresented: $isInspectorPresented
+                                )
+                                .id(storedItem.terminID)
+                                .onAppear {
+                                    // Letzter „angekommener“ Termin = grobe Schätzung der aktuellen Scroll-Position.
+                                    // Reine View-State-Aktualisierung — kein UserDefaults-Write während des Scrollens.
+                                    lastVisibleTerminID = storedItem.terminID
+                                }
+                            }
                         }
                     }
                 }
+                .refreshable {
+                    await apiClient.fetchArchive()
+                }
+                #if os(iOS)
+                .listStyle(.insetGrouped)
+                #else
+                .listStyle(.inset)
+                #endif
+                .opacity(filtered.isEmpty ? 0 : 1)
+                .task {
+                    await apiClient.fetchArchive()
+                    restoreScrollAnchorIfPossible(proxy: proxy, items: filtered)
+                }
+                .onChange(of: storedItems) { _, _ in
+                    // Erst nach erstem Datenladen kann ein gespeicherter Anker greifen.
+                    restoreScrollAnchorIfPossible(proxy: proxy, items: filteredItems)
+                }
             }
-            .refreshable {
-                await apiClient.fetchArchive()
-            }
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #else
-            .listStyle(.inset)
-            #endif
-            .opacity(filtered.isEmpty ? 0 : 1)
             
             if filtered.isEmpty && !storedItems.isEmpty {
                 let empty = emptyFilterUnavailable
@@ -153,8 +175,32 @@ struct ArchiveNew: View {
                 .help("Optionen")
             }
         }
-        .task {
-            await apiClient.fetchArchive()
+        .onDisappear {
+            // Beim Verlassen der View den groben Scroll-Anker einmalig persistieren — Schreiben passiert nicht im Scroll-Pfad.
+            persistScrollAnchorIfNeeded()
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            // Bevor die App in den Hintergrund geht (oder dazwischen pausiert), den Anker einmalig nachziehen.
+            if newPhase == .background || newPhase == .inactive {
+                persistScrollAnchorIfNeeded()
+            }
+        }
+    }
+
+    private func persistScrollAnchorIfNeeded() {
+        guard let id = lastVisibleTerminID else { return }
+        restorationStore.setArchiveNewScrollAnchor(terminID: id)
+    }
+
+    private func restoreScrollAnchorIfPossible(proxy: ScrollViewProxy, items: [StoredArchiveItem]) {
+        guard !didRestoreScrollAnchor else { return }
+        guard let id = restorationStore.validScrollAnchors.archiveNewTerminID else {
+            didRestoreScrollAnchor = true
+            return
+        }
+        guard items.contains(where: { $0.terminID == id }) else { return }
+        didRestoreScrollAnchor = true
+        // `scrollTo` ohne Animation, damit der Restore nicht als sichtbares Springen erscheint.
+        proxy.scrollTo(id, anchor: .top)
     }
 }

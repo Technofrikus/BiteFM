@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ArchiveItem: Codable, Identifiable {
+public struct ArchiveItem: Codable, Identifiable, Equatable, Hashable {
     public var id: Int { terminID }
 
     public let audioFile1: String

@@ -30,6 +30,7 @@ struct BiteFMMacApp: App {
                 .frame(minWidth: 400, idealWidth: 500, minHeight: 700, idealHeight: 900)
                 .environmentObject(APIClient.shared)
                 .environmentObject(AudioPlayerManager.shared)
+                .environmentObject(AppRestorationStore.shared)
         }
         .modelContainer(container)
         .commands {

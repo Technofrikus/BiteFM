@@ -46,6 +46,7 @@ public enum BiteFMBootstrap {
     public static func configureServices(modelContainer container: ModelContainer) {
         APIClient.shared.setup(modelContainer: container)
         AudioPlayerManager.shared.setup(modelContainer: container)
+        AudioPlayerManager.shared.attachRestorationStore(AppRestorationStore.shared)
         #if os(iOS)
         IOSDownloadManager.shared.setup(modelContainer: container)
         #endif
