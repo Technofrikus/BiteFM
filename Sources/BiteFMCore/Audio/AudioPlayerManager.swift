@@ -34,6 +34,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
 
     private var hasMarkedCurrentItemAsPlayed = false
     private var lastMarkedTerminID: Int?
+
+    // MARK: - Listening-time based “heard” tracking (conservative)
+    // Counts actual playback time only while `isPlaying == true`, and only updates every ~5s.
+    private var listenedAccumulatedSeconds: Double = 0
+    private var lastObservedPosSeconds: Double?
+    private var lastObservedWallTime: Date?
+    private var lastListenAccumulatorUpdateAt: Date?
     
     var modelContainer: ModelContainer?
     /// Wird beim Bootstrap injiziert, damit der Player den letzten App-State (zuletzt aktive Ausgabe) selbst pflegen kann.
@@ -283,6 +290,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         currentStreamType = nil
         lastUpdatedSongId = nil
         resumeWasFromSavedPositionOnly = false
+        resetListeningProgressTracking()
         hasMarkedCurrentItemAsPlayed = lastMarkedTerminID == item.terminID
         // Sobald der Nutzer aktiv eine Ausgabe startet, ist der „nur visuell wiederhergestellte“ Modus beendet.
         isRestoredPlaceholder = false
@@ -426,28 +434,60 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 guard pos.isFinite else { return }
                 self.currentTime = pos
                 
-                // „Gehört“: Server via `markAsPlayed` (Broadcast-GET ohne listen=no) + Hörhistorie. Schwelle: 5 Min. in der Datei;
-                // kürzere Ausgaben (< 5 Min. Länge): nahe am Ende.
-                let listenedThresholdSeconds: Double = 300 // 5 Minuten
+                // „Gehört“: konservativ nach echter Hörzeit (nur während `isPlaying == true`, nur alle ~5s).
                 if !self.isLive, let item = self.currentItem, !self.hasMarkedCurrentItemAsPlayed {
-                    let dur: Double = {
-                        if self.duration > 0 { return self.duration }
-                        if let d = self.player?.currentItem?.duration.seconds, d.isFinite, d > 0 { return d }
-                        return 0
-                    }()
-                    let shouldMark: Bool
-                    if dur > 0, dur < listenedThresholdSeconds {
-                        shouldMark = pos >= dur - 1.0
-                    } else {
-                        shouldMark = pos > listenedThresholdSeconds
-                    }
-                    if shouldMark {
-                        self.hasMarkedCurrentItemAsPlayed = true
-                        self.lastMarkedTerminID = item.terminID
-                        Task {
-                            await APIClient.shared.markAsPlayed(item: item)
+                    let now = Date()
+
+                    if self.lastObservedPosSeconds == nil || self.lastObservedWallTime == nil {
+                        self.lastObservedPosSeconds = pos
+                        self.lastObservedWallTime = now
+                    } else if self.isPlaying {
+                        let lastPos = self.lastObservedPosSeconds ?? pos
+                        let lastWall = self.lastObservedWallTime ?? now
+
+                        let deltaPos = pos - lastPos
+                        let deltaWall = now.timeIntervalSince(lastWall)
+
+                        let shouldAccumulate: Bool = {
+                            if let lastUpdate = self.lastListenAccumulatorUpdateAt {
+                                return now.timeIntervalSince(lastUpdate) >= 5.0
+                            }
+                            return true
+                        }()
+
+                        if shouldAccumulate {
+                            // Treat large jumps (seek/skip) as non-listening time.
+                            let looksLikeSeek = deltaPos < 0 || deltaPos > 6 || deltaWall < 0 || deltaWall > 10
+                            if !looksLikeSeek {
+                                let increment = min(max(0, deltaPos), max(0, deltaWall))
+                                self.listenedAccumulatedSeconds += increment
+                                self.lastListenAccumulatorUpdateAt = now
+                            }
+                        }
+
+                        let dur: Double = {
+                            if self.duration > 0 { return self.duration }
+                            if let d = self.player?.currentItem?.duration.seconds, d.isFinite, d > 0 { return d }
+                            return 0
+                        }()
+                        let requiredListenSeconds: Double = {
+                            let threshold: Double = 300
+                            if dur > 0 { return min(threshold, dur) }
+                            return threshold
+                        }()
+
+                        if self.listenedAccumulatedSeconds >= requiredListenSeconds {
+                            self.hasMarkedCurrentItemAsPlayed = true
+                            self.lastMarkedTerminID = item.terminID
+                            Task {
+                                await APIClient.shared.markAsPlayed(item: item)
+                            }
                         }
                     }
+
+                    // Always update observation markers so we can detect seeks reliably.
+                    self.lastObservedPosSeconds = pos
+                    self.lastObservedWallTime = now
                 }
                 
                 // Update Now Playing if song changed
@@ -629,6 +669,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         currentTime = 0
         currentStreamType = streamType
         isRestoredPlaceholder = false
+        resetListeningProgressTracking()
         guard let url = streamType.streamURL else { return }
 
         play(url: url, startAt: 0)
@@ -797,6 +838,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 persistRestorationSession(wasPlaying: true)
             }
         }
+    }
+
+    private func resetListeningProgressTracking() {
+        listenedAccumulatedSeconds = 0
+        lastObservedPosSeconds = nil
+        lastObservedWallTime = nil
+        lastListenAccumulatorUpdateAt = nil
     }
     
     private func setupRemoteTransportControls() {

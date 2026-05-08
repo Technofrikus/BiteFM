@@ -118,7 +118,7 @@ struct BroadcastRow: View {
 
     private var inlineStatusControls: some View {
         HStack(alignment: .center, spacing: 2) {
-            if !isPlaying && apiClient.isPlayed(item: item) {
+            if apiClient.isPlayed(item: item) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.body)
                     .foregroundStyle(.secondary)

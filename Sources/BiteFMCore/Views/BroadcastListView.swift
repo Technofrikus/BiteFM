@@ -16,7 +16,10 @@ struct BroadcastListView: View {
     
     var filteredBroadcasts: [BroadcastSummary] {
         if hidePlayed {
-            return broadcasts.filter { !apiClient.isPlayed(broadcastID: $0.id) }
+            let pinnedTerminID: Int? = playerManager.isLive ? nil : playerManager.currentItem?.terminID
+            return broadcasts.filter { broadcast in
+                !apiClient.isPlayed(broadcastID: broadcast.id) || broadcast.id == pinnedTerminID
+            }
         }
         return broadcasts
     }

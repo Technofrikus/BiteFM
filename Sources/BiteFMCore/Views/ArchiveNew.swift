@@ -26,7 +26,10 @@ struct ArchiveNew: View {
     private var filteredItems: [StoredArchiveItem] {
         var items = storedItems
         if hidePlayed {
-            items = items.filter { !apiClient.isPlayed(broadcastID: $0.terminID) }
+            let pinnedTerminID: Int? = playerManager.isLive ? nil : playerManager.currentItem?.terminID
+            items = items.filter { stored in
+                !apiClient.isPlayed(broadcastID: stored.terminID) || stored.terminID == pinnedTerminID
+            }
         }
         if favoritesOnly {
             items = items.filter { apiClient.isFavorite(slug: $0.sendungSlug, title: $0.sendungTitel) }
