@@ -17,6 +17,9 @@ let package = Package(
             name: "BiteFMCore",
             dependencies: [],
             path: "Sources/BiteFMCore",
+            exclude: [
+                "Assets.xcassets/AppIcon.appiconset",
+            ],
             resources: [.process("Assets.xcassets")]
         ),
         .executableTarget(

@@ -18,8 +18,10 @@
 		6AB614125F732D44130767EE /* BiteFMMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD4F8305DA80311B05F07B5 /* BiteFMMacApp.swift */; };
 		6E8EA4ED52BA7CFBF2ABE3DA /* BroadcastDetailEndpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46CFB083CC9810A34A671A7B /* BroadcastDetailEndpointTests.swift */; };
 		75F687D7EF97C48BEFCEB34E /* DownloadsVerificationMatrix.md in Resources */ = {isa = PBXBuildFile; fileRef = 2C7DF603677A94103378198C /* DownloadsVerificationMatrix.md */; };
+		803209D437C6EA4FC9DC5784 /* BiteFM.sdef in Resources */ = {isa = PBXBuildFile; fileRef = 763CBFAC634C316DC89BAE92 /* BiteFM.sdef */; };
 		82F22C8A7413B75D18C74DDF /* BiteFMCore in Frameworks */ = {isa = PBXBuildFile; productRef = AED80C76F7243BD65351B3A7 /* BiteFMCore */; };
 		93D106F7122F0E0619EF7590 /* BroadcastDetailTrackMatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */; };
+		A6FF5198227D231A05AE5AED /* MacAppleScriptSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 067D51551452BA8A5742A7FC /* MacAppleScriptSupport.swift */; };
 		A8EE734D40CCD9A067E04481 /* BroadcastDetailLRUCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD9D2417277891487077C2D /* BroadcastDetailLRUCacheTests.swift */; };
 		BF58DCF7CB3038343448AB31 /* AppRestorationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881ECA12437F86EC4A737047 /* AppRestorationStoreTests.swift */; };
 		C67EE98BF63EFC8F9C4C13DC /* FavoriteTrackItemDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */; };
@@ -39,12 +41,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		067D51551452BA8A5742A7FC /* MacAppleScriptSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppleScriptSupport.swift; sourceTree = "<group>"; };
 		0CD9D2417277891487077C2D /* BroadcastDetailLRUCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailLRUCacheTests.swift; sourceTree = "<group>"; };
 		16C96E3F47CB200D0528DBC5 /* BiteFMiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiteFMiOSApp.swift; sourceTree = "<group>"; };
 		2C7DF603677A94103378198C /* DownloadsVerificationMatrix.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = DownloadsVerificationMatrix.md; sourceTree = "<group>"; };
 		46CFB083CC9810A34A671A7B /* BroadcastDetailEndpointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailEndpointTests.swift; sourceTree = "<group>"; };
 		530772E642BED6FE0502FF10 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6FD4885D96A1A79C3D8D9CEF /* BiteFM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BiteFM.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		763CBFAC634C316DC89BAE92 /* BiteFM.sdef */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = BiteFM.sdef; sourceTree = "<group>"; };
 		7B31DEB4DA60B282167D4D44 /* MacAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppDelegate.swift; sourceTree = "<group>"; };
 		87A85A2322759B51E65F7523 /* ArchiveSectionHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSectionHelpersTests.swift; sourceTree = "<group>"; };
 		881ECA12437F86EC4A737047 /* AppRestorationStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRestorationStoreTests.swift; sourceTree = "<group>"; };
@@ -117,8 +121,10 @@
 		4B9DDBC341ADB45C6A35BD06 /* BiteFMMac */ = {
 			isa = PBXGroup;
 			children = (
+				763CBFAC634C316DC89BAE92 /* BiteFM.sdef */,
 				ABD4F8305DA80311B05F07B5 /* BiteFMMacApp.swift */,
 				7B31DEB4DA60B282167D4D44 /* MacAppDelegate.swift */,
+				067D51551452BA8A5742A7FC /* MacAppleScriptSupport.swift */,
 				A483538F2E6698D5BA7D4314 /* MacPlaybackGlobalHotkey.swift */,
 				DD3E21FC348BAD7B856C85D7 /* MacSpacePlaybackKeyMonitor.swift */,
 			);
@@ -236,13 +242,16 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					2714EBE26621EC91F046AB7A = {
 						ProvisioningStyle = Automatic;
 					};
 					4487D46B839AC58F0CA0BE66 = {
 						DevelopmentTeam = XXXXXXXXXX;
+					};
+					4A2FB6E6368FC85D3E1C1663 = {
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -284,6 +293,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1151CA5373AED850456B97E0 /* Assets.xcassets in Resources */,
+				803209D437C6EA4FC9DC5784 /* BiteFM.sdef in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -319,6 +329,7 @@
 			files = (
 				6AB614125F732D44130767EE /* BiteFMMacApp.swift in Sources */,
 				387EFDA5C7D68E2515F3EF97 /* MacAppDelegate.swift in Sources */,
+				A6FF5198227D231A05AE5AED /* MacAppleScriptSupport.swift in Sources */,
 				109D3A2B31E636A7F934BE27 /* MacPlaybackGlobalHotkey.swift in Sources */,
 				DC975EE8EF29377C258FAC8D /* MacSpacePlaybackKeyMonitor.swift in Sources */,
 			);
@@ -347,20 +358,20 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = C24WCN78VM;
 				INFOPLIST_FILE = "Info-iOS.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BiteFM;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMiOS;
 				PRODUCT_NAME = BiteFM;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -374,13 +385,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = C24WCN78VM;
 				INFOPLIST_FILE = "Info-iOS.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BiteFM;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMiOS;
 				PRODUCT_NAME = BiteFM;
 				SDKROOT = iphoneos;
@@ -446,7 +458,6 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_DEBUG_DYLIB = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -482,11 +493,20 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = BiteFMMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = C24WCN78VM;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BiteFM;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -495,9 +515,15 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMMac;
 				PRODUCT_NAME = BiteFM;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -526,12 +552,21 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = BiteFMMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = C24WCN78VM;
 				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BiteFM;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -540,9 +575,15 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Moinboards.BiteFMMac;
 				PRODUCT_NAME = BiteFM;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -584,7 +625,6 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;

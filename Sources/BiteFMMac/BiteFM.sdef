@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary title="BiteFM Scripting">
+    <suite name="BiteFM Suite" code="BfMt" description="Terms for controlling BiteFM playback.">
+        <class name="application" code="capp" description="The BiteFM application.">
+            <cocoa class="NSApplication"/>
+            <property name="player state" code="pSts" type="player state" access="r" description="Is BiteFM stopped, paused, or playing?">
+                <cocoa key="playerState"/>
+            </property>
+        </class>
+
+        <enumeration name="player state" code="pStE" description="Playback state.">
+            <enumerator name="stopped" code="kPSS" description="Playback is stopped."/>
+            <enumerator name="playing" code="kPSP" description="Playback is in progress."/>
+            <enumerator name="paused" code="kPSp" description="Playback is paused."/>
+        </enumeration>
+
+        <command name="play" code="BfMtPlAy" description="Start or resume playback.">
+            <cocoa class="BiteFMPlayScriptCommand"/>
+        </command>
+
+        <command name="pause" code="BfMtPaus" description="Pause playback.">
+            <cocoa class="BiteFMPauseScriptCommand"/>
+        </command>
+
+        <command name="playpause" code="BfMtPPau" description="Toggle the playing/paused state.">
+            <cocoa class="BiteFMPlayPauseScriptCommand"/>
+        </command>
+
+        <command name="stop" code="BfMtStop" description="Stop playback.">
+            <cocoa class="BiteFMStopScriptCommand"/>
+        </command>
+    </suite>
+</dictionary>

@@ -16,6 +16,14 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         MacSpacePlaybackKeyMonitor.install()
         MacPlaybackGlobalHotkey.install()
     }
+
+    func application(_ sender: NSApplication, delegateHandlesKey key: String) -> Bool {
+        key == "playerState"
+    }
+
+    @objc dynamic var playerState: UInt32 {
+        macAppleScriptCurrentPlayerState()
+    }
     
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()

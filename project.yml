@@ -55,6 +55,10 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: Sources/BiteFMMac
+        excludes:
+          - BiteFM.sdef
+      - path: Sources/BiteFMMac/BiteFM.sdef
+        buildPhase: resources
       # Gleiches Asset-Katalog wie BiteFMCore (AppIcon + gemeinsame Bilder); SPM liefert Logo per Bundle.module.
       - path: Sources/BiteFMCore/Assets.xcassets
     dependencies:
@@ -80,6 +84,8 @@ targets:
         NSPrincipalClass: NSApplication
         CFBundleDisplayName: "BiteFM"
         LSApplicationCategoryType: public.app-category.music
+        NSAppleScriptEnabled: true
+        OSAScriptingDefinition: BiteFM.sdef
 
   BiteFMiOS:
     type: application
