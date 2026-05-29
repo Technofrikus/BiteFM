@@ -29,12 +29,6 @@ public final class IOSDownloadManager: ObservableObject {
     nonisolated private static let safariLikeDownloadUserAgent =
         "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 
-    nonisolated private static let archivPathAllowed: CharacterSet = {
-        var c = CharacterSet.urlPathAllowed
-        c.remove(charactersIn: "/")
-        return c
-    }()
-
     private var modelContainer: ModelContainer?
     private var bridge: DownloadSessionBridge?
     private var urlSession: URLSession?
@@ -886,12 +880,12 @@ public final class IOSDownloadManager: ObservableObject {
             if !u.isEmpty {
                 if u.hasPrefix("http://") || u.hasPrefix("https://") {
                     if let absolute = URL(string: u) { urls.append(absolute) }
-                } else if let absolute = makeArchivAudioURL(relativePath: u) {
+                } else if let absolute = ArchivAudioURL.make(from: u) {
                     urls.append(absolute)
                 }
             }
         }
-        if !item.audioFile1.isEmpty, let fromArchiveItem = makeArchivAudioURL(relativePath: item.audioFile1) {
+        if !item.audioFile1.isEmpty, let fromArchiveItem = ArchivAudioURL.make(from: item.audioFile1) {
             urls.append(fromArchiveItem)
         }
         // Preserve order but avoid duplicate retries for the same URL.
@@ -935,21 +929,6 @@ public final class IOSDownloadManager: ObservableObject {
         } catch {
             return false
         }
-    }
-
-    /// Builds `https://archiv.bytefm.com/…` with percent-encoded path segments (spaces, umlauts, etc.).
-    nonisolated fileprivate static func makeArchivAudioURL(relativePath: String) -> URL? {
-        var path = relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !path.isEmpty else { return nil }
-        if path.hasPrefix("http://") || path.hasPrefix("https://") {
-            return URL(string: path)
-        }
-        while path.hasPrefix("/") { path.removeFirst() }
-        let segments = path.split(separator: "/").map { substr -> String in
-            String(substr).addingPercentEncoding(withAllowedCharacters: archivPathAllowed) ?? String(substr)
-        }
-        guard !segments.isEmpty else { return nil }
-        return URL(string: "https://archiv.bytefm.com/" + segments.joined(separator: "/"))
     }
 
     /// HEAD uses a delegate-free session so it never interferes with the download `URLSession` delegate.

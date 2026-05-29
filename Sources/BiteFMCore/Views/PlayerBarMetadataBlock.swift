@@ -20,7 +20,7 @@ struct PlayerBarMetadataBlock: View {
                             .font(.headline)
                             .lineLimit(2)
                             .minimumScaleFactor(0.75)
-                        if playerManager.isStalled {
+                        if showsPlaybackActivityIndicator {
                             ProgressView().controlSize(.small)
                         }
                     }
@@ -35,7 +35,7 @@ struct PlayerBarMetadataBlock: View {
                             .font(.headline)
                             .lineLimit(2)
                             .minimumScaleFactor(0.75)
-                        if playerManager.isStalled {
+                        if showsPlaybackActivityIndicator {
                             ProgressView().controlSize(.small)
                         }
                     }
@@ -69,5 +69,9 @@ struct PlayerBarMetadataBlock: View {
             }
         }
         .multilineTextAlignment(.leading)
+    }
+
+    private var showsPlaybackActivityIndicator: Bool {
+        playerManager.isStalled || playerManager.isPreparingArchivePlayback
     }
 }

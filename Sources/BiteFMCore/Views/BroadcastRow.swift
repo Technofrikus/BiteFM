@@ -19,8 +19,33 @@ struct BroadcastRow: View {
     @Binding var selectedItemForDetail: ArchiveItem?
     @Binding var isInspectorPresented: Bool
 
-    var isPlaying: Bool {
-        playerManager.currentItem?.id == item.id && playerManager.isPlaying
+    private enum RowPlaybackVisualState {
+        case idle
+        case preparing
+        case playing
+    }
+
+    private var rowPlaybackState: RowPlaybackVisualState {
+        if playerManager.isPreparingPlayback(for: item) {
+            return .preparing
+        }
+        if playerManager.currentItem?.id == item.id && playerManager.isPlaying {
+            return .playing
+        }
+        return .idle
+    }
+
+    private var isRowHighlighted: Bool {
+        switch rowPlaybackState {
+        case .preparing, .playing:
+            return true
+        case .idle:
+            return false
+        }
+    }
+
+    private var isPlaying: Bool {
+        rowPlaybackState == .playing
     }
 
     private var isCompact: Bool {
@@ -42,9 +67,9 @@ struct BroadcastRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            if isPlaying {
+            if isRowHighlighted {
                 Capsule()
-                    .fill(Color.accentColor)
+                    .fill(Color.accentColor.opacity(rowPlaybackState == .preparing ? 0.55 : 1))
                     .frame(width: 3)
                     .padding(.vertical, 8)
                     .accessibilityHidden(true)
@@ -73,50 +98,72 @@ struct BroadcastRow: View {
 
     /// Datum und optionale Größe bleiben oben; kompakte Status-/Aktionsicons sitzen rechts in derselben Zeile.
     private var playbackTapArea: some View {
-        HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                // Zeile 1: Datum & Meta
-                HStack(spacing: 6) {
-                    Text(dateLineString)
+        Button(action: playAndRevealIfNeeded) {
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 2) {
+                    // Zeile 1: Datum & Meta
+                    HStack(spacing: 6) {
+                        Text(dateLineString)
+                            .multilineTextAlignment(.leading)
+                        if let extra = resolvedMetaLineSizeSuffix {
+                            Text(extra)
+                        }
+                        if rowPlaybackState == .preparing {
+                            Text("lädt …")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundColor(isRowHighlighted ? .accentColor.opacity(0.75) : .secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                    // Zeile 2: Titel
+                    Text((showShowTitle ? item.sendungTitel : item.subtitle).bitefm_sanitizedDisplayLine)
+                        .font(.headline)
+                        .foregroundColor(isRowHighlighted ? .accentColor : .primary)
                         .multilineTextAlignment(.leading)
-                    if let extra = resolvedMetaLineSizeSuffix {
-                        Text(extra)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Zeile 3: Untertitel (optional)
+                    if showShowTitle {
+                        Text(item.subtitle)
+                            .font(.subheadline)
+                            .foregroundColor(isRowHighlighted ? .accentColor.opacity(0.8) : .secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .font(.caption)
-                .foregroundColor(isPlaying ? .accentColor.opacity(0.75) : .secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
-                // Zeile 2: Titel
-                Text((showShowTitle ? item.sendungTitel : item.subtitle).bitefm_sanitizedDisplayLine)
-                    .font(.headline)
-                    .foregroundColor(isPlaying ? .accentColor : .primary)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                // Zeile 3: Untertitel (optional)
-                if showShowTitle {
-                    Text(item.subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(isPlaying ? .accentColor.opacity(0.8) : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                inlineStatusControls
+                    .offset(y: -5) // Zentrierung der 28pt Icons zur ~14pt Caption-Zeile
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .onTapGesture(perform: playAndRevealIfNeeded)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityHint("Spielt diese Ausgabe ab.")
-
-            inlineStatusControls
-                .offset(y: -5) // Zentrierung der 28pt Icons zur ~14pt Caption-Zeile
         }
-        .opacity(apiClient.isPlayed(item: item) && !isPlaying ? 0.65 : 1.0)
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityHint("Spielt diese Ausgabe ab.")
+        .opacity(apiClient.isPlayed(item: item) && !isRowHighlighted ? 0.65 : 1.0)
     }
 
     private var inlineStatusControls: some View {
         HStack(alignment: .center, spacing: 2) {
+            if rowPlaybackState == .preparing {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    .accessibilityLabel("Wiedergabe wird vorbereitet")
+            } else if rowPlaybackState == .playing {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.body)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    .accessibilityLabel("Wird abgespielt")
+            }
             if apiClient.isPlayed(item: item) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.body)

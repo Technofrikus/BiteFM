@@ -23,6 +23,8 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     #endif
     @Published public var isPlaying = false
     @Published public var isStalled = false
+    /// Gesetzt synchron beim Tap, bis AVPlayer tatsächlich spielt oder die Vorbereitung fehlschlägt.
+    @Published public private(set) var preparingArchiveItemID: Int?
     @Published public var currentItem: ArchiveItem?
     @Published public var currentPlaylist: [PlaylistItem]?
     @Published public var currentTime: Double = 0
@@ -53,6 +55,8 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var lastUpdatedSongId: String?
     private var lastSavedPosition: Double = 0
+    /// Last URL passed to `play(url:)` — used for structured failure logs.
+    private var currentPlaybackURL: URL?
 
     /// Wenn die gespeicherte Position im letzten Intervall liegt, sonst startet Wiedergabe „am Ende“ ohne Ton.
     private let nearEndPlaybackThreshold: Double = 5.0
@@ -104,6 +108,26 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     /// rein visuell (ohne Auto-Play) wiederhergestellt werden kann.
     public func attachRestorationStore(_ store: AppRestorationStore) {
         self.restorationStore = store
+    }
+
+    public var isPreparingArchivePlayback: Bool {
+        preparingArchiveItemID != nil
+    }
+
+    public func isPreparingPlayback(for item: ArchiveItem) -> Bool {
+        preparingArchiveItemID == item.terminID
+    }
+
+    private func beginArchivePlaybackSelection(item: ArchiveItem, playlist: [PlaylistItem]?) {
+        preparingArchiveItemID = item.terminID
+        currentItem = item
+        currentPlaylist = playlist
+        isPlaying = false
+        isStalled = false
+    }
+
+    private func clearPreparingPlayback() {
+        preparingArchiveItemID = nil
     }
 
     /// Stellt die zuletzt aktive Ausgabe als Mini-/Now-Playing-Schnappschuss wieder her, **ohne** Audio zu starten.
@@ -286,6 +310,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     #endif
     
     public func play(item: ArchiveItem, playlist: [PlaylistItem]? = nil, initialPosition: Double? = nil) {
+        if !isLive,
+           initialPosition == nil,
+           currentItem?.id == item.id,
+           isPlaying {
+            return
+        }
+
         isLive = false
         currentStreamType = nil
         lastUpdatedSongId = nil
@@ -304,11 +335,11 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             savePlaybackPosition()
         }
 
+        beginArchivePlaybackSelection(item: item, playlist: playlist)
+
         #if os(iOS)
         if let container = modelContainer,
            let localURL = IOSDownloadManager.shared.localFileURL(for: item.terminID, container: container) {
-            self.currentItem = item
-            self.currentPlaylist = playlist
             Task {
                 let startAt: Double
                 if let initialPosition = initialPosition {
@@ -340,25 +371,20 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 #if os(iOS)
                 guard await NetworkPathProbe.isPathSatisfied() else {
                     userFacingPlaybackError = "Keine Internetverbindung. Für diese Ausgabe liegt keine lokale Datei vor."
+                    clearPreparingPlayback()
                     return
                 }
                 #endif
+                var didStartPlayback = false
                 if let detail = await APIClient.shared.fetchBroadcastDetail(for: item) {
                     // detail.recordings.first?.recordingUrl is the audio file
                     if let firstRecording = detail.recordings.first {
-                        let recordingUrl = firstRecording.recordingUrl
-                        // The recordingUrl might be full or partial
-                        let fullUrl: URL? = {
-                            if recordingUrl.hasPrefix("http") {
-                                return URL(string: recordingUrl)
-                            } else {
-                                return URL(string: "https://archiv.bytefm.com/" + recordingUrl)
-                            }
-                        }()
+                        let fullUrl = ArchivAudioURL.make(from: firstRecording.recordingUrl)
                         
                         if let url = fullUrl {
-                            self.currentItem = item
-                            self.currentPlaylist = firstRecording.playlist
+                            if self.currentItem?.id == item.id {
+                                self.currentPlaylist = firstRecording.playlist
+                            }
                             
                             // Use initialPosition if provided, otherwise load saved position
                             let startAt: Double
@@ -373,26 +399,34 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                             
                             self.setupNowPlaying(item: item)
                             self.updatePlaybackRate(1.0)
-                            
+                            didStartPlayback = true
                         }
                     }
+                }
+                if !didStartPlayback, preparingArchiveItemID == item.terminID {
+                    clearPreparingPlayback()
                 }
             }
             return
         }
         
-        let baseUrlString = "https://archiv.bytefm.com/"
-        guard let url = URL(string: baseUrlString + item.audioFile1) else { return }
+        guard let url = ArchivAudioURL.make(from: item.audioFile1) else {
+            LogManager.shared.log(
+                "Playback: ungültige Archiv-URL für terminID=\(item.terminID) audioFile1=\(item.audioFile1)",
+                type: .error
+            )
+            clearPreparingPlayback()
+            return
+        }
 
         Task { @MainActor in
             #if os(iOS)
             guard await NetworkPathProbe.isPathSatisfied() else {
                 userFacingPlaybackError = "Keine Internetverbindung. Für diese Ausgabe liegt keine lokale Datei vor."
+                clearPreparingPlayback()
                 return
             }
             #endif
-            self.currentItem = item
-            self.currentPlaylist = playlist
 
             let startAt: Double
             if let initialPosition = initialPosition {
@@ -521,6 +555,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 self.isStalled = (player.timeControlStatus == .waitingToPlayAtSpecifiedRate)
                 if player.timeControlStatus == .playing {
                     self.isPlaying = true
+                    self.clearPreparingPlayback()
                     self.updatePlaybackRate(1.0)
                 } else if player.timeControlStatus == .paused {
                     self.isPlaying = false
@@ -530,20 +565,28 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         } else if keyPath == "status" {
             if let player = object as? AVPlayer {
                 if player.status == .failed {
-                    LogManager.shared.log("AVPlayer failed with error: \(String(describing: player.error))", type: .error)
                     DispatchQueue.main.async { [weak self] in
                         Task { @MainActor in
-                            self?.handleStreamOrPlaybackFailure(wasLive: self?.isLive ?? false, error: player.error)
+                            self?.handleStreamOrPlaybackFailure(
+                                wasLive: self?.isLive ?? false,
+                                error: player.error,
+                                source: "AVPlayer.status",
+                                player: player
+                            )
                         }
                     }
                 }
             } else if let item = object as? AVPlayerItem {
                 if item.status == .failed {
                     let err = item.error
-                    LogManager.shared.log("AVPlayerItem failed with error: \(String(describing: err))", type: .error)
                     DispatchQueue.main.async { [weak self] in
                         Task { @MainActor in
-                            self?.handleStreamOrPlaybackFailure(wasLive: self?.isLive ?? false, error: err)
+                            self?.handleStreamOrPlaybackFailure(
+                                wasLive: self?.isLive ?? false,
+                                error: err,
+                                source: "AVPlayerItem.status",
+                                playerItem: item
+                            )
                         }
                     }
                 }
@@ -662,6 +705,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         }
         #endif
         userFacingPlaybackError = nil
+        clearPreparingPlayback()
         isLive = true
         currentItem = nil
         currentPlaylist = nil
@@ -683,7 +727,57 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         userFacingPlaybackError = nil
     }
 
-    private func handleStreamOrPlaybackFailure(wasLive: Bool, error: Error?) {
+    private func logPlaybackFailure(
+        source: String,
+        wasLive: Bool,
+        error: Error?,
+        player: AVPlayer? = nil,
+        playerItem: AVPlayerItem? = nil
+    ) {
+        let urlString = currentPlaybackURL?.absoluteString ?? "—"
+        let terminID = currentItem.map { String($0.terminID) } ?? "—"
+        let playerStatus = player?.status.rawValue
+        let itemStatus = playerItem?.status.rawValue
+        var parts = [
+            "Playback failure [\(source)]",
+            "live=\(wasLive)",
+            "terminID=\(terminID)",
+            "url=\(urlString)"
+        ]
+        if let playerStatus {
+            parts.append("playerStatus=\(playerStatus)")
+            if let pe = player?.error {
+                parts.append("playerError=\(pe.localizedDescription)")
+            }
+        }
+        if let itemStatus {
+            parts.append("itemStatus=\(itemStatus)")
+            if let ie = playerItem?.error {
+                parts.append("itemError=\(ie.localizedDescription)")
+            }
+        }
+        if let error {
+            let ns = error as NSError
+            parts.append("error=\(error.localizedDescription)")
+            parts.append("domain=\(ns.domain) code=\(ns.code)")
+        }
+        LogManager.shared.log(parts.joined(separator: " | "), type: .error)
+    }
+
+    private func handleStreamOrPlaybackFailure(
+        wasLive: Bool,
+        error: Error?,
+        source: String = "playback",
+        player: AVPlayer? = nil,
+        playerItem: AVPlayerItem? = nil
+    ) {
+        logPlaybackFailure(
+            source: source,
+            wasLive: wasLive,
+            error: error,
+            player: player ?? self.player,
+            playerItem: playerItem ?? self.player?.currentItem
+        )
         let detail = error?.localizedDescription ?? ""
         if wasLive {
             userFacingPlaybackError = "Livestream konnte nicht gestartet werden. Prüfe deine Internetverbindung.\(detail.isEmpty ? "" : " (\(detail))")"
@@ -693,6 +787,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             userFacingPlaybackError = "Wiedergabe fehlgeschlagen.\(detail.isEmpty ? "" : " \(detail)")"
         }
         isPlaying = false
+        clearPreparingPlayback()
         player?.pause()
         updatePlaybackRate(0.0)
     }
@@ -717,6 +812,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     
     private func play(url: URL, startAt: Double = 0) {
         userFacingPlaybackError = nil
+        currentPlaybackURL = url
         if let oldPlayer = player {
             oldPlayer.removeObserver(self, forKeyPath: "timeControlStatus")
             oldPlayer.removeObserver(self, forKeyPath: "status")
@@ -772,9 +868,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
 
     @objc private func handlePlaybackError(notification: Notification) {
         if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-            LogManager.shared.log("Playback failed with error: \(error.localizedDescription)", type: .error)
             Task { @MainActor in
-                handleStreamOrPlaybackFailure(wasLive: isLive, error: error)
+                handleStreamOrPlaybackFailure(
+                    wasLive: isLive,
+                    error: error,
+                    source: "AVPlayerItemFailedToPlayToEndTime",
+                    playerItem: player?.currentItem
+                )
             }
         }
     }
@@ -811,6 +911,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     func pause() {
         player?.pause()
         isPlaying = false
+        clearPreparingPlayback()
         updatePlaybackRate(0.0)
         savePlaybackPosition()
         if !isLive, currentItem != nil {
