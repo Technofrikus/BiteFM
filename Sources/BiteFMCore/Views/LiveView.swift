@@ -81,6 +81,7 @@ struct LiveView: View {
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: playerManager.isLive && playerManager.isPlaying && playerManager.currentStreamType == selectedStream ? "stop.fill" : "play.fill")
+                            .contentTransition(.identity)
                         Text(playerManager.isLive && playerManager.isPlaying && playerManager.currentStreamType == selectedStream ? "Stream stoppen" : "Stream starten")
                     }
                 }

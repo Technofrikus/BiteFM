@@ -71,6 +71,7 @@ struct MiniPlayerBarView: View {
                     .font(.system(size: 34))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Color.accentColor)
+                    .contentTransition(.identity)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(playerManager.isPlaying ? "Pause" : "Abspielen")

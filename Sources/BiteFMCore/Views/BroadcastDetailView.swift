@@ -80,6 +80,7 @@ struct BroadcastDetailView: View {
                                     }) {
                                         HStack {
                                             Image(systemName: primaryPlayIconName)
+                                                .contentTransition(.identity)
                                             Text(primaryPlayLabel)
                                         }
                                     }
@@ -174,6 +175,7 @@ struct BroadcastDetailView: View {
         }) {
             HStack(spacing: 6) {
                 Image(systemName: primaryPlayIconName)
+                    .contentTransition(.identity)
                 Text(primaryPlayLabel)
             }
         }

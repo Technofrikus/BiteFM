@@ -15,15 +15,7 @@ struct ArchiveView: View {
     @State private var lastIndexDragSymbol: String?
     @State private var favoritesOnly = false
 
-    /// Memo-Cache für die A–Z-Gruppierung. Wird nur neu berechnet, wenn sich die echten
-    /// Eingaben (gefilterte Sendungen) ändern — nicht bei jedem `body`-Durchlauf. Schützt davor,
-    /// dass unabhängige `APIClient`-Updates (z. B. das 60-s-Live-Metadaten-Polling oder der
-    /// Favoriten-Poll) die gesamte Liste neu gruppieren/sortieren.
-    @State private var letterSectionsCache: (signature: LetterSectionsSignature, sections: [(letter: String, shows: [Show])])?
 
-    private struct LetterSectionsSignature: Equatable {
-        let filteredShows: [Show]
-    }
 
     private var showLetterIndexStrip: Bool {
         #if os(macOS)
@@ -56,16 +48,13 @@ struct ArchiveView: View {
     }
     
     /// Sendungen nach Anfangsbuchstaben; Sortierung: **#** (Ziffern & Sonstiges) zuerst, dann A–Z.
-    /// Memoiziert über `letterSectionsCache`, damit unabhängige `body`-Neuberechnungen (z. B. durch
-    /// andere `APIClient`-@Published-Änderungen) die Gruppierung nicht erneut ausführen.
+    /// Reine Berechnung aus `filteredShows` — kein `@State`-Cache, da das Schreiben in einen
+    /// State während des `body`-Durchlaufs (hier mehrfach über `availableSectionIDs` und
+    /// `indexStripSymbols` aufgerufen) die Warnung „Modifying state during view update“ auslöst.
+    /// Das Ergebnis ist deterministisch, sodass SwiftUI über stabile `id`s kein Neuladen der
+    /// Liste erzwingt, auch wenn unabhängige `APIClient`-Updates `body` neu auslösen.
     private var letterSections: [(letter: String, shows: [Show])] {
-        let signature = LetterSectionsSignature(filteredShows: filteredShows)
-        if let cache = letterSectionsCache, cache.signature == signature {
-            return cache.sections
-        }
-        let sections = computeLetterSections(from: filteredShows)
-        letterSectionsCache = (signature, sections)
-        return sections
+        computeLetterSections(from: filteredShows)
     }
 
     private func computeLetterSections(from shows: [Show]) -> [(letter: String, shows: [Show])] {

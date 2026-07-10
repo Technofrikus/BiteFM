@@ -78,6 +78,7 @@ struct PlaybackTransportButtons: View {
                     .frame(width: 32 * s, height: 32 * s)
                     .foregroundColor(.accentColor)
                     .symbolRenderingMode(.monochrome)
+                    .contentTransition(.identity)
             }
             .buttonStyle(.plain)
             .modifier(SpaceBarPlayShortcut(enabled: useKeyboardShortcut))
@@ -259,6 +260,7 @@ private struct NowPlayingTransportButton: View {
                 .font(.system(size: iconSide, weight: .semibold, design: .default))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(isPrimary ? Color.primary : Color.secondary)
+                .contentTransition(.identity)
                 .frame(width: hitSide, height: hitSide)
                 .contentShape(Circle())
                 .background {
@@ -268,27 +270,10 @@ private struct NowPlayingTransportButton: View {
                             Circle()
                                 .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
                         }
-                        .modifier(NowPlayingGlassIfAvailable(isInteractive: true))
                 }
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(.isButton)
-    }
-}
-
-private struct NowPlayingGlassIfAvailable: ViewModifier {
-    let isInteractive: Bool
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            if isInteractive {
-                content.glassEffect(.regular.interactive(), in: .circle)
-            } else {
-                content.glassEffect(.regular, in: .circle)
-            }
-        } else {
-            content
-        }
     }
 }
 #endif
