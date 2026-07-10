@@ -22,6 +22,30 @@ struct ArchiveNew: View {
     /// `UserDefaults`, sondern nur, wenn die View verschwindet oder die App in den Hintergrund geht.
     @State private var lastVisibleTerminID: Int?
     @State private var didRestoreScrollAnchor: Bool = false
+
+    /// Memo-Cache für die Tages-Gruppierung. Wird nur neu berechnet, wenn sich die gefilterten
+    /// Items ändern — nicht bei jedem `body`-Durchlauf. Schützt davor, dass unabhängige
+    /// `APIClient`-Updates (z. B. der Hörverlauf-Poll während der Wiedergabe) die Liste neu gruppieren.
+    ///
+    /// `StoredArchiveItem` ist eine SwiftData-`@Model`-Klasse (nicht `Equatable`), daher basiert die
+    /// Signatur auf genau den Feldern, die für Gruppierung/Sortierung relevant sind.
+    @State private var daySectionsCache: (signature: DaySectionsSignature, sections: [(dayStart: Date, header: String, items: [StoredArchiveItem])])?
+
+    private struct DaySectionsSignature: Equatable {
+        struct Row: Equatable {
+            let terminID: Int
+            let startTime: String
+            let day: TimeInterval
+        }
+        let rows: [Row]
+
+        init(_ items: [StoredArchiveItem]) {
+            let cal = Calendar.current
+            self.rows = items.map {
+                Row(terminID: $0.terminID, startTime: $0.startTime, day: cal.startOfDay(for: $0.broadcastDate).timeIntervalSince1970)
+            }
+        }
+    }
     
     private var filteredItems: [StoredArchiveItem] {
         var items = storedItems
@@ -37,8 +61,19 @@ struct ArchiveNew: View {
         return items
     }
 
-    /// Gruppiert nach Kalendertag (neueste Tage zuerst). Als Funktion, damit `body` die gefilterte Liste nur einmal auswertet.
+    /// Gruppiert nach Kalendertag (neueste Tage zuerst). Memoiziert über `daySectionsCache`, damit
+    /// unabhängige `body`-Neuberechnungen die Gruppierung nicht erneut ausführen.
     private func daySections(from items: [StoredArchiveItem]) -> [(dayStart: Date, header: String, items: [StoredArchiveItem])] {
+        let signature = DaySectionsSignature(items)
+        if let cache = daySectionsCache, cache.signature == signature {
+            return cache.sections
+        }
+        let sections = computeDaySections(from: items)
+        daySectionsCache = (signature, sections)
+        return sections
+    }
+
+    private func computeDaySections(from items: [StoredArchiveItem]) -> [(dayStart: Date, header: String, items: [StoredArchiveItem])] {
         let cal = Calendar.current
         let byDay = Dictionary(grouping: items) { cal.startOfDay(for: $0.broadcastDate) }
         let days = byDay.keys.sorted(by: >)

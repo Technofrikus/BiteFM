@@ -18,6 +18,16 @@ struct ArchiveView: View {
     /// Verhindert, dass die Letter-Anker-Wiederherstellung mehrfach feuert.
     @State private var didRestoreLetterAnchor: Bool = false
 
+    /// Memo-Cache für die A–Z-Gruppierung. Wird nur neu berechnet, wenn sich die echten
+    /// Eingaben (gefilterte Sendungen) ändern — nicht bei jedem `body`-Durchlauf. Schützt davor,
+    /// dass unabhängige `APIClient`-Updates (z. B. das 60-s-Live-Metadaten-Polling oder der
+    /// Favoriten-Poll) die gesamte Liste neu gruppieren/sortieren.
+    @State private var letterSectionsCache: (signature: LetterSectionsSignature, sections: [(letter: String, shows: [Show])])?
+
+    private struct LetterSectionsSignature: Equatable {
+        let filteredShows: [Show]
+    }
+
     private var showLetterIndexStrip: Bool {
         #if os(macOS)
         return true
@@ -49,8 +59,19 @@ struct ArchiveView: View {
     }
     
     /// Sendungen nach Anfangsbuchstaben; Sortierung: **#** (Ziffern & Sonstiges) zuerst, dann A–Z.
+    /// Memoiziert über `letterSectionsCache`, damit unabhängige `body`-Neuberechnungen (z. B. durch
+    /// andere `APIClient`-@Published-Änderungen) die Gruppierung nicht erneut ausführen.
     private var letterSections: [(letter: String, shows: [Show])] {
-        let shows = filteredShows
+        let signature = LetterSectionsSignature(filteredShows: filteredShows)
+        if let cache = letterSectionsCache, cache.signature == signature {
+            return cache.sections
+        }
+        let sections = computeLetterSections(from: filteredShows)
+        letterSectionsCache = (signature, sections)
+        return sections
+    }
+
+    private func computeLetterSections(from shows: [Show]) -> [(letter: String, shows: [Show])] {
         let grouped = Dictionary(grouping: shows) { ArchiveSectionHelpers.indexLetter(forShowTitle: $0.titel) }
         let de = Locale(identifier: "de_DE")
         let keys = grouped.keys.sorted { lhs, rhs in
