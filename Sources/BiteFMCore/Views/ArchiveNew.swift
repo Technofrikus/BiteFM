@@ -3,7 +3,7 @@ import SwiftData
 
 struct ArchiveNew: View {
     @EnvironmentObject private var apiClient: APIClient
-    @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var activePlayback: ActivePlaybackStore
     @EnvironmentObject private var restorationStore: AppRestorationStore
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -26,7 +26,7 @@ struct ArchiveNew: View {
     private var filteredItems: [StoredArchiveItem] {
         var items = storedItems
         if hidePlayed {
-            let pinnedTerminID: Int? = playerManager.isLive ? nil : playerManager.currentItem?.terminID
+            let pinnedTerminID: Int? = activePlayback.isActivePlaying ? nil : activePlayback.activeTerminID
             items = items.filter { stored in
                 !apiClient.isPlayed(broadcastID: stored.terminID) || stored.terminID == pinnedTerminID
             }

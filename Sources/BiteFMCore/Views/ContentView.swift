@@ -712,6 +712,7 @@ private struct FavoritesRouteDestination: View {
     ContentView()
         .environmentObject(APIClient.shared)
         .environmentObject(AudioPlayerManager.shared)
+        .environmentObject(ActivePlaybackStore.shared)
         #if os(iOS)
         .environmentObject(IOSDownloadManager.shared)
         #endif

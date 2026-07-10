@@ -3,7 +3,7 @@ import SwiftUI
 struct BroadcastListView: View {
     let show: Show
     @EnvironmentObject private var apiClient: APIClient
-    @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var activePlayback: ActivePlaybackStore
     @State private var broadcasts: [BroadcastSummary] = []
     @State private var isLoading = false
     @State private var currentPage = 1
@@ -16,7 +16,7 @@ struct BroadcastListView: View {
     
     var filteredBroadcasts: [BroadcastSummary] {
         if hidePlayed {
-            let pinnedTerminID: Int? = playerManager.isLive ? nil : playerManager.currentItem?.terminID
+            let pinnedTerminID: Int? = activePlayback.isActivePlaying ? nil : activePlayback.activeTerminID
             return broadcasts.filter { broadcast in
                 !apiClient.isPlayed(broadcastID: broadcast.id) || broadcast.id == pinnedTerminID
             }

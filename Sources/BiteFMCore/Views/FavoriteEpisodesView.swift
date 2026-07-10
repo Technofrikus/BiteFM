@@ -184,5 +184,6 @@ struct FavoriteEpisodesView: View {
         FavoriteEpisodesView()
             .environmentObject(APIClient.shared)
             .environmentObject(AudioPlayerManager.shared)
+            .environmentObject(ActivePlaybackStore.shared)
     }
 }

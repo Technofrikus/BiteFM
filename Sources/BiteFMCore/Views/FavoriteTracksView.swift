@@ -238,5 +238,6 @@ struct FavoriteTracksView: View {
         FavoriteTracksView()
             .environmentObject(APIClient.shared)
             .environmentObject(AudioPlayerManager.shared)
+            .environmentObject(ActivePlaybackStore.shared)
     }
 }

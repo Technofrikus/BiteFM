@@ -10,7 +10,7 @@ struct BroadcastRow: View {
     var metaLineSizeSuffix: String? = nil
 
     @EnvironmentObject private var apiClient: APIClient
-    @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var activePlayback: ActivePlaybackStore
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
     #endif
@@ -26,10 +26,10 @@ struct BroadcastRow: View {
     }
 
     private var rowPlaybackState: RowPlaybackVisualState {
-        if playerManager.isPreparingPlayback(for: item) {
+        if activePlayback.isActivePreparing, activePlayback.activeTerminID == item.id {
             return .preparing
         }
-        if playerManager.currentItem?.id == item.id && playerManager.isPlaying {
+        if activePlayback.activeTerminID == item.id, activePlayback.isActivePlaying {
             return .playing
         }
         return .idle
@@ -264,7 +264,7 @@ struct BroadcastRow: View {
     }
 
     private func playAndRevealIfNeeded() {
-        playerManager.play(item: item)
+        AudioPlayerManager.shared.play(item: item)
         if isInspectorPresented {
             selectedItemForDetail = item
         }
@@ -280,7 +280,7 @@ struct BroadcastRow: View {
                 switch snap.status {
                 case .downloaded:
                     Button {
-                        playerManager.play(item: item)
+                        AudioPlayerManager.shared.play(item: item)
                     } label: {
                         Image(systemName: "play.circle.fill")
                             .font(.body)

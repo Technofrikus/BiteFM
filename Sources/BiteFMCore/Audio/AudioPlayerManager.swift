@@ -21,15 +21,23 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     private var audioInterruptionObserver: NSObjectProtocol?
     private var wasPlayingBeforeInterruption = false
     #endif
-    @Published public var isPlaying = false
+    @Published public var isPlaying = false {
+        didSet { ActivePlaybackStore.shared.notifyActiveStateChanged() }
+    }
     @Published public var isStalled = false
     /// Gesetzt synchron beim Tap, bis AVPlayer tatsächlich spielt oder die Vorbereitung fehlschlägt.
-    @Published public private(set) var preparingArchiveItemID: Int?
-    @Published public var currentItem: ArchiveItem?
+    @Published public private(set) var preparingArchiveItemID: Int? {
+        didSet { ActivePlaybackStore.shared.notifyActiveStateChanged() }
+    }
+    @Published public var currentItem: ArchiveItem? {
+        didSet { ActivePlaybackStore.shared.notifyActiveStateChanged() }
+    }
     @Published public var currentPlaylist: [PlaylistItem]?
     @Published public var currentTime: Double = 0
     @Published public var duration: Double = 0
-    @Published public var isLive = false
+    @Published public var isLive = false {
+        didSet { ActivePlaybackStore.shared.notifyActiveStateChanged() }
+    }
     @Published public var currentStreamType: StreamType?
     /// Shown in alerts (e.g. Live offline, playback failure); cleared when starting new playback or by the UI.
     @Published public var userFacingPlaybackError: String?
@@ -97,6 +105,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     
     func setup(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
+        ActivePlaybackStore.shared.attach(self)
 
         // Initial cleanup of old playback positions
         Task {

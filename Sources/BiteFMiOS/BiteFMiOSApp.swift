@@ -41,6 +41,7 @@ struct BiteFMiOSApp: App {
             ContentView()
                 .environmentObject(APIClient.shared)
                 .environmentObject(AudioPlayerManager.shared)
+                .environmentObject(ActivePlaybackStore.shared)
                 .environmentObject(IOSDownloadManager.shared)
                 .environmentObject(AppRestorationStore.shared)
         }

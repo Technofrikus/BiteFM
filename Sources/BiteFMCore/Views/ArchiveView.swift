@@ -6,7 +6,7 @@ import AppKit
 
 struct ArchiveView: View {
     @EnvironmentObject private var apiClient: APIClient
-    @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var activePlayback: ActivePlaybackStore
     @EnvironmentObject private var restorationStore: AppRestorationStore
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -460,7 +460,8 @@ struct ArchiveView: View {
     /// Typo wie bei „Neu im Archiv“ (`BroadcastRow`: `.headline` / `.subheadline`, Herz `.body`).
     @ViewBuilder
     private func showRow(for show: Show, rowInsets: EdgeInsets) -> some View {
-        let isPlaying = playerManager.currentItem?.sendungTitel == show.titel && playerManager.isPlaying
+        let isPlaying = activePlayback.isActivePlaying
+            && activePlayback.activeSendungID == show.id
         let accessoryBox: CGFloat = 22
         #if os(macOS)
         let rowVerticalPadding: CGFloat = 4
@@ -518,6 +519,7 @@ struct ArchiveView: View {
     ArchiveView()
         .environmentObject(APIClient.shared)
         .environmentObject(AudioPlayerManager.shared)
+        .environmentObject(ActivePlaybackStore.shared)
 }
 
 #if os(macOS)
