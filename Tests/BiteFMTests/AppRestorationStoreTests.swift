@@ -136,20 +136,8 @@ final class AppRestorationStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.validNavigationRoutes.favorites, routes)
     }
 
-    // MARK: - Scroll anchors
-
-    func testScrollAnchorsPersistAndReload() {
-        let store = AppRestorationStore(defaults: defaults, storageKey: storageKey, writeDebounce: 0)
-        store.setArchiveScrollAnchor(letter: "M")
-        store.setArchiveNewScrollAnchor(terminID: 12345)
-        store.setFavoriteEpisodesScrollAnchor(terminID: 67890)
-        store.flushNow()
-
-        let reloaded = AppRestorationStore(defaults: defaults, storageKey: storageKey, writeDebounce: 0)
-        XCTAssertEqual(reloaded.validScrollAnchors.archiveLetter, "M")
-        XCTAssertEqual(reloaded.validScrollAnchors.archiveNewTerminID, 12345)
-        XCTAssertEqual(reloaded.validScrollAnchors.favoriteEpisodesTerminID, 67890)
-    }
+    // MARK: - Scroll anchors removed
+    // Die Scroll-Anker-Wiederherstellung wurde entfernt; dieser Test entfällt.
 
     // MARK: - Version mismatch
 

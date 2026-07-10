@@ -4,9 +4,7 @@ import SwiftData
 struct ArchiveNew: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
-    @EnvironmentObject private var restorationStore: AppRestorationStore
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.scenePhase) private var scenePhase
 
     @Query(sort: [
         SortDescriptor(\StoredArchiveItem.datum, order: .reverse),
@@ -18,10 +16,6 @@ struct ArchiveNew: View {
     @State private var isInspectorPresented = false
     @State private var hidePlayed = false
     @State private var favoritesOnly = false
-    /// In-View-Tracking der zuletzt sichtbaren Termin-ID. Wir schreiben sie nicht bei jedem Scroll-Event nach
-    /// `UserDefaults`, sondern nur, wenn die View verschwindet oder die App in den Hintergrund geht.
-    @State private var lastVisibleTerminID: Int?
-    @State private var didRestoreScrollAnchor: Bool = false
 
     /// Memo-Cache für die Tages-Gruppierung. Wird nur neu berechnet, wenn sich die gefilterten
     /// Items ändern — nicht bei jedem `body`-Durchlauf. Schützt davor, dass unabhängige
@@ -46,7 +40,7 @@ struct ArchiveNew: View {
             }
         }
     }
-    
+
     private var filteredItems: [StoredArchiveItem] {
         var items = storedItems
         if hidePlayed {
@@ -61,16 +55,14 @@ struct ArchiveNew: View {
         return items
     }
 
-    /// Gruppiert nach Kalendertag (neueste Tage zuerst). Memoiziert über `daySectionsCache`, damit
-    /// unabhängige `body`-Neuberechnungen die Gruppierung nicht erneut ausführen.
-    private func daySections(from items: [StoredArchiveItem]) -> [(dayStart: Date, header: String, items: [StoredArchiveItem])] {
+    /// Befüllt `daySectionsCache` außerhalb von `body` (in `.task`/`.onChange`), damit kein
+    /// State während des View-Updates mutiert wird.
+    private func refreshDaySections() {
+        let items = filteredItems
         let signature = DaySectionsSignature(items)
-        if let cache = daySectionsCache, cache.signature == signature {
-            return cache.sections
+        if daySectionsCache?.signature != signature {
+            daySectionsCache = (signature, computeDaySections(from: items))
         }
-        let sections = computeDaySections(from: items)
-        daySectionsCache = (signature, sections)
-        return sections
     }
 
     private func computeDaySections(from items: [StoredArchiveItem]) -> [(dayStart: Date, header: String, items: [StoredArchiveItem])] {
@@ -124,7 +116,10 @@ struct ArchiveNew: View {
     
     var body: some View {
         let filtered = filteredItems
-        let sections = daySections(from: filtered)
+        // Rein lesend: Cache nutzen, sonst einmalig rein berechnen (KEIN State-Write in `body`).
+        let sections = daySectionsCache?.signature == DaySectionsSignature(filtered)
+            ? daySectionsCache!.sections
+            : computeDaySections(from: filtered)
         ZStack {
             ScrollViewReader { proxy in
                 List {
@@ -150,11 +145,7 @@ struct ArchiveNew: View {
                                 // Spacer-Zeile, da `List` sonst eine Mindesthöhe erzwingt.
                                 .listRowInsets(EdgeInsets(top: top, leading: 10, bottom: bottom, trailing: 12))
                                 .id(storedItem.terminID)
-                                .onAppear {
-                                    // Letzter „angekommener“ Termin = grobe Schätzung der aktuellen Scroll-Position.
-                                    // Reine View-State-Aktualisierung — kein UserDefaults-Write während des Scrollens.
-                                    lastVisibleTerminID = storedItem.terminID
-                                }
+                            }
                             }
                         }
                     }
@@ -170,13 +161,15 @@ struct ArchiveNew: View {
                 .opacity(filtered.isEmpty ? 0 : 1)
                 .task {
                     await apiClient.fetchArchive()
-                    restoreScrollAnchorIfPossible(proxy: proxy, items: filtered)
+                    refreshDaySections()
                 }
                 .onChange(of: storedItems) { _, _ in
-                    // Erst nach erstem Datenladen kann ein gespeicherter Anker greifen.
-                    restoreScrollAnchorIfPossible(proxy: proxy, items: filteredItems)
+                    // Kein Scroll-Anker-Restore mehr.
+                    refreshDaySections()
                 }
-            }
+                .onChange(of: filteredItems) { _, _ in
+                    refreshDaySections()
+                }
             
             if filtered.isEmpty && !storedItems.isEmpty {
                 let empty = emptyFilterUnavailable
@@ -223,34 +216,7 @@ struct ArchiveNew: View {
             }
         }
         .onDisappear {
-            // Beim Verlassen der View den groben Scroll-Anker einmalig persistieren — Schreiben passiert nicht im Scroll-Pfad.
-            persistScrollAnchorIfNeeded()
+            // Kein Scroll-Anker-Restore mehr: Scroll-Position wird nicht mehr gespeichert.
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            // Bevor die App in den Hintergrund geht (oder dazwischen pausiert), den Anker einmalig nachziehen.
-            if newPhase == .background || newPhase == .inactive {
-                persistScrollAnchorIfNeeded()
-            }
-        }
-    }
-
-    private func persistScrollAnchorIfNeeded() {
-        guard let id = lastVisibleTerminID else { return }
-        restorationStore.setArchiveNewScrollAnchor(terminID: id)
-    }
-
-    private func restoreScrollAnchorIfPossible(proxy: ScrollViewProxy, items: [StoredArchiveItem]) {
-        let sessionKey = "ArchiveNew.scrollAnchor"
-        guard !didRestoreScrollAnchor, restorationStore.shouldRestore(key: sessionKey) else { return }
-        guard let id = restorationStore.validScrollAnchors.archiveNewTerminID else {
-            didRestoreScrollAnchor = true
-            restorationStore.markRestored(key: sessionKey)
-            return
-        }
-        guard items.contains(where: { $0.terminID == id }) else { return }
-        didRestoreScrollAnchor = true
-        restorationStore.markRestored(key: sessionKey)
-        // `scrollTo` ohne Animation, damit der Restore nicht als sichtbares Springen erscheint.
-        proxy.scrollTo(id, anchor: .top)
     }
 }

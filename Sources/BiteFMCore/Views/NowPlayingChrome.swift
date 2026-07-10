@@ -17,7 +17,6 @@ struct MiniPlayerBarView: View {
     /// Prefer labeling at call sites: `MiniPlayerBarView(chrome: .tabAccessory, onExpand: { … })` (avoids trailing-closure ambiguity with `chrome:`).
     var onExpand: () -> Void
     var chrome: MiniPlayerBarChrome = .safeAreaInsetRow
-    var namespace: Namespace.ID? = nil
 
     var body: some View {
         let cornerRadius: CGFloat = chrome == .tabAccessory ? 18 : 16
@@ -28,12 +27,7 @@ struct MiniPlayerBarView: View {
                 .padding(.vertical, 10)
                 .background {
                     NowPlayingMatchedSurfaceBackground(
-                        namespace: namespace,
                         cornerRadius: cornerRadius,
-                        // `tabViewBottomAccessory` dupliziert die View intern (Layout/Transitions).
-                        // Zusammen mit matchedGeometry kann das zu "multiple isSource: true" Warnungen führen.
-                        // Für die Accessory-Variante lassen wir daher matched-geometry als Source aus.
-                        isMatchedGeometrySource: false,
                         materialFallback: nil
                     )
                 }
@@ -45,9 +39,7 @@ struct MiniPlayerBarView: View {
                     .padding(.vertical, 10)
                     .background {
                         NowPlayingMatchedSurfaceBackground(
-                            namespace: namespace,
                             cornerRadius: cornerRadius,
-                            isMatchedGeometrySource: true,
                             materialFallback: AnyView(Rectangle().fill(Material.bar))
                         )
                     }
@@ -94,7 +86,6 @@ struct ExpandedNowPlayingView: View {
     @EnvironmentObject private var apiClient: APIClient
     @Environment(\.dismiss) private var dismiss
     var onClose: (() -> Void)? = nil
-    var namespace: Namespace.ID? = nil
     var allowsSwipeToDismiss: Bool = false
     /// Bewusst `@State` (statt `@GestureState`): beim Loslassen einer erfolgreichen Dismiss-Geste soll
     /// der Offset NICHT auf 0 zurückspringen — der `fullScreenCover`-Dismiss läuft dann von der
@@ -122,9 +113,7 @@ struct ExpandedNowPlayingView: View {
                     .ignoresSafeArea()
 
                 NowPlayingMatchedSurfaceBackground(
-                    namespace: namespace,
                     cornerRadius: presentationCornerRadius,
-                    isMatchedGeometrySource: false,
                     materialFallback: AnyView(
                         Rectangle().fill(isOverlayMode ? overlayBackgroundColor : Color.clear)
                     )
@@ -395,53 +384,26 @@ private struct NowPlayingPresentationClip: ViewModifier {
     }
 }
 
-private struct NowPlayingSurfaceMatchModifier: ViewModifier {
-    let namespace: Namespace.ID?
-    let cornerRadius: CGFloat
-    let isSource: Bool
-
-    func body(content: Content) -> some View {
-        if let namespace {
-            content
-                .matchedGeometryEffect(
-                    id: NowPlayingSurfaceMatchID.surface,
-                    in: namespace,
-                    isSource: isSource
-                )
-        } else {
-            content
-        }
-    }
-}
-
-private enum NowPlayingSurfaceMatchID {
-    static let surface: String = "NowPlayingSurface"
-}
-
+/// Hintergrund-Surface für Mini-Player-Leiste und Expanded-Sheet.
+/// Bewusst **ohne** `matchedGeometryEffect`: Mini-Leiste (Hauptfenster) und Expanded-Sheet
+/// (`sheet`/`fullScreenCover`) liegen auf unterschiedlichen Screens/Windows. Ein `matchedGeometryEffect`
+/// über zwei Screens hinweg löst zur Laufzeit
+/// „Transformers don't support animations across multiple screens simultaneously“ aus (u. a. beim
+/// Tippen auf Play/Pause, weil dann beide Views neu gerendert werden). Die Sheet-Präsentation
+/// animiert ohnehin nativ; ein Morph von der Mini-Leiste ist damit nicht möglich, aber fehlerfrei.
 private struct NowPlayingMatchedSurfaceBackground: View {
-    let namespace: Namespace.ID?
     let cornerRadius: CGFloat
-    let isMatchedGeometrySource: Bool
     let materialFallback: AnyView?
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        Group {
-            if let materialFallback {
-                materialFallback
-                    .clipShape(shape)
-            } else {
-                Color.clear
-                    .clipShape(shape)
-            }
+        if let materialFallback {
+            materialFallback
+                .clipShape(shape)
+        } else {
+            Color.clear
+                .clipShape(shape)
         }
-        .modifier(
-            NowPlayingSurfaceMatchModifier(
-                namespace: namespace,
-                cornerRadius: cornerRadius,
-                isSource: isMatchedGeometrySource
-            )
-        )
     }
 }
 

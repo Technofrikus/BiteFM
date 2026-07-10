@@ -15,16 +15,10 @@ struct FavoriteEpisodesView: View {
     
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
-    @EnvironmentObject private var restorationStore: AppRestorationStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.scenePhase) private var scenePhase
     @State private var sortMode: SortMode = .episodeDate
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
-    /// Letzter im Viewport sichtbarer `terminID` — wird nicht laufend nach `UserDefaults` geschrieben,
-    /// sondern nur bei View-Disappear bzw. scenePhase-Wechsel.
-    @State private var lastVisibleTerminID: Int?
-    @State private var didRestoreScrollAnchor: Bool = false
     
     private var sortedEpisodes: [FavoriteShowItem] {
         let items = apiClient.favoriteShowItems
@@ -86,9 +80,6 @@ struct FavoriteEpisodesView: View {
                                 isInspectorPresented: $isInspectorPresented
                             )
                             .id(entry.id)
-                            .onAppear {
-                                lastVisibleTerminID = entry.id
-                            }
                         }
                     }
                     #if os(iOS)
@@ -97,12 +88,10 @@ struct FavoriteEpisodesView: View {
                     .listStyle(.inset)
                     #endif
                     .task {
-                        restoreScrollAnchorIfPossible(proxy: proxy)
+                        // Kein Scroll-Anker-Restore mehr.
                     }
                     .onChange(of: apiClient.favoriteShowItems.count) { _, _ in
-                        // Wir prüfen nur die Listenlänge, weil `FavoriteShowItem` kein `Equatable` ist.
-                        // Der Restore selbst ist idempotent (`didRestoreScrollAnchor`).
-                        restoreScrollAnchorIfPossible(proxy: proxy)
+                        // Kein Scroll-Anker-Restore mehr.
                     }
                 }
             }
@@ -149,33 +138,6 @@ struct FavoriteEpisodesView: View {
             guard !isInspectorPresented else { return }
             await apiClient.fetchFavorites()
         }
-        .onDisappear {
-            persistScrollAnchorIfNeeded()
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .background || newPhase == .inactive {
-                persistScrollAnchorIfNeeded()
-            }
-        }
-    }
-
-    private func persistScrollAnchorIfNeeded() {
-        guard let id = lastVisibleTerminID else { return }
-        restorationStore.setFavoriteEpisodesScrollAnchor(terminID: id)
-    }
-
-    private func restoreScrollAnchorIfPossible(proxy: ScrollViewProxy) {
-        let sessionKey = "FavoriteEpisodesView.scrollAnchor"
-        guard !didRestoreScrollAnchor, restorationStore.shouldRestore(key: sessionKey) else { return }
-        guard let id = restorationStore.validScrollAnchors.favoriteEpisodesTerminID else {
-            didRestoreScrollAnchor = true
-            restorationStore.markRestored(key: sessionKey)
-            return
-        }
-        guard apiClient.favoriteShowItems.contains(where: { $0.id == id }) else { return }
-        didRestoreScrollAnchor = true
-        restorationStore.markRestored(key: sessionKey)
-        proxy.scrollTo(id, anchor: .top)
     }
 }
 
@@ -185,5 +147,6 @@ struct FavoriteEpisodesView: View {
             .environmentObject(APIClient.shared)
             .environmentObject(AudioPlayerManager.shared)
             .environmentObject(ActivePlaybackStore.shared)
+            .environmentObject(PlaybackProgressStore.shared)
     }
 }

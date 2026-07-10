@@ -14,22 +14,19 @@ public struct AppRestorationState: Codable, Equatable {
     public var selectedRoot: SelectedRoot?
     public var lastPlaybackSession: PlaybackSession?
     public var navigationRoutes: NavigationRoutes
-    public var scrollAnchors: ScrollAnchors
 
     public init(
         version: Int = AppRestorationState.currentVersion,
         savedAt: Date = Date(),
         selectedRoot: SelectedRoot? = nil,
         lastPlaybackSession: PlaybackSession? = nil,
-        navigationRoutes: NavigationRoutes = NavigationRoutes(),
-        scrollAnchors: ScrollAnchors = ScrollAnchors()
+        navigationRoutes: NavigationRoutes = NavigationRoutes()
     ) {
         self.version = version
         self.savedAt = savedAt
         self.selectedRoot = selectedRoot
         self.lastPlaybackSession = lastPlaybackSession
         self.navigationRoutes = navigationRoutes
-        self.scrollAnchors = scrollAnchors
     }
 }
 
@@ -124,26 +121,6 @@ extension AppRestorationState {
     }
 }
 
-// MARK: - Scroll anchors (optional, stable ids)
-
-extension AppRestorationState {
-    /// Stabile Anker für lange Listen — keine Pixel-Offsets, sondern IDs sichtbarer Zeilen, die wir per `scrollTo` wiederherstellen können.
-    public struct ScrollAnchors: Codable, Equatable {
-        /// Buchstaben-Section in `ArchiveView` (z. B. „A“, „#“).
-        public var archiveLetter: String?
-        /// Termin-ID des sichtbaren Eintrags in „Neu im Archiv“.
-        public var archiveNewTerminID: Int?
-        /// Termin-ID des sichtbaren Eintrags in der Favoriten-Episodenliste.
-        public var favoriteEpisodesTerminID: Int?
-
-        public init(
-            archiveLetter: String? = nil,
-            archiveNewTerminID: Int? = nil,
-            favoriteEpisodesTerminID: Int? = nil
-        ) {
-            self.archiveLetter = archiveLetter
-            self.archiveNewTerminID = archiveNewTerminID
-            self.favoriteEpisodesTerminID = favoriteEpisodesTerminID
-        }
-    }
-}
+// MARK: - Scroll anchors removed
+// Die Scroll-Anker-Wiederherstellung beim Re-Öffnen wurde entfernt (verwirrendes Springen).
+// Die `ScrollAnchors`-Struktur ist daher entfernt.

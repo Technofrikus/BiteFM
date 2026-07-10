@@ -189,4 +189,5 @@ struct LiveView: View {
     LiveView()
         .environmentObject(APIClient.shared)
         .environmentObject(AudioPlayerManager.shared)
+        .environmentObject(PlaybackProgressStore.shared)
 }

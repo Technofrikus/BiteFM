@@ -11,10 +11,6 @@ public final class AppRestorationStore: ObservableObject {
 
     @Published public private(set) var state: AppRestorationState
 
-    /// Tracks which restoration keys (e.g. scroll anchors, deep routes) have been "consumed" during this app session.
-    /// Non-persisted, resets on every cold launch.
-    private var consumedRestorationKeys = Set<String>()
-
     /// Zeitspanne, ab der ein gespeicherter Snapshot als veraltet gilt. Vermeidet das Wiederbeleben monatealter Zustände
     /// (z. B. Sendungen, die im API nicht mehr existieren oder für den Nutzer keinen Bezug mehr haben).
     public let maxSnapshotAge: TimeInterval = 60 * 60 * 24 * 30
@@ -60,11 +56,6 @@ public final class AppRestorationStore: ObservableObject {
     public var validNavigationRoutes: AppRestorationState.NavigationRoutes {
         guard !isStale(savedAt: state.savedAt) else { return AppRestorationState.NavigationRoutes() }
         return state.navigationRoutes
-    }
-
-    public var validScrollAnchors: AppRestorationState.ScrollAnchors {
-        guard !isStale(savedAt: state.savedAt) else { return AppRestorationState.ScrollAnchors() }
-        return state.scrollAnchors
     }
 
     // MARK: - Public mutation API
@@ -128,26 +119,10 @@ public final class AppRestorationStore: ObservableObject {
         scheduleFlush()
     }
 
-    public func setArchiveScrollAnchor(letter: String?) {
-        guard state.scrollAnchors.archiveLetter != letter else { return }
-        state.scrollAnchors.archiveLetter = letter
-        state.savedAt = Date()
-        scheduleFlush()
-    }
-
-    public func setArchiveNewScrollAnchor(terminID: Int?) {
-        guard state.scrollAnchors.archiveNewTerminID != terminID else { return }
-        state.scrollAnchors.archiveNewTerminID = terminID
-        state.savedAt = Date()
-        scheduleFlush()
-    }
-
-    public func setFavoriteEpisodesScrollAnchor(terminID: Int?) {
-        guard state.scrollAnchors.favoriteEpisodesTerminID != terminID else { return }
-        state.scrollAnchors.favoriteEpisodesTerminID = terminID
-        state.savedAt = Date()
-        scheduleFlush()
-    }
+    // MARK: - Scroll anchor restoration removed
+    // Scroll-Position-Wiederherstellung beim Re-Öffnen wurde entfernt (verwirrendes Springen).
+    // Die zugehörigen `setArchiveScrollAnchor`/`setArchiveNewScrollAnchor`/
+    // `setFavoriteEpisodesScrollAnchor`-Methoden und `ScrollAnchors` sind entfernt.
 
     /// Erzwingt sofortiges Schreiben, z. B. bei Background/Termination.
     public func flushNow() {
@@ -162,17 +137,6 @@ public final class AppRestorationStore: ObservableObject {
     }
 
     // MARK: - Session-only restoration tracking
-
-    /// Returns true if the given key has not been consumed yet in this app session.
-    /// Used to ensure that "jumpy" restorations like scroll positions only happen once after a cold launch.
-    public func shouldRestore(key: String) -> Bool {
-        !consumedRestorationKeys.contains(key)
-    }
-
-    /// Marks a restoration key as consumed for the remainder of this app session.
-    public func markRestored(key: String) {
-        consumedRestorationKeys.insert(key)
-    }
 
     // MARK: - Persistence
 

@@ -114,7 +114,6 @@ private struct LoggedInRootView: View {
     @State private var didApplyRestoredFavoritesPath: Bool = false
     #if os(iOS)
     @State private var didApplyOfflineLaunchTab = false
-    @Namespace private var nowPlayingNamespace
     #endif
 
     private var useCompactRoot: Bool {
@@ -238,15 +237,13 @@ private struct LoggedInRootView: View {
             IPhoneTabShellWithBottomAccessory(
                 selectedTab: $selectedTab,
                 isNowPlayingExpanded: $isNowPlayingExpanded,
-                favoritesPath: $favoritesPath,
-                namespace: nowPlayingNamespace
+                favoritesPath: $favoritesPath
             )
         } else {
             IPhoneTabShellLegacyInset(
                 selectedTab: $selectedTab,
                 isNowPlayingExpanded: $isNowPlayingExpanded,
-                favoritesPath: $favoritesPath,
-                namespace: nowPlayingNamespace
+                favoritesPath: $favoritesPath
             )
         }
     }
@@ -258,7 +255,6 @@ private struct LoggedInRootView: View {
         @Binding var selectedTab: MainTab
         @Binding var isNowPlayingExpanded: Bool
         @Binding var favoritesPath: [AppRestorationState.DeepRoute]
-        let namespace: Namespace.ID
 
         var body: some View {
             let miniActive = playerManager.currentItem != nil || playerManager.isLive
@@ -306,8 +302,7 @@ private struct LoggedInRootView: View {
             .tabViewBottomAccessory(isEnabled: miniActive) {
                 MiniPlayerBarView(
                     onExpand: { expandNowPlaying() },
-                    chrome: .tabAccessory,
-                    namespace: namespace
+                    chrome: .tabAccessory
                 )
                 .environmentObject(playerManager)
             }
@@ -326,7 +321,6 @@ private struct LoggedInRootView: View {
         @Binding var selectedTab: MainTab
         @Binding var isNowPlayingExpanded: Bool
         @Binding var favoritesPath: [AppRestorationState.DeepRoute]
-        let namespace: Namespace.ID
 
         var body: some View {
             TabView(selection: $selectedTab) {
@@ -373,8 +367,7 @@ private struct LoggedInRootView: View {
                 if playerManager.currentItem != nil || playerManager.isLive {
                     MiniPlayerBarView(
                         onExpand: { expandNowPlaying() },
-                        chrome: .safeAreaInsetRow,
-                        namespace: namespace
+                        chrome: .safeAreaInsetRow
                     )
                 }
             }
@@ -713,6 +706,7 @@ private struct FavoritesRouteDestination: View {
         .environmentObject(APIClient.shared)
         .environmentObject(AudioPlayerManager.shared)
         .environmentObject(ActivePlaybackStore.shared)
+        .environmentObject(PlaybackProgressStore.shared)
         #if os(iOS)
         .environmentObject(IOSDownloadManager.shared)
         #endif

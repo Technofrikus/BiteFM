@@ -109,48 +109,72 @@ struct PlaybackTransportButtons: View {
 
 struct PlaybackSeekBar: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var progress: PlaybackProgressStore
     var compactTimeline: Bool
 
+    /// Lokaler Drag-Wert, damit die 1-Hz-`currentTime`-Veröffentlichung nicht direkt in die
+    /// `Slider`-Binding zurückgeschrieben wird (Echo-Schleife). Während des Ziehens steuert der
+    /// lokale Wert den Slider; beim Loslassen wird einmalig geseekt.
+    @State private var dragValue: Double = 0
+    @State private var isEditing: Bool = false
+
     var body: some View {
-        if !playerManager.isLive && playerManager.duration > 0 {
+        if !playerManager.isLive && progress.duration > 0 {
+            let duration = progress.duration
             Group {
                 if compactTimeline {
                     VStack(spacing: 6) {
                         Slider(
                             value: Binding(
-                                get: { playerManager.currentTime },
-                                set: { playerManager.seek(to: $0) }
+                                get: { isEditing ? dragValue : progress.currentTime },
+                                set: { dragValue = $0 }
                             ),
-                            in: 0...playerManager.duration
+                            in: 0...duration,
+                            onEditingChanged: { editing in
+                                isEditing = editing
+                                if editing {
+                                    dragValue = progress.currentTime
+                                } else {
+                                    playerManager.seek(to: dragValue)
+                                }
+                            }
                         )
                         .controlSize(.regular)
                         HStack {
-                            Text(PlaybackTimeFormatting.string(from: playerManager.currentTime))
+                            Text(PlaybackTimeFormatting.string(from: isEditing ? dragValue : progress.currentTime))
                                 .font(.caption2.monospacedDigit())
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text("-" + PlaybackTimeFormatting.string(from: playerManager.duration - playerManager.currentTime))
+                            Text("-" + PlaybackTimeFormatting.string(from: max(0, duration - (isEditing ? dragValue : progress.currentTime))))
                                 .font(.caption2.monospacedDigit())
                                 .foregroundColor(.secondary)
                         }
                     }
                 } else {
                     HStack(spacing: 12) {
-                        Text(PlaybackTimeFormatting.string(from: playerManager.currentTime))
+                        Text(PlaybackTimeFormatting.string(from: isEditing ? dragValue : progress.currentTime))
                             .font(.caption2.monospacedDigit())
                             .foregroundColor(.secondary)
                             .frame(width: 45, alignment: .trailing)
 
                         Slider(
                             value: Binding(
-                                get: { playerManager.currentTime },
-                                set: { playerManager.seek(to: $0) }
+                                get: { isEditing ? dragValue : progress.currentTime },
+                                set: { dragValue = $0 }
                             ),
-                            in: 0...playerManager.duration
+                            in: 0...duration,
+                            onEditingChanged: { editing in
+                                isEditing = editing
+                                if editing {
+                                    dragValue = progress.currentTime
+                                } else {
+                                    playerManager.seek(to: dragValue)
+                                }
+                            }
                         )
                         .controlSize(.mini)
 
-                        Text("-" + PlaybackTimeFormatting.string(from: playerManager.duration - playerManager.currentTime))
+                        Text("-" + PlaybackTimeFormatting.string(from: max(0, duration - (isEditing ? dragValue : progress.currentTime))))
                             .font(.caption2.monospacedDigit())
                             .foregroundColor(.secondary)
                             .frame(width: 45, alignment: .leading)

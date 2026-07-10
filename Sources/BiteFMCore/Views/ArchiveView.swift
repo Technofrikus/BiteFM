@@ -7,7 +7,6 @@ import AppKit
 struct ArchiveView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
-    @EnvironmentObject private var restorationStore: AppRestorationStore
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -15,8 +14,6 @@ struct ArchiveView: View {
     @State private var hoveredIndexSymbol: String?
     @State private var lastIndexDragSymbol: String?
     @State private var favoritesOnly = false
-    /// Verhindert, dass die Letter-Anker-Wiederherstellung mehrfach feuert.
-    @State private var didRestoreLetterAnchor: Bool = false
 
     /// Memo-Cache für die A–Z-Gruppierung. Wird nur neu berechnet, wenn sich die echten
     /// Eingaben (gefilterte Sendungen) ändern — nicht bei jedem `body`-Durchlauf. Schützt davor,
@@ -144,12 +141,9 @@ struct ArchiveView: View {
                     if apiClient.shows.isEmpty {
                         await apiClient.fetchShows()
                     }
-                    restoreLetterAnchorIfPossible(proxy: proxy)
                 }
                 .onChange(of: apiClient.shows) { _, _ in
-                    // Sendungsliste kommt asynchron — der Letter-Anker greift erst, wenn die Sektionen tatsächlich
-                    // existieren. Wir versuchen es einmalig nach dem Erstausflug.
-                    restoreLetterAnchorIfPossible(proxy: proxy)
+                    // Sendungsliste kommt asynchron — kein Scroll-Anker-Restore mehr.
                 }
                 .refreshable {
                     await apiClient.fetchShows()
@@ -406,24 +400,6 @@ struct ArchiveView: View {
             }
             #endif
         }
-        // Stabiler semantischer Anker statt Pixeloffset — der Store drosselt redundante Writes selbst.
-        restorationStore.setArchiveScrollAnchor(letter: id)
-    }
-
-    /// Wendet einen gespeicherten Letter-Anker einmalig an, sobald passende Sektionen existieren.
-    private func restoreLetterAnchorIfPossible(proxy: ScrollViewProxy) {
-        let sessionKey = "ArchiveView.scrollAnchor"
-        guard !didRestoreLetterAnchor, restorationStore.shouldRestore(key: sessionKey) else { return }
-        guard let letter = restorationStore.validScrollAnchors.archiveLetter else {
-            didRestoreLetterAnchor = true
-            restorationStore.markRestored(key: sessionKey)
-            return
-        }
-        guard availableSectionIDs.contains(letter) else { return }
-        didRestoreLetterAnchor = true
-        restorationStore.markRestored(key: sessionKey)
-        // Ohne Animation, weil der Restore sonst sofort nach dem Erscheinen der Liste sichtbar zappeln würde.
-        proxy.scrollTo(letter, anchor: .top)
     }
 
     private func indexDragGesture(proxy: ScrollViewProxy) -> some Gesture {
@@ -541,6 +517,7 @@ struct ArchiveView: View {
         .environmentObject(APIClient.shared)
         .environmentObject(AudioPlayerManager.shared)
         .environmentObject(ActivePlaybackStore.shared)
+        .environmentObject(PlaybackProgressStore.shared)
 }
 
 #if os(macOS)

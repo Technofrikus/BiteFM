@@ -42,8 +42,6 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     /// *changes*, so the player-bar metadata block can do an O(1) lookup instead of re-scanning the
     /// playlist against `currentTime` on every 1 Hz render.
     @Published public private(set) var currentPlaylistItemID: String?
-    @Published public var currentTime: Double = 0
-    @Published public var duration: Double = 0
     @Published public var isLive = false {
         didSet { ActivePlaybackStore.shared.notifyActiveStateChanged() }
     }
@@ -53,6 +51,12 @@ public class AudioPlayerManager: NSObject, ObservableObject {
 
     private var hasMarkedCurrentItemAsPlayed = false
     private var lastMarkedTerminID: Int?
+    // `currentTime`/`duration` used to be `@Published` on this object, which made the 1 Hz tick
+    // re-render every view observing `AudioPlayerManager` (incl. `ContentView` + the scroll list).
+    // They are now plain stored properties; `syncProgress()` pushes them to `PlaybackProgressStore`,
+    // which only the player-bar UI observes.
+    public private(set) var currentTime: Double = 0
+    public private(set) var duration: Double = 0
 
     // MARK: - Listening-time based “heard” tracking (conservative)
     // Counts actual playback time only while `isPlaying == true`, and only updates every ~5s.
@@ -72,6 +76,9 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var lastUpdatedSongId: String?
     private var lastSavedPosition: Double = 0
+    /// Letzte Position, für die der Restoration-Store geschrieben wurde — drosselt den
+    /// `updatePlaybackPosition`-Aufruf auf ~alle 10 s (verhindert per-Sekunde-List-Rerenders).
+    private var lastRestorationUpdatePosition: Double = 0
     /// Last URL passed to `play(url:)` — used for structured failure logs.
     private var currentPlaybackURL: URL?
 
@@ -169,6 +176,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
 
         setupNowPlaying(item: session.item)
         updatePlaybackRate(0.0)
+        syncProgress()
         LogManager.shared.log("Restored last playback snapshot for terminID=\(session.terminID) at \(Int(session.position))s (paused)", type: .info)
     }
 
@@ -496,6 +504,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 let pos = time.seconds
                 guard pos.isFinite else { return }
                 self.currentTime = pos
+                self.syncProgress()
                 
                 // „Gehört“: konservativ nach echter Hörzeit (nur während `isPlaying == true`, nur alle ~5s).
                 if !self.isLive, let item = self.currentItem, !self.hasMarkedCurrentItemAsPlayed {
@@ -571,16 +580,28 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                     self.savePlaybackPosition()
                 }
 
-                // App-State (Restoration) ebenfalls drosseln: Position/Status periodisch updaten.
-                if !self.isLive, !self.isRestoredPlaceholder, self.currentItem != nil {
+                // App-State (Restoration) drosseln: Position/Status nur ~alle 10 s updaten, nicht
+                // pro 1-Hz-Tick. Jeder Write mutiert `@Published state` des `AppRestorationStore`, was
+                // alle Views, die ihn als `@EnvironmentObject` halten (z. B. die Listen), pro Sekunde
+                // neu rendert — sichtbares Stottern beim Scrollen während der Wiedergabe.
+                if !self.isLive, !self.isRestoredPlaceholder, self.currentItem != nil,
+                   abs(self.currentTime - self.lastRestorationUpdatePosition) > 10.0 {
                     self.restorationStore?.updatePlaybackPosition(
                         self.currentTime,
                         duration: self.duration,
                         wasPlaying: self.isPlaying
                     )
+                    self.lastRestorationUpdatePosition = self.currentTime
                 }
             }
         }
+    }
+
+    /// Spiegelt `currentTime`/`duration` in den separaten `PlaybackProgressStore` (den nur die
+    /// Player-Bar beobachtet). Muss nach jeder Mutation von `currentTime`/`duration` aufgerufen werden,
+    /// damit die Fortschritts-UI synchron bleibt, ohne `AudioPlayerManager` selbst zu veröffentlichen.
+    private func syncProgress() {
+        PlaybackProgressStore.shared.update(currentTime: currentTime, duration: duration)
     }
 
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
@@ -630,6 +651,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 let durationSeconds = item.duration.seconds
                 if durationSeconds.isFinite, durationSeconds > 0 {
                     self.duration = durationSeconds
+                    self.syncProgress()
                     
                     if !self.isLive, self.currentItem != nil {
                         self.updateNowPlayingForArchive()
@@ -697,6 +719,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         let time = CMTime(seconds: seconds, preferredTimescale: 1000)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
         self.currentTime = seconds
+        self.syncProgress()
         updatePlaybackRate(isPlaying ? 1.0 : 0.0)
         
         if !isLive && currentItem != nil {
@@ -747,6 +770,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         currentTime = 0
         currentStreamType = streamType
         isRestoredPlaceholder = false
+        syncProgress()
         resetListeningProgressTracking()
         guard let url = streamType.streamURL else { return }
 
@@ -861,6 +885,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         duration = 0 // Reset duration for new item
         currentTime = startAt // Reset current time to startAt for new item
         lastSavedPosition = startAt
+        syncProgress()
         
         let playerItem = AVPlayerItem(url: url)
         if player == nil {
