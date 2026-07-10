@@ -15,7 +15,7 @@ settings:
       ENABLE_DEBUG_DYLIB: NO
   base:
     MARKETING_VERSION: "0.4.2"
-    CURRENT_PROJECT_VERSION: "48"
+    CURRENT_PROJECT_VERSION: "49"
 
 schemes:
   BiteFMMac:
@@ -68,7 +68,8 @@ targets:
       base:
         CODE_SIGN_STYLE: Automatic
         # Xcode → Accounts → Team → „Team ID“ (10 Zeichen). Platzhalter ersetzen.
-        DEVELOPMENT_TEAM: XXXXXXXXXX
+        DEVELOPMENT_TEAM: C24WCN78VM
+        ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_ENTITLEMENTS: BiteFMMac.entitlements
         PRODUCT_NAME: BiteFM
       configs:
@@ -100,7 +101,7 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: XXXXXXXXXX
+        DEVELOPMENT_TEAM: C24WCN78VM
         PRODUCT_NAME: BiteFM
         TARGETED_DEVICE_FAMILY: "1,2"
     info:
@@ -139,5 +140,5 @@ targets:
         product: BiteFMCore
     settings:
       base:
-        DEVELOPMENT_TEAM: XXXXXXXXXX
+        DEVELOPMENT_TEAM: C24WCN78VM
         GENERATE_INFOPLIST_FILE: YES
