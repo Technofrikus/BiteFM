@@ -30,9 +30,18 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         didSet { ActivePlaybackStore.shared.notifyActiveStateChanged() }
     }
     @Published public var currentItem: ArchiveItem? {
-        didSet { ActivePlaybackStore.shared.notifyActiveStateChanged() }
+        didSet {
+            ActivePlaybackStore.shared.notifyActiveStateChanged()
+            if currentItem == nil { currentPlaylistItemID = nil }
+        }
     }
-    @Published public var currentPlaylist: [PlaylistItem]?
+    @Published public var currentPlaylist: [PlaylistItem]? {
+        didSet { currentPlaylistItemID = nil }
+    }
+    /// ID of the currently playing playlist song during archive playback. Published only when it
+    /// *changes*, so the player-bar metadata block can do an O(1) lookup instead of re-scanning the
+    /// playlist against `currentTime` on every 1 Hz render.
+    @Published public private(set) var currentPlaylistItemID: String?
     @Published public var currentTime: Double = 0
     @Published public var duration: Double = 0
     @Published public var isLive = false {
@@ -259,15 +268,21 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     
     private func setupAudioSession() {
         #if os(iOS)
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])
-            try session.setActive(true)
-            LogManager.shared.log("AudioSession configured successfully", type: .info)
-        } catch {
-            LogManager.shared.log("Failed to setup AVAudioSession: \(error)", type: .error)
+        // Configure the session on a background context: AVAudioSession.setActive(_:) is the only
+        // activation API available on iOS (the async activate() is macOS-only), and calling it on
+        // the main thread triggers an Apple runtime warning about UI unresponsiveness. The
+        // @MainActor interrupt-observer registration is done separately, on the main thread.
+        Task.detached {
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])
+                try session.setActive(true)
+                LogManager.shared.log("AudioSession configured successfully", type: .info)
+            } catch {
+                LogManager.shared.log("Failed to setup AVAudioSession: \(error)", type: .error)
+            }
+            await MainActor.run { self.registerAudioInterruptionObserver() }
         }
-        registerAudioInterruptionObserver()
         #endif
     }
 
@@ -302,13 +317,18 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             }()
             if wasPlayingBeforeInterruption && shouldResume {
                 wasPlayingBeforeInterruption = false
-                do {
-                    try AVAudioSession.sharedInstance().setActive(true)
-                } catch {
-                    LogManager.shared.log("Failed to reactivate AVAudioSession: \(error)", type: .error)
+                // setActive(_:) must not run on the main thread (iOS-only sync API; see setupAudioSession).
+                Task.detached {
+                    do {
+                        try AVAudioSession.sharedInstance().setActive(true)
+                    } catch {
+                        LogManager.shared.log("Failed to reactivate AVAudioSession: \(error)", type: .error)
+                    }
+                    await MainActor.run {
+                        self.player?.play()
+                        self.updatePlaybackRate(1.0)
+                    }
                 }
-                player?.play()
-                updatePlaybackRate(1.0)
             } else {
                 wasPlayingBeforeInterruption = false
             }
@@ -533,11 +553,16 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                     self.lastObservedWallTime = now
                 }
                 
-                // Update Now Playing if song changed
-                if !self.isLive && self.currentItem != nil && self.currentPlaylist != nil {
-                    let currentSong = self.currentPlaylist?.last(where: { Double($0.time) <= time.seconds + 1 })
+                // Detect current playlist song change (drives Now Playing + player-bar metadata).
+                // Only publishes when the song actually changes, so the 1 Hz tick doesn't force
+                // per-second re-renders of the player-bar metadata block.
+                if !self.isLive, self.currentItem != nil, let playlist = self.currentPlaylist {
+                    let currentSong = playlist.last(where: { Double($0.time) <= time.seconds + 1 })
                     if currentSong?.id != self.lastUpdatedSongId {
                         self.updateNowPlayingForArchive()
+                    }
+                    if currentSong?.id != self.currentPlaylistItemID {
+                        self.currentPlaylistItemID = currentSong?.id
                     }
                 }
                 

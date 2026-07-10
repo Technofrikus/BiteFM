@@ -10,8 +10,8 @@ struct PlayerBarMetadataBlock: View {
             if let item = playerManager.currentItem {
                 let currentSong: PlaylistItem? = {
                     guard let playlist = playerManager.currentPlaylist else { return nil }
-                    let currentTime = playerManager.currentTime
-                    return playlist.last(where: { Double($0.time) <= currentTime + 1 })
+                    guard let id = playerManager.currentPlaylistItemID else { return nil }
+                    return playlist.first(where: { $0.id == id })
                 }()
 
                 if let song = currentSong {

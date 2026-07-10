@@ -9,6 +9,12 @@ BiteFM is a native radio client for ByteFM, built for macOS and iOS using SwiftU
 - **Build Specific Target**: `swift build --product [BiteFMCore|BiteFMMac]`
 - **Bump Patch Version**: `swift Tools/bump-version.swift patch`
 
+### Agent build notes (non-interactive terminal)
+- **Prefer `swift build` / `swift test`** (SPM) over `xcodebuild` for agent-driven compilation — it is non-interactive and avoids signing/license prompts.
+- **`xcodebuild` can hang** waiting on stdin (unaccepted Xcode license, signing identity, keychain unlock). If you must use it, accept the license once yourself (`sudo xcodebuild -license accept`) and pass non-interactive flags (`-quiet`, `-allowProvisioningUpdates`); never rely on stdin. A hang is the prompt, not a missing toolchain.
+- **`timeout` does not exist on macOS.** Do not use `timeout <n> swift build`; run `swift build` directly (or `gtimeout` from coreutils if a wall-clock bound is truly needed).
+- **SPM builds run on the host platform only.** `swift build` on macOS compiles the macOS path and **excludes `#if os(iOS)` code**. Changes inside iOS-only blocks (e.g. `AVAudioSession` setup in `AudioPlayerManager`) are NOT validated by `swift build` — verify those with an iOS build (`xcodebuild -scheme BiteFMiOS -sdk iphonesimulator build`, or build the BiteFMiOS scheme in Xcode).
+
 ## Versioning
 - **Build Number**: Automated via Git commit count in `pre-commit` hook.
 - **Marketing Version**: Manual in `project.yml` for Major/Minor, or via `swift Tools/bump-version.swift patch` for Patch updates.
