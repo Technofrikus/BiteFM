@@ -1,5 +1,50 @@
 import SwiftUI
 
+/// Narrow, value-type snapshot of the `APIClient` state a `BroadcastRow` actually needs
+/// (favorite/played flags). Rows observe this instead of the whole `APIClient` as an
+/// `@EnvironmentObject`, so the 60-second `liveMetadata` poll (and other unrelated
+/// `@Published` changes) no longer re-render every visible row.
+struct FavoritePlayedState: Equatable {
+    let favoriteSlugs: Set<String>
+    let favoriteShowIDs: Set<Int>
+    let listenedShowIDs: Set<Int>
+
+    @MainActor
+    static func from(_ api: APIClient) -> FavoritePlayedState {
+        FavoritePlayedState(
+            favoriteSlugs: api.favoriteSlugs,
+            favoriteShowIDs: api.favoriteShowIDs,
+            listenedShowIDs: api.listenedShowIDs
+        )
+    }
+}
+
+/// Builds a `BroadcastRow` wired to a narrow `FavoritePlayedState` snapshot instead of the
+/// full `APIClient`. Pass the current state from the parent (recomputed only when the three
+/// relevant `APIClient` sets change), so unrelated `APIClient` publishes don't re-render rows.
+@MainActor
+func makeBroadcastRow(
+    item: ArchiveItem,
+    showShowTitle: Bool = true,
+    showHeart: Bool = true,
+    onFavoriteTap: (() -> Void)? = nil,
+    metaLineSizeSuffix: String? = nil,
+    favoritePlayed: FavoritePlayedState,
+    selectedItemForDetail: Binding<ArchiveItem?>,
+    isInspectorPresented: Binding<Bool>
+) -> BroadcastRow {
+    BroadcastRow(
+        item: item,
+        showShowTitle: showShowTitle,
+        showHeart: showHeart,
+        onFavoriteTap: onFavoriteTap,
+        metaLineSizeSuffix: metaLineSizeSuffix,
+        favoritePlayed: favoritePlayed,
+        selectedItemForDetail: selectedItemForDetail,
+        isInspectorPresented: isInspectorPresented
+    )
+}
+
 struct BroadcastRow: View {
     let item: ArchiveItem
     var showShowTitle: Bool = true
@@ -8,8 +53,10 @@ struct BroadcastRow: View {
     var onFavoriteTap: (() -> Void)? = nil
     /// Rechts in der Datumszeile (vor dem Info-Button), z. B. feste MB aus dem Download-Tab.
     var metaLineSizeSuffix: String? = nil
+    /// Narrow snapshot of the favorite/played state this row needs. Replaces observing the
+    /// whole `APIClient` (which re-rendered every row on the 60 s `liveMetadata` poll).
+    let favoritePlayed: FavoritePlayedState
 
-    @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
     #if os(iOS)
     /// Used only for actions (start / cancel). Rows do NOT observe the whole manager's
@@ -31,6 +78,7 @@ struct BroadcastRow: View {
         showHeart: Bool = true,
         onFavoriteTap: (() -> Void)? = nil,
         metaLineSizeSuffix: String? = nil,
+        favoritePlayed: FavoritePlayedState,
         selectedItemForDetail: Binding<ArchiveItem?>,
         isInspectorPresented: Binding<Bool>
     ) {
@@ -39,6 +87,7 @@ struct BroadcastRow: View {
         self.showHeart = showHeart
         self.onFavoriteTap = onFavoriteTap
         self.metaLineSizeSuffix = metaLineSizeSuffix
+        self.favoritePlayed = favoritePlayed
         self._selectedItemForDetail = selectedItemForDetail
         self._isInspectorPresented = isInspectorPresented
         #if os(iOS)
@@ -183,7 +232,7 @@ struct BroadcastRow: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .accessibilityHint("Spielt diese Ausgabe ab.")
-        .opacity(apiClient.isPlayed(item: item) && !isRowHighlighted ? 0.65 : 1.0)
+        .opacity(favoritePlayed.listenedShowIDs.contains(item.terminID) && !isRowHighlighted ? 0.65 : 1.0)
     }
 
     private var inlineStatusControls: some View {
@@ -202,7 +251,7 @@ struct BroadcastRow: View {
                     .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                     .accessibilityLabel("Wird abgespielt")
             }
-            if apiClient.isPlayed(item: item) {
+            if favoritePlayed.listenedShowIDs.contains(item.terminID) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -265,7 +314,21 @@ struct BroadcastRow: View {
     @ViewBuilder
     private var heartControl: some View {
         if showHeart {
-            let isFav = showShowTitle ? apiClient.isFavorite(item: item) : apiClient.isEpisodeFavorite(item: item)
+            let isFav = showShowTitle
+                ? FavoriteStateLogic.isFavoriteArchiveItem(
+                    sendungSlug: item.sendungSlug,
+                    terminSlug: item.terminSlug,
+                    sendungTitel: item.sendungTitel,
+                    terminID: item.terminID,
+                    favoriteSlugs: favoritePlayed.favoriteSlugs,
+                    favoriteShowIDs: favoritePlayed.favoriteShowIDs
+                )
+                : FavoriteStateLogic.isEpisodeFavorite(
+                    terminID: item.terminID,
+                    terminSlug: item.terminSlug,
+                    favoriteShowIDs: favoritePlayed.favoriteShowIDs,
+                    favoriteSlugs: favoritePlayed.favoriteSlugs
+                )
             if let onFavoriteTap {
                 Button(action: onFavoriteTap) {
                     Image(systemName: isFav ? "heart.fill" : "heart")

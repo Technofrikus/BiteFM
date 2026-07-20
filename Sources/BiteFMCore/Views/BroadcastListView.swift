@@ -13,6 +13,10 @@ struct BroadcastListView: View {
     @State private var hasMorePages = true
     @State private var hidePlayed = false
     @State private var searchText = ""
+    /// Narrow snapshot of the favorite/played state `BroadcastRow` needs. Recomputed only when
+    /// the relevant `APIClient` sets change, so the 60 s `liveMetadata` poll does not re-render
+    /// every row (and rows no longer observe the whole `APIClient`).
+    @State private var favoritePlayed = FavoritePlayedState.from(APIClient.shared)
     
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
@@ -21,7 +25,7 @@ struct BroadcastListView: View {
         if hidePlayed {
             let pinnedTerminID: Int? = activePlayback.isActivePlaying ? nil : activePlayback.activeTerminID
             return broadcasts.filter { broadcast in
-                !apiClient.isPlayed(broadcastID: broadcast.id) || broadcast.id == pinnedTerminID
+                !favoritePlayed.listenedShowIDs.contains(broadcast.id) || broadcast.id == pinnedTerminID
             }
         }
         return broadcasts
@@ -49,30 +53,7 @@ struct BroadcastListView: View {
             if listShowsEpisodes {
                 List {
                     ForEach(Array(displayedBroadcasts.enumerated()), id: \.element.id) { idx, broadcast in
-                        let isFirst = idx == 0
-                        let isLastEpisodeRow = idx == displayedBroadcasts.count - 1
-                        let top: CGFloat = isFirst ? 12 : 4
-                        let bottom: CGFloat = isLastEpisodeRow && !isLoading ? 12 : 4
-                        let item = broadcast.toArchiveItem(showTitle: show.titel, showSlug: show.slug, sendungID: show.id)
-                        BroadcastRow(
-                            item: item,
-                            showShowTitle: false,
-                            showHeart: true,
-                            onFavoriteTap: apiClient.isLoggedIn
-                                ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
-                                : nil,
-                            selectedItemForDetail: $selectedItemForDetail,
-                            isInspectorPresented: $isInspectorPresented
-                        )
-                        .listRowInsets(EdgeInsets(top: top, leading: 10, bottom: bottom, trailing: 12))
-                        .onAppear {
-                            // Pagination: Ende der geladenen (ungefilterten) Liste erreicht
-                            if broadcast.id == filteredBroadcasts.last?.id && hasMorePages && !isLoading {
-                                Task {
-                                    await loadMoreUntilVisible()
-                                }
-                            }
-                        }
+                        broadcastRow(idx: idx, broadcast: broadcast)
                     }
                     
                     if isLoading {
@@ -182,6 +163,9 @@ struct BroadcastListView: View {
                 await loadMoreUntilVisible()
             }
         }
+        .onChange(of: apiClient.favoriteSlugs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
+        .onChange(of: apiClient.favoriteShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
+        .onChange(of: apiClient.listenedShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
     }
     
     /// Liste sichtbar, solange Einträge da sind oder noch nachgeladen wird.
@@ -189,6 +173,35 @@ struct BroadcastListView: View {
         !displayedBroadcasts.isEmpty || isLoading
     }
     
+    @ViewBuilder
+    private func broadcastRow(idx: Int, broadcast: BroadcastSummary) -> some View {
+        let isFirst = idx == 0
+        let isLastEpisodeRow = idx == displayedBroadcasts.count - 1
+        let top: CGFloat = isFirst ? 12 : 4
+        let bottom: CGFloat = isLastEpisodeRow && !isLoading ? 12 : 4
+        let item = broadcast.toArchiveItem(showTitle: show.titel, showSlug: show.slug, sendungID: show.id)
+        makeBroadcastRow(
+            item: item,
+            showShowTitle: false,
+            showHeart: true,
+            onFavoriteTap: apiClient.isLoggedIn
+                ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
+                : nil,
+            favoritePlayed: favoritePlayed,
+            selectedItemForDetail: $selectedItemForDetail,
+            isInspectorPresented: $isInspectorPresented
+        )
+        .listRowInsets(EdgeInsets(top: top, leading: 10, bottom: bottom, trailing: 12))
+        .onAppear {
+            // Pagination: Ende der geladenen (ungefilterten) Liste erreicht
+            if broadcast.id == filteredBroadcasts.last?.id && hasMorePages && !isLoading {
+                Task {
+                    await loadMoreUntilVisible()
+                }
+            }
+        }
+    }
+
     private func loadMoreUntilVisible() async {
         // Load initial or more items until we have enough to show or no more pages exist
         while hasMorePages && !isLoading {

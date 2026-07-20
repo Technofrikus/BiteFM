@@ -22,14 +22,32 @@ struct DownloadsView: View {
     @State private var editMode: EditMode = .inactive
     @State private var selection = Set<Int>()
 
+    /// Memo-Cache für die sortierte/ranking-Reihenfolge. Wird nur neu berechnet, wenn sich die
+    /// rohen `allEpisodes` ändern — nicht bei jedem `body`-Durchlauf (der z. B. durch das
+    /// `downloadManager`-EnvironmentObject bei Fortschritts-Ticks erneut feuert).
+    @State private var listRowsCache: [StoredDownloadedEpisode]?
+
+    /// Summe der fertigen Downloads (inkl. Dateigröße von der Platte, falls `fileSizeBytes` fehlt).
+    /// Memoiziert über `totalDownloadedBytesCache`, da es über alle Reihen iteriert.
+    @State private var totalDownloadedBytesCache: Int64 = 0
+
     private var listRows: [StoredDownloadedEpisode] {
-        allEpisodes.sorted { lhs, rhs in
+        listRowsCache ?? allEpisodes
+    }
+
+    /// Befüllt `listRowsCache`/`totalDownloadedBytesCache` außerhalb von `body` (in `.task`/`.onChange`).
+    private func refreshCaches() {
+        let sorted = allEpisodes.sorted { lhs, rhs in
             let lRank = rowRank(lhs)
             let rRank = rowRank(rhs)
             if lRank != rRank { return lRank < rRank }
             if lhs.broadcastDate != rhs.broadcastDate { return lhs.broadcastDate > rhs.broadcastDate }
             return lhs.terminID > rhs.terminID
         }
+        listRowsCache = sorted
+        totalDownloadedBytesCache = sorted
+            .filter { $0.status == .downloaded }
+            .reduce(Int64(0)) { $0 + IOSDownloadManager.effectiveDownloadedAudioBytes(for: $1) }
     }
 
     /// Downloading/queued first, then failed, then completed (still date order within groups).
@@ -43,9 +61,7 @@ struct DownloadsView: View {
 
     /// Summe der fertigen Downloads (inkl. Dateigröße von der Platte, falls `fileSizeBytes` fehlt).
     private var totalDownloadedAudioBytes: Int64 {
-        listRows
-            .filter { $0.status == .downloaded }
-            .reduce(Int64(0)) { $0 + IOSDownloadManager.effectiveDownloadedAudioBytes(for: $1) }
+        totalDownloadedBytesCache
     }
 
     var body: some View {
@@ -66,9 +82,10 @@ struct DownloadsView: View {
                     Section {
                         ForEach(listRows, id: \.terminID) { row in
                             let item = row.toArchiveItem()
-                            BroadcastRow(
+                            makeBroadcastRow(
                                 item: item,
                                 metaLineSizeSuffix: downloadSizeLabel(for: row),
+                                favoritePlayed: .init(favoriteSlugs: [], favoriteShowIDs: [], listenedShowIDs: []),
                                 selectedItemForDetail: $selectedForDetail,
                                 isInspectorPresented: $isInspectorPresented
                             )
@@ -168,7 +185,9 @@ struct DownloadsView: View {
         }
         .task {
             await downloadManager.runForegroundMaintenance()
+            refreshCaches()
         }
+        .onChange(of: allEpisodes) { _, _ in refreshCaches() }
     }
 
     private func deleteAllDownloads() {

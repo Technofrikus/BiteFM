@@ -15,6 +15,27 @@ struct ArchiveView: View {
     @State private var lastIndexDragSymbol: String?
     @State private var favoritesOnly = false
 
+    /// Memo-Cache für die A–Z-Gruppierung. Wird nur neu berechnet, wenn sich die echten
+    /// Eingaben (gefilterte Sendungen) ändern — nicht bei jedem `body`-Durchlauf. Schützt davor,
+    /// dass unabhängige `APIClient`-Updates (z. B. das 60-s-Live-Metadaten-Polling oder der
+    /// Favoriten-Poll) die gesamte Liste neu gruppieren/sortieren.
+    ///
+    /// `Show` ist eine `Codable`-`struct` (nicht `Equatable`), daher basiert die Signatur auf
+    /// genau den Feldern, die für Gruppierung/Sortierung relevant sind (`id` + `titel`).
+    @State private var letterSectionsCache: (signature: LetterSectionsSignature, sections: [(letter: String, shows: [Show])])?
+
+    private struct LetterSectionsSignature: Equatable {
+        struct Row: Equatable {
+            let id: Int
+            let title: String
+        }
+        let rows: [Row]
+
+        init(_ shows: [Show]) {
+            self.rows = shows.map { Row(id: $0.id, title: $0.titel) }
+        }
+    }
+
 
 
     private var showLetterIndexStrip: Bool {
@@ -48,13 +69,12 @@ struct ArchiveView: View {
     }
     
     /// Sendungen nach Anfangsbuchstaben; Sortierung: **#** (Ziffern & Sonstiges) zuerst, dann A–Z.
-    /// Reine Berechnung aus `filteredShows` — kein `@State`-Cache, da das Schreiben in einen
-    /// State während des `body`-Durchlaufs (hier mehrfach über `availableSectionIDs` und
-    /// `indexStripSymbols` aufgerufen) die Warnung „Modifying state during view update“ auslöst.
-    /// Das Ergebnis ist deterministisch, sodass SwiftUI über stabile `id`s kein Neuladen der
-    /// Liste erzwingt, auch wenn unabhängige `APIClient`-Updates `body` neu auslösen.
+    /// Memoiziert über `letterSectionsCache`, damit unabhängige `body`-Neuberechnungen (z. B. durch
+    /// andere `APIClient`-@Published-Änderungen) die Gruppierung nicht erneut ausführen. Die
+    /// Berechnung selbst läuft in `refreshLetterSections()` (`.task`/`.onChange`), nicht in `body`,
+    /// um die Warnung „Modifying state during view update“ zu vermeiden.
     private var letterSections: [(letter: String, shows: [Show])] {
-        computeLetterSections(from: filteredShows)
+        letterSectionsCache?.sections ?? computeLetterSections(from: filteredShows)
     }
 
     private func computeLetterSections(from shows: [Show]) -> [(letter: String, shows: [Show])] {
@@ -77,6 +97,15 @@ struct ArchiveView: View {
     /// 0 = „#“, 1 = Buchstaben
     private func letterSortRank(_ key: String) -> Int {
         key == "#" ? 0 : 1
+    }
+
+    /// Befüllt `letterSectionsCache` außerhalb von `body` (in `.task`/`.onChange`), damit kein
+    /// State während des View-Updates mutiert wird.
+    private func refreshLetterSections() {
+        let signature = LetterSectionsSignature(filteredShows)
+        if letterSectionsCache?.signature != signature {
+            letterSectionsCache = (signature, computeLetterSections(from: filteredShows))
+        }
     }
     
     private var availableSectionIDs: Set<String> {
@@ -130,9 +159,11 @@ struct ArchiveView: View {
                     if apiClient.shows.isEmpty {
                         await apiClient.fetchShows()
                     }
+                    refreshLetterSections()
                 }
                 .onChange(of: apiClient.shows) { _, _ in
                     // Sendungsliste kommt asynchron — kein Scroll-Anker-Restore mehr.
+                    refreshLetterSections()
                 }
                 .refreshable {
                     await apiClient.fetchShows()
