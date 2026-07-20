@@ -4,6 +4,7 @@ struct BroadcastListView: View {
     let show: Show
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
+    @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
     #endif
@@ -13,11 +14,8 @@ struct BroadcastListView: View {
     @State private var hasMorePages = true
     @State private var hidePlayed = false
     @State private var searchText = ""
-    /// Narrow snapshot of the favorite/played state `BroadcastRow` needs. Recomputed only when
-    /// the relevant `APIClient` sets change, so the 60 s `liveMetadata` poll does not re-render
-    /// every row (and rows no longer observe the whole `APIClient`).
-    @State private var favoritePlayed = FavoritePlayedState.from(APIClient.shared)
-    
+    /// Narrow snapshot of the favorite/played state `BroadcastRow` needs, sourced from
+    /// the shared `FavoritePlayedStore` (no per-view `@State` or `.onChange` duplication).
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
     
@@ -25,7 +23,7 @@ struct BroadcastListView: View {
         if hidePlayed {
             let pinnedTerminID: Int? = activePlayback.isActivePlaying ? nil : activePlayback.activeTerminID
             return broadcasts.filter { broadcast in
-                !favoritePlayed.listenedShowIDs.contains(broadcast.id) || broadcast.id == pinnedTerminID
+                !favoritePlayedStore.state.listenedShowIDs.contains(broadcast.id) || broadcast.id == pinnedTerminID
             }
         }
         return broadcasts
@@ -163,9 +161,6 @@ struct BroadcastListView: View {
                 await loadMoreUntilVisible()
             }
         }
-        .onChange(of: apiClient.favoriteSlugs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
-        .onChange(of: apiClient.favoriteShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
-        .onChange(of: apiClient.listenedShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
     }
     
     /// Liste sichtbar, solange Einträge da sind oder noch nachgeladen wird.
@@ -187,7 +182,7 @@ struct BroadcastListView: View {
             onFavoriteTap: apiClient.isLoggedIn
                 ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
                 : nil,
-            favoritePlayed: favoritePlayed,
+            favoritePlayed: favoritePlayedStore.state,
             selectedItemForDetail: $selectedItemForDetail,
             isInspectorPresented: $isInspectorPresented
         )

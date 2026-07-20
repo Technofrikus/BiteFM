@@ -31,6 +31,7 @@ struct BiteFMMacApp: App {
                 .environmentObject(APIClient.shared)
                 .environmentObject(AudioPlayerManager.shared)
                 .environmentObject(ActivePlaybackStore.shared)
+                .environmentObject(FavoritePlayedStore.shared)
                 .environmentObject(PlaybackProgressStore.shared)
                 .environmentObject(AppRestorationStore.shared)
         }

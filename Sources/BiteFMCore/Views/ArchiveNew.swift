@@ -4,6 +4,7 @@ import SwiftData
 struct ArchiveNew: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
+    @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
     @Environment(\.modelContext) private var modelContext
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
@@ -19,10 +20,8 @@ struct ArchiveNew: View {
     @State private var isInspectorPresented = false
     @State private var hidePlayed = false
     @State private var favoritesOnly = false
-    /// Narrow snapshot of the favorite/played state `BroadcastRow` needs. Recomputed only when
-    /// the three relevant `APIClient` sets change, so the 60 s `liveMetadata` poll does not
-    /// re-render every row (and every row no longer observes the whole `APIClient`).
-    @State private var favoritePlayed = FavoritePlayedState.from(APIClient.shared)
+    /// Narrow snapshot of the favorite/played state `BroadcastRow` needs, sourced from the
+    /// shared `FavoritePlayedStore` (no per-view `@State` or `.onChange` duplication).
 
     /// Memo-Cache für die Tages-Gruppierung. Wird nur neu berechnet, wenn sich die gefilterten
     /// Items ändern — nicht bei jedem `body`-Durchlauf. Schützt davor, dass unabhängige
@@ -139,13 +138,14 @@ struct ArchiveNew: View {
                                 let top: CGFloat = isFirst ? 12 : 4
                                 let bottom: CGFloat = isLast ? 12 : 4
                                 let item = storedItem.toArchiveItem()
+                                let favoriteAction: (() -> Void)? = apiClient.isLoggedIn
+                                    ? { Task { await apiClient.toggleFavoriteBroadcast(slug: item.sendungSlug, displayTitle: item.sendungTitel) } }
+                                    : nil
 
                                 makeBroadcastRow(
                                     item: item,
-                                    onFavoriteTap: apiClient.isLoggedIn
-                                        ? { Task { await apiClient.toggleFavoriteBroadcast(slug: item.sendungSlug, displayTitle: item.sendungTitel) } }
-                                        : nil,
-                                    favoritePlayed: favoritePlayed,
+                                    onFavoriteTap: favoriteAction,
+                                    favoritePlayed: favoritePlayedStore.state,
                                     selectedItemForDetail: $selectedItemForDetail,
                                     isInspectorPresented: $isInspectorPresented
                                 )
@@ -157,7 +157,6 @@ struct ArchiveNew: View {
                             }
                         }
                     }
-                }
                 .refreshable {
                     await apiClient.fetchArchive()
                 }
@@ -178,9 +177,7 @@ struct ArchiveNew: View {
                 .onChange(of: filteredItems) { _, _ in
                     refreshDaySections()
                 }
-                .onChange(of: apiClient.favoriteSlugs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
-                .onChange(of: apiClient.favoriteShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
-                .onChange(of: apiClient.listenedShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
+            }
             
             if filtered.isEmpty && !storedItems.isEmpty {
                 let empty = emptyFilterUnavailable

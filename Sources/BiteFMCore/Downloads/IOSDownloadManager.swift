@@ -406,7 +406,7 @@ public final class IOSDownloadManager: ObservableObject {
             let ctx = ModelContext(container)
             try? Self.deleteDownloadedEpisode(terminID: terminID, context: ctx)
         }
-        snapshotByTerminID.removeValue(forKey: terminID)
+        removeSnapshot(for: terminID)
         Task { @MainActor in
             await refreshSnapshotFromStore()
             await processDownloadQueue()

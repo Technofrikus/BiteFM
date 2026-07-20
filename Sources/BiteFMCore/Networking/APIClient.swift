@@ -216,6 +216,9 @@ public class APIClient: ObservableObject {
             // Cached data is ready; unblock the UI before remote sync starts.
             didFinishInitialBootstrap = true
 
+            // Keep the favorite/played snapshot store in sync with the local cache.
+            FavoritePlayedStore.shared.refresh()
+
             // Remote refresh runs in the background so startup stays responsive.
             if isLoggedIn {
                 Task {
@@ -488,6 +491,7 @@ public class APIClient: ObservableObject {
                                 self.listenedShowIDs = ids
                                 self.recordListeningHistoryFetchSuccess()
                                 LogManager.shared.log("Successfully decoded history: \(historyResponse.data.count) entries", type: .info)
+                                FavoritePlayedStore.shared.refresh()
                                 
                                 if trackedShowID != nil {
                                     self.pendingHistoryVerificationShowID = nil
@@ -627,6 +631,7 @@ public class APIClient: ObservableObject {
                                 
                                 await MainActor.run {
                                     self.favoriteShowFavoritedAt = favoritedAtMap
+                                    FavoritePlayedStore.shared.refresh()
                                 }
                             }
                         } catch {
@@ -740,11 +745,16 @@ public class APIClient: ObservableObject {
                 favoriteSlugs.insert(displayTitle)
             }
         }
+        // Reflect the change in the UI immediately (optimistic update) so the heart flips
+        // without waiting for the server round-trip. The post-network `refresh()` below
+        // re-syncs (and rolls back via `restoreFavoriteUICache` on failure).
+        FavoritePlayedStore.shared.refresh()
         
         let success = await toggleChangeFavorite(queryItems: [URLQueryItem(name: "broadcast_slug", value: slug)])
         if !success {
             restoreFavoriteUICache(snapshot)
         }
+        FavoritePlayedStore.shared.refresh()
     }
     
     func toggleFavoriteEpisode(showID: Int) async {
@@ -761,6 +771,7 @@ public class APIClient: ObservableObject {
         if !success {
             restoreFavoriteUICache(snapshot)
         }
+        FavoritePlayedStore.shared.refresh()
     }
     
     /// Toggles favorite for a track (`track_id`); `trackID` is the favorite row id from `get_favorites` → `tracks[].id`.
@@ -777,6 +788,7 @@ public class APIClient: ObservableObject {
         if !success {
             restoreFavoriteUICache(snapshot)
         }
+        FavoritePlayedStore.shared.refresh()
     }
     
     func isFavoriteTrackRow(id: Int) -> Bool {
@@ -967,6 +979,7 @@ public class APIClient: ObservableObject {
         favoriteTrackItems.removeAll()
         favoriteShowFavoritedAt.removeAll()
         listenedShowIDs.removeAll()
+        FavoritePlayedStore.shared.refresh()
         UserDefaults.standard.removeObject(forKey: Self.listeningHistoryLastSuccessKey)
         
         // Clear favorites and history from database (mainContext — gleicher Kontext wie @Query / UI)

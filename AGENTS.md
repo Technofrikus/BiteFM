@@ -22,11 +22,20 @@ BiteFM is a native radio client for ByteFM, built for macOS and iOS using SwiftU
 
 ## Key Conventions
 - **Architecture**: Modular design with `BiteFMCore` (logic, models, views) and platform-specific targets (`BiteFMMac`, `BiteFMiOS`).
+- **Module layout** (`Sources/BiteFMCore/`):
+  - `Networking/` — `APIClient` (networking facade), `BroadcastDetailLRUCache`, `KeychainHelper`, `LogManager`, `NetworkPathProbe`.
+  - `Audio/` — `AudioPlayerManager` (`AVPlayer` wrapper), `ActivePlaybackStore` (narrow "which row is active" snapshot), `PlaybackProgressStore`.
+  - `AppState/` — `AppRestorationState`, `AppRestorationStore`, and `FavoritePlayedStore` (narrow favorite/played snapshot for list rows).
+  - `Models/` — SwiftData models (`StoredArchiveItem`, `StoredShow`, `StoredFavoriteBroadcast`, `StoredListeningHistoryEntry`, …) and API response models (`Show`, `ArchiveItem`, `LiveMetadata`, `FavoriteBroadcast`, `FavoriteStateLogic`).
+  - `Views/` — SwiftUI views. Shared list rows go through `BroadcastRow` + `makeBroadcastRow`, which take a `FavoritePlayedState` snapshot rather than observing the whole `APIClient`.
+  - `Downloads/` — `IOSDownloadManager` (iOS only) + models.
+  - `Utils/` — pure helpers (`ArchivAudioURL`, `ArchiveSectionHelpers`).
+  - `BiteFMBootstrap.swift` — SwiftData container + service wiring (`configureServices`).
 - **UI**: Pure SwiftUI with adaptive layouts for Mac and iPhone.
 - **Data**: `SwiftData` for persistent storage of archive items and playback history.
 - **Audio**: `AVFoundation` (`AVPlayer`) for streaming and archive playback.
 - **System Integration**: `MediaPlayer` framework for Now Playing and media keys.
-- **API**: Custom ByteFM API integration (see `Sources/BiteFMCore/BiteFMBootstrap.swift` and models).
+- **API**: Custom ByteFM API integration (see `Sources/BiteFMCore/BiteFMBootstrap.swift` and models). Domain vocabulary lives in `CONTEXT.md`.
 
 ## macOS sandbox playback console noise (last verified 2026-05-29)
 

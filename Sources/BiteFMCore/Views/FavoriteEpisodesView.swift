@@ -15,6 +15,7 @@ struct FavoriteEpisodesView: View {
     
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
@@ -22,10 +23,8 @@ struct FavoriteEpisodesView: View {
     @State private var sortMode: SortMode = .episodeDate
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
-    /// Narrow snapshot of the favorite/played state `BroadcastRow` needs. Recomputed only when
-    /// the relevant `APIClient` sets change, so the 60 s `liveMetadata` poll does not re-render
-    /// every row (and rows no longer observe the whole `APIClient`).
-    @State private var favoritePlayed = FavoritePlayedState.from(APIClient.shared)
+    /// Narrow snapshot of the favorite/played state `BroadcastRow` needs, sourced from the
+    /// shared `FavoritePlayedStore` (no per-view `@State` or `.onChange` duplication).
     
     private var sortedEpisodes: [FavoriteShowItem] {
         let items = apiClient.favoriteShowItems
@@ -83,7 +82,7 @@ struct FavoriteEpisodesView: View {
                                 onFavoriteTap: apiClient.isLoggedIn
                                     ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
                                     : nil,
-                                favoritePlayed: favoritePlayed,
+                                favoritePlayed: favoritePlayedStore.state,
                                 selectedItemForDetail: $selectedItemForDetail,
                                 isInspectorPresented: $isInspectorPresented
                             )
@@ -101,9 +100,6 @@ struct FavoriteEpisodesView: View {
                     .onChange(of: apiClient.favoriteShowItems.count) { _, _ in
                         // Kein Scroll-Anker-Restore mehr.
                     }
-                    .onChange(of: apiClient.favoriteSlugs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
-                    .onChange(of: apiClient.favoriteShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
-                    .onChange(of: apiClient.listenedShowIDs) { _, _ in favoritePlayed = FavoritePlayedState.from(apiClient) }
                 }
             }
         }
