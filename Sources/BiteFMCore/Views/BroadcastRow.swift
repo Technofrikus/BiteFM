@@ -12,12 +12,42 @@ struct BroadcastRow: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
     #if os(iOS)
+    /// Used only for actions (start / cancel). Rows do NOT observe the whole manager's
+    /// `objectWillChange` — that would re-render every row on each progress tick. Instead each
+    /// row subscribes (via `onReceive`) to its own terminID's publisher on the manager, so only
+    /// the actively downloading row re-renders.
     @EnvironmentObject private var downloadManager: IOSDownloadManager
+    /// This row's download UI snapshot, kept in sync from the manager's per-terminID publisher.
+    @State private var downloadSnap: EpisodeDownloadUISnapshot
     #endif
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @Binding var selectedItemForDetail: ArchiveItem?
     @Binding var isInspectorPresented: Bool
+
+    init(
+        item: ArchiveItem,
+        showShowTitle: Bool = true,
+        showHeart: Bool = true,
+        onFavoriteTap: (() -> Void)? = nil,
+        metaLineSizeSuffix: String? = nil,
+        selectedItemForDetail: Binding<ArchiveItem?>,
+        isInspectorPresented: Binding<Bool>
+    ) {
+        self.item = item
+        self.showShowTitle = showShowTitle
+        self.showHeart = showHeart
+        self.onFavoriteTap = onFavoriteTap
+        self.metaLineSizeSuffix = metaLineSizeSuffix
+        self._selectedItemForDetail = selectedItemForDetail
+        self._isInspectorPresented = isInspectorPresented
+        #if os(iOS)
+        // Seed the local snapshot from the manager's current value so the row shows correct
+        // state before the first publisher emission. The `onReceive` below keeps it in sync.
+        _downloadSnap = State(wrappedValue: IOSDownloadManager.shared.uiSnapshot(for: item.terminID)
+            ?? EpisodeDownloadUISnapshot(status: .queued, progress: 0, expectedSizeBytes: 0, exists: false))
+        #endif
+    }
 
     private enum RowPlaybackVisualState {
         case idle
@@ -94,6 +124,14 @@ struct BroadcastRow: View {
             .padding(.horizontal, 8)
         }
         .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 12))
+        #if os(iOS)
+        // Subscribe to THIS terminID's publisher only. Progress ticks for other downloads do
+        // not touch this row. This is the reliable alternative to per-row `@StateObject`, which
+        // is flaky inside `List`/`ForEach` rows.
+        .onReceive(IOSDownloadManager.shared.publisher(for: item.terminID)) { newSnap in
+            downloadSnap = newSnap
+        }
+        #endif
     }
 
     /// Datum und optionale Größe bleiben oben; kompakte Status-/Aktionsicons sitzen rechts in derselben Zeile.
@@ -189,11 +227,10 @@ struct BroadcastRow: View {
     #if os(iOS)
     private var resolvedMetaLineSizeSuffix: String? {
         if let metaLineSizeSuffix, !metaLineSizeSuffix.isEmpty { return metaLineSizeSuffix }
-        guard let snap = downloadManager.uiSnapshot(for: item.terminID) else { return nil }
-        guard snap.expectedSizeBytes > 0 else { return nil }
-        switch snap.status {
+        guard downloadSnap.exists, downloadSnap.expectedSizeBytes > 0 else { return nil }
+        switch downloadSnap.status {
         case .preparing, .queued, .downloading:
-            return Self.formatMegabytes(snap.expectedSizeBytes, tildePrefix: true)
+            return Self.formatMegabytes(downloadSnap.expectedSizeBytes, tildePrefix: true)
         default:
             return nil
         }
@@ -274,9 +311,9 @@ struct BroadcastRow: View {
     /// iOS-only: download / Fortschritt / erneuter Download bei Fehler; nach Erfolg Play-Hinweis (Hauptbereich spielt ebenfalls ab).
     @ViewBuilder
     private var downloadLeadingControl: some View {
-        let snap = downloadManager.uiSnapshot(for: item.terminID)
+        let snap = downloadSnap
         Group {
-            if let snap {
+            if snap.exists {
                 switch snap.status {
                 case .downloaded:
                     Button {

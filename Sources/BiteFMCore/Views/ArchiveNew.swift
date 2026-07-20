@@ -5,6 +5,9 @@ struct ArchiveNew: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
     @Environment(\.modelContext) private var modelContext
+    #if os(iOS)
+    @EnvironmentObject private var downloadManager: IOSDownloadManager
+    #endif
 
     @Query(sort: [
         SortDescriptor(\StoredArchiveItem.datum, order: .reverse),

@@ -2,6 +2,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import Combine
 
 // MARK: - UI helpers (observed by rows)
 
@@ -10,14 +11,20 @@ public struct EpisodeDownloadUISnapshot: Equatable, Sendable {
     public var progress: Double
     /// Größe aus HTTP HEAD (oder 0); für Anzeige „~… MB“ vor Abschluss des Downloads.
     public var expectedSizeBytes: Int64
+    /// False until the manager has real state for this terminID. Lets a row show the
+    /// "download" button for episodes that were never downloaded, vs. a cancel button once a
+    /// download actually exists (queued/active/failed/downloaded).
+    public var exists: Bool
 
-    public init(status: EpisodeDownloadStatus, progress: Double, expectedSizeBytes: Int64 = 0) {
+    public init(status: EpisodeDownloadStatus, progress: Double, expectedSizeBytes: Int64 = 0, exists: Bool = true) {
         self.status = status
         self.progress = progress
         self.expectedSizeBytes = expectedSizeBytes
+        self.exists = exists
     }
 }
 
+/// Per-row, isolated download state for SwiftUI. Rows subscribe to their own terminID's
 /// iOS-only: background-friendly downloads, disk/budget checks, SwiftData sync.
 @MainActor
 public final class IOSDownloadManager: ObservableObject {
@@ -33,14 +40,97 @@ public final class IOSDownloadManager: ObservableObject {
     private var bridge: DownloadSessionBridge?
     private var urlSession: URLSession?
 
+    /// Shared, delegate-free ephemeral session for one-shot probes (reachability + HEAD).
+    /// Reusing a single session (and invalidating it after each probe) avoids leaking a
+    /// brand-new `URLSession` per call, which left dangling `nw_connection` objects behind
+    /// and produced the "Client called nw_connection_copy_protocol_metadata_internal on
+    /// unconnected nw_connection" console noise during downloads.
+    private var probeSession: URLSession?
+
+    /// Returns a valid delegate-free ephemeral session for one-shot probes, creating it on
+    /// first use. After `finishTasksAndInvalidate()` the session is dead, so callers must
+    /// clear `probeSession` (via `invalidateProbeSession()`) to force recreation next time.
+    private func makeProbeSession() -> URLSession {
+        if let existing = probeSession { return existing }
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 60
+        config.timeoutIntervalForResource = 120
+        config.httpCookieStorage = HTTPCookieStorage.shared
+        config.httpCookieAcceptPolicy = .always
+        config.httpShouldSetCookies = true
+        config.httpAdditionalHeaders = [
+            "User-Agent": Self.safariLikeDownloadUserAgent,
+            "Accept": "*/*",
+            "Accept-Language": "de-DE,de;q=0.9,en;q=0.8"
+        ]
+        let s = URLSession(configuration: config)
+        probeSession = s
+        return s
+    }
+
+    /// Tears down the probe session so a later probe creates a fresh one. Safe to call when
+    /// `probeSession` is already nil/invalid.
+    private func invalidateProbeSession() {
+        probeSession?.finishTasksAndInvalidate()
+        probeSession = nil
+    }
+
     /// In-memory task id → terminID (not persisted; progress is reloaded from DB on demand).
     private var taskToTerminID: [Int: Int] = [:]
     private var terminIDToTask: [Int: Int] = [:]
     /// Source URL for active tasks — used to pick a **correct file extension** (AVPlayer rejects `.bin` for MP3).
     private var taskToRemoteURL: [Int: URL] = [:]
 
-    /// Fast path for SwiftUI lists.
-    @Published private(set) public var snapshotByTerminID: [Int: EpisodeDownloadUISnapshot] = [:]
+    /// Fast path for SwiftUI lists. NOTE: intentionally NOT `@Published`. Per-row UI observes its
+    /// own isolated publisher (see `publisher(for:)`), so mutating this map must not emit
+    /// `objectWillChange` on the manager — that would re-render every view holding the manager as
+    /// an `EnvironmentObject` on each progress tick. Only `budgetPrompt`/`deviceSpaceError` stay
+    /// `@Published` (they change rarely, on user-facing errors).
+    public var snapshotByTerminID: [Int: EpisodeDownloadUISnapshot] = [:]
+
+    /// Per-terminID `CurrentValueSubject` carrying that row's UI snapshot. Rows subscribe via
+    /// `onReceive(manager.publisher(for:))`, so a progress tick re-renders ONLY the row for that
+    /// terminID — never the whole list. This is the reliable alternative to per-row
+    /// `@StateObject` (which is flaky inside `List`/`ForEach` rows in SwiftUI).
+    private var stateSubjects: [Int: CurrentValueSubject<EpisodeDownloadUISnapshot, Never>] = [:]
+
+    /// Returns a publisher that emits the UI snapshot for `terminID`, seeded with the current
+    /// value (or a "no download" placeholder). Each terminID has its own subject, so a row only
+    /// receives updates for its own terminID.
+    public func publisher(for terminID: Int) -> AnyPublisher<EpisodeDownloadUISnapshot, Never> {
+        if let subject = stateSubjects[terminID] { return subject.eraseToAnyPublisher() }
+        let initial = snapshotByTerminID[terminID]
+            ?? EpisodeDownloadUISnapshot(status: .queued, progress: 0, expectedSizeBytes: 0, exists: false)
+        let subject = CurrentValueSubject<EpisodeDownloadUISnapshot, Never>(initial)
+        stateSubjects[terminID] = subject
+        return subject.eraseToAnyPublisher()
+    }
+
+    /// Updates the internal snapshot map *and* forwards the new value to that terminID's publisher.
+    private func setSnapshot(_ snap: EpisodeDownloadUISnapshot, for terminID: Int) {
+        snapshotByTerminID[terminID] = snap
+        stateSubjects[terminID]?.send(snap)
+    }
+
+    /// Removes a terminID from the snapshot map and emits a "no download" placeholder on its
+    /// publisher, so any subscribed row immediately reverts to the "download" button.
+    private func removeSnapshot(for terminID: Int) {
+        snapshotByTerminID.removeValue(forKey: terminID)
+        stateSubjects[terminID]?.send(
+            EpisodeDownloadUISnapshot(status: .queued, progress: 0, expectedSizeBytes: 0, exists: false)
+        )
+    }
+
+    /// Replaces the whole snapshot map (e.g. after a DB reload) and forwards each value to its
+    /// terminID's publisher.
+    private func replaceAllSnapshots(_ map: [Int: EpisodeDownloadUISnapshot]) {
+        snapshotByTerminID = map
+        for (tid, snap) in map {
+            if let subject = stateSubjects[tid] {
+                subject.send(snap)
+            }
+        }
+    }
 
     /// Gleichzeitig laufende Downloads (Bandbreite); weitere bleiben `.queued`.
     private let maxConcurrentDownloads = 2
@@ -64,6 +154,18 @@ public final class IOSDownloadManager: ObservableObject {
     }
 
     private init() {}
+
+    /// Dedicated serial queue for the `URLSession` delegate. Running the delegate off the main
+    /// thread keeps the high-frequency `didWriteData` callbacks (potentially hundreds/sec on a
+    /// fast link) off the UI thread; only the throttled (~10 Hz) progress forward hops to
+    /// `@MainActor`. This is the main CPU win during active downloads.
+    private static let bridgeDelegateQueue: OperationQueue = {
+        let q = OperationQueue()
+        q.name = "fm.byte.bitefm.download-bridge"
+        q.maxConcurrentOperationCount = 1
+        q.qualityOfService = .utility
+        return q
+    }()
 
     public func setup(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
@@ -89,7 +191,7 @@ public final class IOSDownloadManager: ObservableObject {
                 "Accept": "*/*",
                 "Accept-Language": "de-DE,de;q=0.9,en;q=0.8"
             ]
-            let session = URLSession(configuration: config, delegate: b, delegateQueue: .main)
+            let session = URLSession(configuration: config, delegate: b, delegateQueue: Self.bridgeDelegateQueue)
             urlSession = session
         }
         urlSession?.getAllTasks { tasks in
@@ -165,12 +267,15 @@ public final class IOSDownloadManager: ObservableObject {
             return
         }
 
-        snapshotByTerminID[item.terminID] = EpisodeDownloadUISnapshot(status: .preparing, progress: 0, expectedSizeBytes: 0)
+        setSnapshot(
+            EpisodeDownloadUISnapshot(status: .preparing, progress: 0, expectedSizeBytes: 0),
+            for: item.terminID
+        )
 
         let context = ModelContext(container)
         let row = try? fetchOrCreateRow(for: item, context: context)
         guard let row else {
-            snapshotByTerminID.removeValue(forKey: item.terminID)
+            removeSnapshot(for: item.terminID)
             lastErrorMessage = "Download konnte nicht angelegt werden."
             await refreshSnapshotFromStore()
             return
@@ -227,10 +332,13 @@ public final class IOSDownloadManager: ObservableObject {
         }
         row.expectedSizeBytes = expected
         try? context.save()
-        snapshotByTerminID[item.terminID] = EpisodeDownloadUISnapshot(
-            status: .preparing,
-            progress: 0,
-            expectedSizeBytes: expected
+        setSnapshot(
+            EpisodeDownloadUISnapshot(
+                status: .preparing,
+                progress: 0,
+                expectedSizeBytes: expected
+            ),
+            for: item.terminID
         )
 
         let budgetBytes = expected > 0 ? expected : Self.fallbackBudgetBytesPerEpisode
@@ -519,32 +627,27 @@ public final class IOSDownloadManager: ObservableObject {
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        Task { @MainActor in
-            guard let terminID = taskToTerminID[taskIdentifier] else { return }
-            let p: Double
-            if totalBytesExpectedToWrite > 0 {
-                p = min(1, max(0, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
-            } else {
-                p = 0
-            }
-            var expectedSnap: Int64 = 0
-            if let container = modelContainer {
-                let ctx = ModelContext(container)
-                let fd = FetchDescriptor<StoredDownloadedEpisode>(
-                    predicate: #Predicate<StoredDownloadedEpisode> { $0.terminID == terminID }
-                )
-                if let row = try? ctx.fetch(fd).first {
-                    expectedSnap = row.expectedSizeBytes
-                    row.progress = p
-                    row.status = .downloading
-                    try? ctx.save()
-                }
-            }
-            snapshotByTerminID[terminID] = EpisodeDownloadUISnapshot(
-                status: .downloading,
-                progress: p,
-                expectedSizeBytes: expectedSnap
-            )
+        guard let terminID = taskToTerminID[taskIdentifier] else { return }
+        let p: Double
+        if totalBytesExpectedToWrite > 0 {
+            p = min(1, max(0, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
+        } else {
+            p = 0
+        }
+        // Hot path (~10 Hz). Deliberately NO SwiftData fetch/save here: persisting progress to
+        // the DB on every tick caused the "CoreData: debug: WAL checkpoint" spam and needless
+        // CPU. The internal `snapshotByTerminID` map (and the per-terminID publisher) carry the
+        // UI state; the DB row is refreshed from memory at download completion.
+        // `expectedSizeBytes` is read from the existing in-memory snapshot.
+        let expectedSnap: Int64 = snapshotByTerminID[terminID]?.expectedSizeBytes ?? 0
+        let newSnap = EpisodeDownloadUISnapshot(
+            status: .downloading,
+            progress: p,
+            expectedSizeBytes: expectedSnap
+        )
+        // Skip the update when nothing the UI shows has changed.
+        if snapshotByTerminID[terminID] != newSnap {
+            setSnapshot(newSnap, for: terminID)
         }
     }
 
@@ -571,7 +674,7 @@ public final class IOSDownloadManager: ObservableObject {
             predicate: #Predicate<StoredDownloadedEpisode> { $0.terminID == itemTerminID }
         )
         guard (try? context.fetch(stillExistsFd).first) != nil else {
-            snapshotByTerminID.removeValue(forKey: itemTerminID)
+            removeSnapshot(for: itemTerminID)
             await refreshSnapshotFromStore()
             return
         }
@@ -656,7 +759,7 @@ public final class IOSDownloadManager: ObservableObject {
                 expectedSizeBytes: r.expectedSizeBytes
             )
         }
-        snapshotByTerminID = map
+        replaceAllSnapshots(map)
     }
 
     public func runForegroundMaintenance() async {
@@ -904,24 +1007,13 @@ public final class IOSDownloadManager: ObservableObject {
     }
 
     private func canProbeDownloadURL(url: URL) async -> Bool {
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 20
-        config.waitsForConnectivity = false
-        config.httpCookieStorage = HTTPCookieStorage.shared
-        config.httpCookieAcceptPolicy = .always
-        config.httpShouldSetCookies = true
-        config.httpAdditionalHeaders = [
-            "User-Agent": Self.safariLikeDownloadUserAgent,
-            "Accept": "*/*",
-            "Accept-Language": "de-DE,de;q=0.9,en;q=0.8"
-        ]
-        let session = URLSession(configuration: config)
+        let session = makeProbeSession()
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
         req.timeoutInterval = 15
         req.setValue("bytes=0-0", forHTTPHeaderField: "Range")
         Self.applyArchivDownloadHeaders(to: &req)
+        defer { invalidateProbeSession() }
         do {
             let (_, response) = try await session.data(for: req)
             guard let http = response as? HTTPURLResponse else { return false }
@@ -933,21 +1025,11 @@ public final class IOSDownloadManager: ObservableObject {
 
     /// HEAD uses a delegate-free session so it never interferes with the download `URLSession` delegate.
     private func fetchExpectedContentLength(url: URL) async throws -> Int64 {
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 60
-        config.timeoutIntervalForResource = 120
-        config.httpCookieStorage = HTTPCookieStorage.shared
-        config.httpCookieAcceptPolicy = .always
-        config.httpShouldSetCookies = true
-        config.httpAdditionalHeaders = [
-            "User-Agent": Self.safariLikeDownloadUserAgent,
-            "Accept": "*/*",
-            "Accept-Language": "de-DE,de;q=0.9,en;q=0.8"
-        ]
-        let session = URLSession(configuration: config)
+        let session = makeProbeSession()
         var req = URLRequest(url: url)
         req.httpMethod = "HEAD"
         Self.applyArchivDownloadHeaders(to: &req)
+        defer { invalidateProbeSession() }
         let (_, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { return 0 }
         if !(200...299).contains(http.statusCode) {
@@ -1083,6 +1165,15 @@ public struct DownloadBudgetPrompt: Identifiable, Equatable {
 private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate {
     weak var manager: IOSDownloadManager?
 
+    /// Throttle progress forwarding to the main actor. `didWriteData` can fire
+    /// hundreds of times per second on a fast link; forwarding every tick would
+    /// spawn a storm of MainActor tasks, SwiftData saves, and SwiftUI re-renders
+    /// (the >150% CPU / scroll stutter seen during downloads). We coalesce to ~10 Hz.
+    private var lastForwardedAt: Date = .distantPast
+    private let minForwardInterval: TimeInterval = 0.1
+    /// Latest progress seen since the last forward, so a slow final tick still lands.
+    private var pendingProgress: (taskIdentifier: Int, written: Int64, expected: Int64)?
+
     init(manager: IOSDownloadManager) {
         self.manager = manager
     }
@@ -1111,11 +1202,18 @@ private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate 
         totalBytesExpectedToWrite: Int64
     ) {
         let tid = downloadTask.taskIdentifier
+        pendingProgress = (tid, totalBytesWritten, totalBytesExpectedToWrite)
+        let now = Date()
+        guard now.timeIntervalSince(lastForwardedAt) >= minForwardInterval else { return }
+        lastForwardedAt = now
+        let snapshot = pendingProgress
+        pendingProgress = nil
+        guard let snap = snapshot else { return }
         Task { @MainActor in
             manager?.downloadDidProgress(
-                taskIdentifier: tid,
-                totalBytesWritten: totalBytesWritten,
-                totalBytesExpectedToWrite: totalBytesExpectedToWrite
+                taskIdentifier: snap.taskIdentifier,
+                totalBytesWritten: snap.written,
+                totalBytesExpectedToWrite: snap.expected
             )
         }
     }

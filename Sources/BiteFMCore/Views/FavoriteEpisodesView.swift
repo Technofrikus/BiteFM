@@ -16,6 +16,9 @@ struct FavoriteEpisodesView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #if os(iOS)
+    @EnvironmentObject private var downloadManager: IOSDownloadManager
+    #endif
     @State private var sortMode: SortMode = .episodeDate
     @State private var selectedItemForDetail: ArchiveItem?
     @State private var isInspectorPresented = false
@@ -74,7 +77,7 @@ struct FavoriteEpisodesView: View {
                                 showShowTitle: false,
                                 showHeart: true,
                                 onFavoriteTap: apiClient.isLoggedIn
-                                    ? { Task { await apiClient.toggleFavoriteEpisode(showID: entry.show.id) } }
+                                    ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
                                     : nil,
                                 selectedItemForDetail: $selectedItemForDetail,
                                 isInspectorPresented: $isInspectorPresented

@@ -4,6 +4,9 @@ struct BroadcastListView: View {
     let show: Show
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
+    #if os(iOS)
+    @EnvironmentObject private var downloadManager: IOSDownloadManager
+    #endif
     @State private var broadcasts: [BroadcastSummary] = []
     @State private var isLoading = false
     @State private var currentPage = 1
