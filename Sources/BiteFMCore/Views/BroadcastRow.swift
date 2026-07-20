@@ -154,19 +154,9 @@ struct BroadcastRow: View {
                     .accessibilityHidden(true)
             }
             Group {
-                if isCompact {
-                    HStack(alignment: .top, spacing: 10) {
-                        playbackTapArea
-                        detailInfoButton
-                    }
-                } else {
-                    HStack(alignment: .top, spacing: 0) {
-                        playbackTapArea
-                        Divider()
-                            .frame(height: 28)
-                            .padding(.horizontal, 6)
-                        detailInfoButton
-                    }
+                HStack(alignment: .top, spacing: 2) {
+                    playbackTapArea
+                    detailInfoButton
                 }
             }
             .padding(.vertical, contentVerticalPadding)
@@ -309,6 +299,7 @@ struct BroadcastRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isSelected ? "Details schließen" : "Details")
+        .offset(y: -5) // Align with inlineStatusControls (same -5 lift to the caption line)
     }
 
     @ViewBuilder

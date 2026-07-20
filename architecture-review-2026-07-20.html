@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BiteFM — Architecture Review (updated 2026-07-20)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>window.mermaid && mermaid.initialize({startOnLoad:true, theme:'dark'});</script>
+<style>
+  body { background: #0b0f17; }
+  .card { break-inside: avoid; }
+  .badge-strong { background:#16a34a; }
+  .badge-worth { background:#d97706; }
+  .badge-spec { background:#6b7280; }
+  .badge-done { background:#2563eb; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .diagram-box { background:#0f1623; border:1px solid #1f2937; border-radius:12px; padding:10px; }
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display:none; }
+  .done { border-color:#2563eb; }
+</style>
+</head>
+<body class="text-slate-200 font-sans antialiased">
+<div class="max-w-5xl mx-auto px-5 py-10">
+
+  <header class="mb-10">
+    <h1 class="text-3xl font-bold text-white">BiteFM — Architecture Deepening Review</h1>
+    <p class="mt-2 text-slate-400">Scan for deepening opportunities: turning shallow modules into deep ones. Vocabulary follows <span class="mono">/codebase-design</span> (module, interface, seam, adapter, leverage, locality).</p>
+    <p class="mt-1 text-xs text-slate-500">Updated 2026-07-20 · Status reflects commits through <span class="mono">5a98172</span> + pending optimistic-toggle fix. Hot spots from <span class="mono">git log</span>: APIClient, ArchiveView/ArchiveNew grouping, playback re-render churn.</p>
+    <p class="mt-1 text-xs text-slate-500">Domain vocabulary now lives in <span class="mono">CONTEXT.md</span>; module layout documented in <span class="mono">AGENTS.md</span>.</p>
+  </header>
+
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-white mb-4">Candidate Overview</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="card diagram-box done">
+        <div class="text-white font-semibold">1 · Favorite/Played state seam</div>
+        <div class="text-sm text-slate-400 mt-1">Extracted into <span class="mono">FavoritePlayedStore</span> (deep module). Duplicated <span class="mono">@State</span> + 3× <span class="mono">.onChange</span> removed from all list views.</div>
+        <span class="inline-block mt-3 text-xs font-bold px-2 py-1 rounded text-white badge-done">Implemented</span>
+      </div>
+      <div class="card diagram-box">
+        <div class="text-white font-semibold">2 · APIClient god-module</div>
+        <div class="text-sm text-slate-400 mt-1">1,325-line ObservableObject mixing networking, auth, polling, favorites, history, archive, live metadata. Still a single wide seam.</div>
+        <span class="inline-block mt-3 text-xs font-bold px-2 py-1 rounded text-white badge-strong">Strong</span>
+      </div>
+      <div class="card diagram-box">
+        <div class="text-white font-semibold">3 · Archive sectioning logic</div>
+        <div class="text-sm text-slate-400 mt-1">Grouping/sort duplicated across ArchiveView & ArchiveNew; <span class="mono">ArchiveSectionHelpers</span> is a shallow util bag.</div>
+        <span class="inline-block mt-3 text-xs font-bold px-2 py-1 rounded text-white badge-worth">Worth exploring</span>
+      </div>
+      <div class="card diagram-box">
+        <div class="text-white font-semibold">4 · Live-metadata poll coupling</div>
+        <div class="text-sm text-slate-400 mt-1">60s <span class="mono">liveMetadata</span> publish on the shared object still forces every list view to defend against re-render.</div>
+        <span class="inline-block mt-3 text-xs font-bold px-2 py-1 rounded text-white badge-worth">Worth exploring</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- IMPLEMENTED -->
+  <section class="card diagram-box mb-8 border-blue-500/40 done">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h3 class="text-lg font-semibold text-white">✅ Candidate 1 (renumbered) · Favorite/Played store — IMPLEMENTED</h3>
+      <span class="text-xs font-bold px-2 py-1 rounded text-white badge-done">Done</span>
+    </div>
+    <p class="text-sm text-slate-400 mt-1">Commit <span class="mono">5a98172</span>. Extracted the favorite/played snapshot into <span class="mono">FavoritePlayedStore</span> (<span class="mono">AppState/FavoritePlayedStore.swift</span>): a <span class="mono">@MainActor ObservableObject</span> singleton that republishes one <span class="mono">FavoritePlayedState</span> value. <span class="mono">APIClient</span> calls <span class="mono">refresh()</span> after every mutation of the three underlying sets. The three list views (<span class="mono">ArchiveNew</span>, <span class="mono">BroadcastListView</span>, <span class="mono">FavoriteEpisodesView</span>) now read <span class="mono">favoritePlayedStore.state</span> via <span class="mono">@EnvironmentObject</span> and drop the duplicated <span class="mono">@State</span> + <span class="mono">.onChange</span> blocks. Injected at both app roots.</p>
+
+    <div class="mt-3 text-sm text-slate-300">
+      <span class="font-semibold text-emerald-300">Follow-up fixes shipped in this pass:</span>
+      <ul class="list-disc list-inside mt-1 space-y-1">
+        <li><strong>Instant favorite heart (Neu tab):</strong> added optimistic <span class="mono">refresh()</span> in <span class="mono">toggleFavoriteBroadcast</span> before the network round-trip.</li>
+        <li><strong>Instant favorite heart (Favoriten tab + tracks):</strong> the Favoriten tab uses <span class="mono">toggleFavoriteEpisode</span>, which still lagged. Added optimistic <span class="mono">refresh()</span> to <span class="mono">toggleFavoriteEpisode</span> and <span class="mono">toggleFavoriteTrack</span> too — now all three toggle paths flip the heart instantly.</li>
+        <li><strong>Download cancel reflects in list rows:</strong> <span class="mono">removeDownload</span> now calls <span class="mono">removeSnapshot(for:)</span> (emits the no-download placeholder on the per-row publisher) instead of a bare map removal.</li>
+        <li><strong>List-view icon alignment:</strong> unified the compact/regular row layouts in <span class="mono">BroadcastRow</span> into a single <span class="mono">HStack(spacing: 2)</span> and added <span class="mono">.offset(y: -5)</span> to the detail button to align it with the inline status controls.</li>
+      </ul>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">Before — duplicated seam</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          ArchiveNew ─@State + 3× .onChange─▶ FPState<br/>
+          BroadcastListView ─@State + 3× .onChange─▶ FPState<br/>
+          FavoriteEpisodesView ─@State + 3× .onChange─▶ FPState<br/>
+          <span class="text-rose-400">3 copies of the same adapter</span>
+        </div>
+      </div>
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">After — one deep store</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          APIClient ─observe 3 sets─▶ FavoritePlayedStore<br/>
+          &nbsp;&nbsp;└ republishes FavoritePlayedState<br/>
+          ArchiveNew / BroadcastListView / FavoriteEpisodesView<br/>
+          &nbsp;&nbsp;└ @EnvironmentObject ─▶ makeBroadcastRow
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CANDIDATE 2 -->
+  <section class="card diagram-box mb-8">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h3 class="text-lg font-semibold text-white">2 · APIClient is a shallow god-module</h3>
+      <span class="text-xs font-bold px-2 py-1 rounded text-white badge-strong">Strong</span>
+    </div>
+    <p class="text-sm text-slate-400 mt-1"><span class="mono">Sources/BiteFMCore/Networking/APIClient.swift</span> — 1,325 lines, single <span class="mono">@MainActor ObservableObject</span>. <span class="text-emerald-300">Note:</span> the favorite/played extraction (Candidate 1) reduced its *view-layer* surface but the module itself is unchanged — still mixes auth, live-metadata polling, favorites, history, archive, shows.</p>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Solution</div>
+      <p class="text-sm text-slate-300 mt-1">Split into focused sub-modules behind a thin facade: <strong>AuthModule</strong>, <strong>FavoritesModule</strong> (owns <span class="mono">FavoriteStateLogic</span>), <strong>HistoryModule</strong>, <strong>ArchiveModule</strong>, <strong>LiveMetadataModule</strong>, <strong>ShowsModule</strong>. <span class="mono">APIClient</span> becomes a facade owning the <span class="mono">URLSession</span> adapter and wiring. <span class="mono">FavoritePlayedStore</span> already shows the pattern to follow.</p>
+    </div>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Benefits</div>
+      <ul class="list-disc list-inside text-sm text-slate-300 mt-1 space-y-1">
+        <li><strong></strong>Locality:</strong> favorite-toggle bugs live next to favorite state, not 800 lines from live-metadata polling.</li>
+        <li><strong>Leverage:</strong> each sub-module is unit-testable with a stubbed <span class="mono">URLSession</span> — no SwiftUI or full object graph.</li>
+        <li><strong>Tests:</strong> pure fetch/parse logic tested in isolation.</li>
+      </ul>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">Before — one wide seam</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          Views ──observe──▶ APIClient (1,325 LOC)<br/>
+          &nbsp;&nbsp;├ auth · favorites · history<br/>
+          &nbsp;&nbsp;├ archive · liveMetadata · shows<br/>
+          <span class="text-rose-400">any @Published → all views re-render</span>
+        </div>
+      </div>
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">After — deep sub-modules</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          APIClient (facade + URLSession adapter)<br/>
+          &nbsp;&nbsp;├ AuthModule · FavoritesModule<br/>
+          &nbsp;&nbsp;├ HistoryModule · ArchiveModule<br/>
+          &nbsp;&nbsp;└ LiveMetadataModule · ShowsModule<br/>
+          Views ──observe──▶ narrow store only
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CANDIDATE 3 -->
+  <section class="card diagram-box mb-8">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h3 class="text-lg font-semibold text-white">3 · Archive sectioning logic is duplicated and shallow</h3>
+      <span class="text-xs font-bold px-2 py-1 rounded text-white badge-worth">Worth exploring</span>
+    </div>
+    <p class="text-sm text-slate-400 mt-1"><span class="mono">ArchiveView.computeLetterSections</span> / <span class="mono">ArchiveNew.computeDaySections</span> + <span class="mono">ArchiveSectionHelpers.swift</span>.</p>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Problem</div>
+      <p class="text-sm text-slate-300 mt-1">Two list views each implement their own <span class="mono">Dictionary(grouping:)</span> + locale sort + per-group sort, plus a private <span class="mono">*SectionsSignature</span> memo-cache. <span class="mono">ArchiveSectionHelpers</span> is a bag of three unrelated static functions — shallow by the deletion test. The grouping/sorting <em>policy</em> (A–Z rank, "#" first, de_DE collation) is split across two views with subtly different rules.</p>
+    </div>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Solution</div>
+      <p class="text-sm text-slate-300 mt-1">Extract a <strong>deep</strong> <span class="mono">ArchiveSectioner</span> module with two pure entry points: <span class="mono">sectionByLetter(_ shows:)</span> and <span class="mono">sectionByDay(_ items:)</span>, each returning a value type that also encapsulates its own change-signature (so the memo-cache moves inside the module). <span class="mono">ArchiveSectionHelpers</span> is folded in or deleted.</p>
+    </div>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Benefits</div>
+      <ul class="list-disc list-inside text-sm text-slate-300 mt-1 space-y-1">
+        <li><strong></strong>Locality:</strong> all collation rules in one module; a locale bug is fixed once.</li>
+        <li><strong>Leverage:</strong> both archive tabs share one tested sectioner.</li>
+        <li><strong>Tests:</strong> pure functions over <span class="mono">[Show]</span> / <span class="mono">[StoredArchiveItem]</span> — no SwiftUI, no <span class="mono">@State</span> cache logic.</li>
+      </ul>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">Before</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          ArchiveView.computeLetterSections (group+sort+signature)<br/>
+          ArchiveNew.computeDaySections (group+sort+signature)<br/>
+          ArchiveSectionHelpers (3 loose statics)
+        </div>
+      </div>
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">After</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          ArchiveSectioner (deep module)<br/>
+          &nbsp;&nbsp;├ sectionByLetter(_:)<br/>
+          &nbsp;&nbsp;└ sectionByDay(_:)  // owns signature + cache<br/>
+          Views ──call──▶ result
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CANDIDATE 4 -->
+  <section class="card diagram-box mb-8">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h3 class="text-lg font-semibold text-white">4 · Live-metadata poll is coupled to the shared object</h3>
+      <span class="text-xs font-bold px-2 py-1 rounded text-white badge-worth">Worth exploring</span>
+    </div>
+    <p class="text-sm text-slate-400 mt-1"><span class="mono">APIClient.startLiveMetadataPolling</span> / <span class="mono">fetchLiveMetadata</span> publishes <span class="mono">liveMetadata</span> on the shared object.</p>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Problem</div>
+      <p class="text-sm text-slate-300 mt-1">The 60s <span class="mono">liveMetadata</span> publish is the root cause of the re-render defenses. It lives on the shared <span class="mono">APIClient</span>, so its <span class="mono">@Published</span> is visible to all consumers whether they need it. Only <span class="mono">LiveView</span> and <span class="mono">PlayerBarView</span> (when live) consume it.</p>
+    </div>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Solution</div>
+      <p class="text-sm text-slate-300 mt-1">Move live-metadata into its own <strong>LiveMetadataStore</strong> (or the LiveMetadataModule from Candidate 2) that owns the polling task and republishes only to <span class="mono">LiveView</span> / <span class="mono">PlayerBarView</span>. <span class="mono">APIClient</span> stops publishing <span class="mono">liveMetadata</span>; the now-unnecessary re-render guards in list views can be removed as a follow-up.</p>
+    </div>
+
+    <div class="mt-4">
+      <div class="font-semibold text-slate-200 text-sm">Benefits</div>
+      <ul class="list-disc list-inside text-sm text-slate-300 mt-1 space-y-1">
+        <li><strong>Locality:</strong> live-metadata lifecycle lives with its only consumers.</li>
+        <li><strong>Leverage:</strong> removes the entire class of "ignore unrelated publish" code across list views.</li>
+        <li><strong>Tests:</strong> the decode + equality-guard is unit-testable in isolation.</li>
+      </ul>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">Before</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          APIClient.liveMetadata @Published (60s)<br/>
+          &nbsp;&nbsp;└▶ ALL consumers re-evaluate<br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;list views add guards to ignore it
+        </div>
+      </div>
+      <div>
+        <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">After</div>
+        <div class="diagram-box text-xs mono text-slate-300">
+          LiveMetadataStore (owns poll)<br/>
+          &nbsp;&nbsp;└▶ LiveView, PlayerBarView (live only)<br/>
+          list views: no guard needed
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="diagram-box mb-8 border-amber-500/40">
+    <h3 class="text-lg font-semibold text-amber-300">Recommended next step</h3>
+    <p class="text-sm text-slate-300 mt-2">Candidate 2 (split <span class="mono">APIClient</span>) is the highest-leverage remaining work and now has a proven template — <span class="mono">FavoritePlayedStore</span> and <span class="mono">ActivePlaybackStore</span> show exactly how to carve a narrow store out of the shared object. Start with <strong>LiveMetadataModule</strong> (Candidate 4) as the first slice: it is the smallest, most isolated seam and directly removes the last re-render-defense code. Then proceed to FavoritesModule / HistoryModule / ArchiveModule.</p>
+    <p class="text-sm text-slate-400 mt-3">Status: Candidate 1 (Favorite/Played store) + its follow-up fixes are committed (<span class="mono">5a98172</span>) and the optimistic-toggle extension + icon-alignment change are pending in this commit. Candidates 2–4 remain open.</p>
+  </section>
+
+  <footer class="text-xs text-slate-600 mt-6">BiteFM architecture review · updated 2026-07-20 · saved in repo root for continuation. No repo source modified by this document.</footer>
+</div>
+</body>
+</html>

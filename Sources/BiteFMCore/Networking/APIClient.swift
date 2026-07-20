@@ -766,6 +766,10 @@ public class APIClient: ObservableObject {
         } else {
             favoriteShowIDs.insert(showID)
         }
+        // Optimistic UI update: reflect the change immediately, before the server
+        // round-trip, so the heart flips without delay. The post-network refresh()
+        // re-syncs and rolls back via restoreFavoriteUICache on failure.
+        FavoritePlayedStore.shared.refresh()
         
         let success = await toggleChangeFavorite(queryItems: [URLQueryItem(name: "show_id", value: String(showID))])
         if !success {
@@ -783,6 +787,9 @@ public class APIClient: ObservableObject {
         } else if let cached = cachedItem {
             favoriteTrackItems.insert(cached, at: 0)
         }
+        // Optimistic UI update: reflect the change immediately, before the server
+        // round-trip. The post-network refresh() re-syncs and rolls back on failure.
+        FavoritePlayedStore.shared.refresh()
         
         let success = await toggleChangeFavorite(queryItems: [URLQueryItem(name: "track_id", value: String(trackID))])
         if !success {
