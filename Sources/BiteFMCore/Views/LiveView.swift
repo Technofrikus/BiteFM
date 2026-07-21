@@ -5,6 +5,7 @@ struct LiveView: View {
     private let showsMetadataUI: Bool
     private let showsArtwork: Bool
     @EnvironmentObject private var apiClient: APIClient
+    @EnvironmentObject private var liveMetadataStore: LiveMetadataStore
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedStream: StreamType = .web
@@ -29,27 +30,27 @@ struct LiveView: View {
                         }
 
                         VStack(spacing: horizontalSizeClass == .compact ? 4 : 6) {
-                            if let currentTrack = apiClient.liveMetadata?.tracks[selectedStream.rawValue]?.first {
+                            if let currentTrack = liveMetadataStore.liveMetadata?.tracks[selectedStream.rawValue]?.first {
                                 Text(currentTrack.decodedBasicHTMLEntities)
                                     .font(.title2)
                                     .fontWeight(.bold)
                                     .multilineTextAlignment(.center)
                             }
 
-                            if let currentShow = apiClient.liveMetadata?.currentShowTitle[selectedStream.rawValue], !currentShow.isEmpty {
+                            if let currentShow = liveMetadataStore.liveMetadata?.currentShowTitle[selectedStream.rawValue], !currentShow.isEmpty {
                                 Text(currentShow)
                                     .font(.headline)
                                     .foregroundColor(.secondary)
                             }
 
-                            if let currentSubtitle = apiClient.liveMetadata?.currentShowSubtitle[selectedStream.rawValue], !currentSubtitle.isEmpty {
+                            if let currentSubtitle = liveMetadataStore.liveMetadata?.currentShowSubtitle[selectedStream.rawValue], !currentSubtitle.isEmpty {
                                 Text(currentSubtitle)
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
                             }
 
-                            if let currentTime = apiClient.liveMetadata?.currentShowTime[selectedStream.rawValue], !currentTime.isEmpty {
+                            if let currentTime = liveMetadataStore.liveMetadata?.currentShowTime[selectedStream.rawValue], !currentTime.isEmpty {
                                 Text(currentTime)
                                     .font(.caption)
                                     .foregroundColor(.secondary.opacity(0.8))
@@ -95,7 +96,7 @@ struct LiveView: View {
                             .font(.headline)
                             .padding(.horizontal)
 
-                        let history = apiClient.liveMetadata?.tracks[selectedStream.rawValue] ?? []
+                        let history = liveMetadataStore.liveMetadata?.tracks[selectedStream.rawValue] ?? []
                         if history.count > 1 {
                             let tail = Array(history.dropFirst())
                             VStack(spacing: 0) {
@@ -130,11 +131,11 @@ struct LiveView: View {
         }
         .onAppear {
             guard enablePolling else { return }
-            apiClient.startLiveMetadataPolling()
+            liveMetadataStore.startPolling()
         }
         .onDisappear {
             guard enablePolling else { return }
-            apiClient.stopLiveMetadataPolling()
+            liveMetadataStore.stopPolling()
         }
         .alert("Wiedergabe", isPresented: .init(
             get: { playerManager.userFacingPlaybackError != nil },
@@ -160,7 +161,7 @@ struct LiveView: View {
 
     @ViewBuilder
     private var currentArtwork: some View {
-        if let imageURL = apiClient.liveMetadata?.artistImageURL[selectedStream.rawValue],
+        if let imageURL = liveMetadataStore.liveMetadata?.artistImageURL[selectedStream.rawValue],
            !imageURL.isEmpty,
            !imageURL.lowercased().contains("blank.png"),
            let url = URL(string: imageURL) {
@@ -189,6 +190,7 @@ struct LiveView: View {
 #Preview {
     LiveView()
         .environmentObject(APIClient.shared)
+        .environmentObject(LiveMetadataStore.shared)
         .environmentObject(AudioPlayerManager.shared)
         .environmentObject(PlaybackProgressStore.shared)
 }

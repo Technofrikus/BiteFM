@@ -3,7 +3,7 @@ import SwiftUI
 /// Shared “now playing” title/subtitle lines for the full player bar and the iPhone mini player.
 struct PlayerBarMetadataBlock: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
-    @EnvironmentObject private var apiClient: APIClient
+    @EnvironmentObject private var liveMetadataStore: LiveMetadataStore
 
     var body: some View {
         Group {
@@ -46,7 +46,7 @@ struct PlayerBarMetadataBlock: View {
                         .minimumScaleFactor(0.85)
                 }
             } else if playerManager.isLive, let streamType = playerManager.currentStreamType {
-                let metadata = apiClient.liveMetadata
+                let metadata = liveMetadataStore.liveMetadata
                 let currentTrack = metadata?.tracks[streamType.rawValue]?.first?.decodedBasicHTMLEntities ?? streamType.displayName
                 let currentShow = metadata?.currentShowTitle[streamType.rawValue] ?? "BiteFM Live Stream"
 

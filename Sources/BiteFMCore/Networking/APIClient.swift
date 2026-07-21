@@ -57,7 +57,6 @@ public class APIClient: ObservableObject {
     /// Local or merged „Favorisiert am“-Zeitstempel pro Episoden-`show.id` (SwiftData + API).
     @Published var favoriteShowFavoritedAt: [Int: Date] = [:]
     @Published var listenedShowIDs: Set<Int> = []
-    @Published var liveMetadata: LiveMetadataResponse?
     @Published var errorMessage: String?
     @Published var didFinishInitialBootstrap = false
     /// Set when a main list fetch fails with a connectivity error and the UI might be empty; cleared on any successful list refresh.
@@ -98,7 +97,6 @@ public class APIClient: ObservableObject {
     private static let listeningHistoryLastSuccessKey = "listeningHistoryLastFetchSuccessAt"
     
     private var broadcastDetailsCache = BroadcastDetailLRUCache(capacity: 50)
-    private var pollingTask: Task<Void, Never>?
     private var archivePollingTask: Task<Void, Never>?
     private var pendingHistoryVerificationShowID: Int?
     /// Basic-Auth-Zugangsdaten für die laufende Session, sobald `login` erfolgreich war — **bevor** `LoginView` sie in UserDefaults/Keychain geschrieben hat (vermeidet 401 auf den ersten API-Calls).
@@ -173,7 +171,6 @@ public class APIClient: ObservableObject {
            let _ = KeychainHelper.readPassword(account: username) {
             self.isLoggedIn = true
         }
-        // Do NOT start live metadata polling globally anymore
     }
     
     func setup(modelContainer: ModelContainer) {
@@ -837,21 +834,6 @@ public class APIClient: ObservableObject {
         }
     }
     
-    func startLiveMetadataPolling() {
-        pollingTask?.cancel()
-        pollingTask = Task {
-            while !Task.isCancelled {
-                await fetchLiveMetadata()
-                try? await Task.sleep(nanoseconds: 60 * 1_000_000_000) // Poll every 60 seconds
-            }
-        }
-    }
-    
-    func stopLiveMetadataPolling() {
-        pollingTask?.cancel()
-        pollingTask = nil
-    }
-
     func startArchivePolling() {
         archivePollingTask?.cancel()
         archivePollingTask = Task {
@@ -868,33 +850,6 @@ public class APIClient: ObservableObject {
     func stopArchivePolling() {
         archivePollingTask?.cancel()
         archivePollingTask = nil
-    }
-    
-    func fetchLiveMetadata() async {
-        guard let url = URL(string: "https://www.byte.fm/api/v1/song-history/") else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
-        
-        do {
-            let (data, _) = try await session.data(for: request)
-            let metadata = try JSONDecoder().decode(LiveMetadataResponse.self, from: data)
-            // Gleicher Inhalt: kein @Published-Feuer → weniger Attribut-Invalidierungen (LiveView + PlayerBarView).
-            guard metadata != liveMetadata else { return }
-            self.liveMetadata = metadata
-            
-            // Update Now Playing if live is active
-            if AudioPlayerManager.shared.isLive {
-                AudioPlayerManager.shared.updateNowPlayingWithMetadata(metadata)
-            }
-        } catch {
-            if isBenignCancellation(error) {
-                LogManager.shared.log("Live metadata fetch cancelled", type: .debug)
-                return
-            }
-            LogManager.shared.log("Failed to fetch live metadata: \(error)", type: .error)
-        }
     }
     
     func autoLogin() async {
@@ -972,7 +927,7 @@ public class APIClient: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "savedUsername")
         isLoggedIn = false
         lastListRefreshFailedWithoutNetwork = false
-        stopLiveMetadataPolling()
+        LiveMetadataStore.shared.stopPolling()
         stopArchivePolling()
         broadcastDetailsCache.clear()
         favoritesPollingTask?.cancel()

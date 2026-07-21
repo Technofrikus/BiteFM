@@ -411,7 +411,7 @@ private struct NowPlayingMatchedSurfaceBackground: View {
 // MARK: - Live metadata (no ArchiveItem)
 
 private struct ExpandedLiveNowPlayingContent: View {
-    @EnvironmentObject private var apiClient: APIClient
+    @EnvironmentObject private var liveMetadataStore: LiveMetadataStore
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     var scrollAtTop: Binding<Bool>? = nil
@@ -426,7 +426,7 @@ private struct ExpandedLiveNowPlayingContent: View {
                     fallbackCoverIcon
 
                     if let streamType = playerManager.currentStreamType,
-                       let imageURL = apiClient.liveMetadata?.artistImageURL[streamType.rawValue],
+                       let imageURL = liveMetadataStore.liveMetadata?.artistImageURL[streamType.rawValue],
                        !imageURL.isEmpty,
                        !imageURL.lowercased().contains("blank.png"),
                        let url = URL(string: imageURL) {
@@ -446,7 +446,7 @@ private struct ExpandedLiveNowPlayingContent: View {
 
                 VStack(spacing: 8) {
                     if let streamType = playerManager.currentStreamType,
-                       let currentTrack = apiClient.liveMetadata?.tracks[streamType.rawValue]?.first {
+                       let currentTrack = liveMetadataStore.liveMetadata?.tracks[streamType.rawValue]?.first {
                         Text(currentTrack.decodedBasicHTMLEntities)
                             .font(.title2)
                             .fontWeight(.bold)
@@ -454,7 +454,7 @@ private struct ExpandedLiveNowPlayingContent: View {
                     }
 
                     if let streamType = playerManager.currentStreamType,
-                       let currentShow = apiClient.liveMetadata?.currentShowTitle[streamType.rawValue],
+                       let currentShow = liveMetadataStore.liveMetadata?.currentShowTitle[streamType.rawValue],
                        !currentShow.isEmpty {
                         Text(currentShow)
                             .font(.headline)
@@ -463,7 +463,7 @@ private struct ExpandedLiveNowPlayingContent: View {
                     }
 
                     if let streamType = playerManager.currentStreamType,
-                       let currentSubtitle = apiClient.liveMetadata?.currentShowSubtitle[streamType.rawValue],
+                       let currentSubtitle = liveMetadataStore.liveMetadata?.currentShowSubtitle[streamType.rawValue],
                        !currentSubtitle.isEmpty {
                         Text(currentSubtitle)
                             .font(.subheadline)
@@ -472,7 +472,7 @@ private struct ExpandedLiveNowPlayingContent: View {
                     }
 
                     if let streamType = playerManager.currentStreamType,
-                       let currentTime = apiClient.liveMetadata?.currentShowTime[streamType.rawValue],
+                       let currentTime = liveMetadataStore.liveMetadata?.currentShowTime[streamType.rawValue],
                        !currentTime.isEmpty {
                         Text(currentTime)
                             .font(.caption)
@@ -495,12 +495,12 @@ private struct ExpandedLiveNowPlayingContent: View {
             scrollAtTop?.wrappedValue = minY >= -6
         }
         .onAppear {
-            apiClient.startLiveMetadataPolling()
+            liveMetadataStore.startPolling()
         }
         .onDisappear {
             // Live-Stream läuft weiter (Mini-Player / andere UI): Metadaten-Polling nicht beenden.
             if !playerManager.isLive {
-                apiClient.stopLiveMetadataPolling()
+                liveMetadataStore.stopPolling()
             }
         }
     }

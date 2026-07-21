@@ -27,7 +27,7 @@ public enum StreamType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct LiveMetadataResponse: Codable, Equatable {
+public struct LiveMetadataResponse: Codable, Equatable {
     let tracks: [String: [String]]
     let artistImageURL: [String: String]
     let currentShowTitle: [String: String]

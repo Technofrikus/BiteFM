@@ -40,6 +40,7 @@ struct BiteFMiOSApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(APIClient.shared)
+                .environmentObject(LiveMetadataStore.shared)
                 .environmentObject(AudioPlayerManager.shared)
                 .environmentObject(ActivePlaybackStore.shared)
                 .environmentObject(FavoritePlayedStore.shared)
