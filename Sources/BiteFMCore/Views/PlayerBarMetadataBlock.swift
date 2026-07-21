@@ -4,6 +4,9 @@ import SwiftUI
 struct PlayerBarMetadataBlock: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @EnvironmentObject private var liveMetadataStore: LiveMetadataStore
+    @EnvironmentObject private var progress: PlaybackProgressStore
+
+    var showProgressLine: Bool = false
 
     var body: some View {
         Group {
@@ -24,6 +27,10 @@ struct PlayerBarMetadataBlock: View {
                             ProgressView().controlSize(.small)
                         }
                     }
+                    if showProgressLine {
+                        PlaybackProgressLine()
+                            .padding(.vertical, 2)
+                    }
                     Text("\(item.sendungTitel.bitefm_sanitizedDisplayLine) — \(item.subtitle.bitefm_sanitizedDisplayLine)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -38,6 +45,10 @@ struct PlayerBarMetadataBlock: View {
                         if showsPlaybackActivityIndicator {
                             ProgressView().controlSize(.small)
                         }
+                    }
+                    if showProgressLine {
+                        PlaybackProgressLine()
+                            .padding(.vertical, 2)
                     }
                     Text(item.subtitle.bitefm_sanitizedDisplayLine)
                         .font(.subheadline)
@@ -54,6 +65,10 @@ struct PlayerBarMetadataBlock: View {
                     .font(.headline)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
+                if showProgressLine {
+                    PlaybackProgressLine()
+                        .padding(.vertical, 2)
+                }
                 Text(currentShow)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -62,6 +77,10 @@ struct PlayerBarMetadataBlock: View {
                 Text("BiteFM Live Stream")
                     .font(.headline)
                     .lineLimit(1)
+                if showProgressLine {
+                    PlaybackProgressLine()
+                        .padding(.vertical, 2)
+                }
                 Text("Radio für gute Musik")
                     .font(.subheadline)
                     .foregroundColor(.secondary)

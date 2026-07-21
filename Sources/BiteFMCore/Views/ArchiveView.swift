@@ -20,21 +20,9 @@ struct ArchiveView: View {
     /// dass unabhängige `APIClient`-Updates (z. B. das 60-s-Live-Metadaten-Polling oder der
     /// Favoriten-Poll) die gesamte Liste neu gruppieren/sortieren.
     ///
-    /// `Show` ist eine `Codable`-`struct` (nicht `Equatable`), daher basiert die Signatur auf
-    /// genau den Feldern, die für Gruppierung/Sortierung relevant sind (`id` + `titel`).
-    @State private var letterSectionsCache: (signature: LetterSectionsSignature, sections: [(letter: String, shows: [Show])])?
-
-    private struct LetterSectionsSignature: Equatable {
-        struct Row: Equatable {
-            let id: Int
-            let title: String
-        }
-        let rows: [Row]
-
-        init(_ shows: [Show]) {
-            self.rows = shows.map { Row(id: $0.id, title: $0.titel) }
-        }
-    }
+    /// Die Berechnung selbst läuft im `ArchiveSectioner` mit eigenem Signatur-Memo;
+    /// der Aufruf in `body` ist rein lesend.
+    @State private var sectioner = ArchiveSectioner()
 
 
 
@@ -69,43 +57,19 @@ struct ArchiveView: View {
     }
     
     /// Sendungen nach Anfangsbuchstaben; Sortierung: **#** (Ziffern & Sonstiges) zuerst, dann A–Z.
-    /// Memoiziert über `letterSectionsCache`, damit unabhängige `body`-Neuberechnungen (z. B. durch
+    /// Memoiziert über `sectioner.sectionByLetter`, damit unabhängige `body`-Neuberechnungen (z. B. durch
     /// andere `APIClient`-@Published-Änderungen) die Gruppierung nicht erneut ausführen. Die
-    /// Berechnung selbst läuft in `refreshLetterSections()` (`.task`/`.onChange`), nicht in `body`,
-    /// um die Warnung „Modifying state during view update“ zu vermeiden.
+    /// Berechnung selbst läuft mit dem internen Signatur-Memo des Sectioners.
     private var letterSections: [(letter: String, shows: [Show])] {
-        letterSectionsCache?.sections ?? computeLetterSections(from: filteredShows)
+        sectioner.sectionByLetter(filteredShows)
     }
 
-    private func computeLetterSections(from shows: [Show]) -> [(letter: String, shows: [Show])] {
-        let grouped = Dictionary(grouping: shows) { ArchiveSectionHelpers.indexLetter(forShowTitle: $0.titel) }
-        let de = Locale(identifier: "de_DE")
-        let keys = grouped.keys.sorted { lhs, rhs in
-            let pL = letterSortRank(lhs)
-            let pR = letterSortRank(rhs)
-            if pL != pR { return pL < pR }
-            return lhs.compare(rhs, options: [.caseInsensitive], range: nil, locale: de) == .orderedAscending
-        }
-        return keys.map { letter in
-            let list = (grouped[letter] ?? []).sorted {
-                $0.titel.localizedCaseInsensitiveCompare($1.titel) == .orderedAscending
-            }
-            return (letter, list)
-        }
-    }
-    
-    /// 0 = „#“, 1 = Buchstaben
-    private func letterSortRank(_ key: String) -> Int {
-        key == "#" ? 0 : 1
-    }
-
-    /// Befüllt `letterSectionsCache` außerhalb von `body` (in `.task`/`.onChange`), damit kein
+    /// Befüllt den `sectioner`-Cache außerhalb von `body` (in `.task`/`.onChange`), damit kein
     /// State während des View-Updates mutiert wird.
     private func refreshLetterSections() {
-        let signature = LetterSectionsSignature(filteredShows)
-        if letterSectionsCache?.signature != signature {
-            letterSectionsCache = (signature, computeLetterSections(from: filteredShows))
-        }
+        // sectioner.sectionByLetter(_:) hat seinen eigenen internen Cache;
+        // dieser Aufruf wärmt den Cache auf, damit der `body`-Zugriff nur "cached hit" sieht.
+        _ = sectioner.sectionByLetter(filteredShows)
     }
     
     private var availableSectionIDs: Set<String> {
@@ -302,7 +266,7 @@ struct ArchiveView: View {
     
     @ViewBuilder
     private func archiveSectionHeader(letter: String) -> some View {
-        let label = ArchiveSectionHelpers.archiveLetterSectionLabel(letter)
+        let label = ArchiveSectioner.archiveLetterSectionLabel(letter)
         #if os(iOS)
         // iOS List headers should look system-native (no custom boxed background).
         Text(label)
@@ -364,7 +328,7 @@ struct ArchiveView: View {
                     guard isActive else { return }
                     jumpToSection(symbol, proxy: proxy)
                 } label: {
-                    Text(ArchiveSectionHelpers.archiveLetterSectionLabel(symbol))
+                    Text(ArchiveSectioner.archiveLetterSectionLabel(symbol))
                         .font(.system(size: indexFontSize, weight: .medium, design: .rounded))
                         .frame(minWidth: 28)
                         .lineLimit(1)
@@ -378,8 +342,8 @@ struct ArchiveView: View {
                 .foregroundStyle(indexForeground(isActive: isActive, isHovered: isHovered))
                 .contentShape(Rectangle())
                 .accessibilityLabel(isActive
-                    ? "Zu \(ArchiveSectionHelpers.archiveLetterSectionLabel(symbol))"
-                    : "\(ArchiveSectionHelpers.archiveLetterSectionLabel(symbol)) nicht verfügbar"
+                    ? "Zu \(ArchiveSectioner.archiveLetterSectionLabel(symbol))"
+                    : "\(ArchiveSectioner.archiveLetterSectionLabel(symbol)) nicht verfügbar"
                 )
                 .accessibilityHint(isActive ? "Springt zu dieser Buchstabengruppe." : "Keine Sendungen in dieser Gruppe.")
                 .accessibilityAddTraits(.isButton)
@@ -387,7 +351,7 @@ struct ArchiveView: View {
                 .onHover { hovering in
                     hoveredIndexSymbol = hovering ? symbol : nil
                 }
-                .help(isActive ? "Zu \(ArchiveSectionHelpers.archiveLetterSectionLabel(symbol)) springen" : "Keine Sendung in dieser Gruppe")
+                .help(isActive ? "Zu \(ArchiveSectioner.archiveLetterSectionLabel(symbol)) springen" : "Keine Sendung in dieser Gruppe")
                 #endif
             }
         }

@@ -30,8 +30,11 @@ struct PlayerBarView: View {
             PlaybackControlsStack(compactTimeline: true, keyboardShortcut: false, spacing: 10)
         }
         .padding(.horizontal)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .background(Material.bar)
+        .overlay(alignment: .bottom) {
+            PlaybackProgressLine()
+        }
     }
 
     private var regularBody: some View {
@@ -49,7 +52,10 @@ struct PlayerBarView: View {
             PlaybackSeekBar(compactTimeline: false)
         }
         .padding(.horizontal)
-        .padding(.vertical, 16)
+        .padding(.vertical, 18)
         .background(Material.bar)
+        .overlay(alignment: .bottom) {
+            PlaybackProgressLine()
+        }
     }
 }

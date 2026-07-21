@@ -309,9 +309,7 @@ private struct LoggedInRootView: View {
         }
 
         private func expandNowPlaying() {
-            withAnimation(.spring(response: 0.48, dampingFraction: 0.86)) {
-                isNowPlayingExpanded = true
-            }
+            isNowPlayingExpanded = true
         }
     }
 
@@ -374,9 +372,7 @@ private struct LoggedInRootView: View {
         }
 
         private func expandNowPlaying() {
-            withAnimation(.spring(response: 0.48, dampingFraction: 0.86)) {
-                isNowPlayingExpanded = true
-            }
+            isNowPlayingExpanded = true
         }
     }
     #else

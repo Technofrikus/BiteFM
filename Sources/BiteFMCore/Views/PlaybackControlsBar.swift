@@ -186,6 +186,25 @@ struct PlaybackSeekBar: View {
     }
 }
 
+/// Thin progress line at the bottom of the player bar, showing current playback position.
+struct PlaybackProgressLine: View {
+    @EnvironmentObject private var progress: PlaybackProgressStore
+
+    var body: some View {
+        if progress.duration > 0 {
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(Color.white)
+                    .frame(width: geometry.size.width * min(1, max(0, progress.currentTime / progress.duration)))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 1)
+            .animation(.linear(duration: 0.9), value: progress.currentTime)
+            .transition(.identity)
+        }
+    }
+}
+
 /// Transport + optional seek; used by expanded Now Playing bottom bar and composed inside `PlayerBarView` on macOS.
 struct PlaybackControlsStack: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager

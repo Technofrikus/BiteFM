@@ -51,7 +51,7 @@ struct MiniPlayerBarView: View {
         HStack(alignment: .center, spacing: 12) {
             Button(action: onExpand) {
                 VStack(alignment: .leading, spacing: 4) {
-                    PlayerBarMetadataBlock()
+                    PlayerBarMetadataBlock(showProgressLine: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -60,7 +60,13 @@ struct MiniPlayerBarView: View {
             .accessibilityLabel("Wiedergabe öffnen")
             .accessibilityHint("Zeigt die aktuelle Wiedergabe mit Details und Steuerung.")
 
-            Button(action: { playerManager.togglePlayPause() }) {
+            Button(action: {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    playerManager.togglePlayPause()
+                }
+            }) {
                 let imageName: String = {
                     if playerManager.isPlaying {
                         return playerManager.isLive ? "stop.circle.fill" : "pause.circle.fill"

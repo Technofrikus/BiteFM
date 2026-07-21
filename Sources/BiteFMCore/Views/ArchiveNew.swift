@@ -23,29 +23,8 @@ struct ArchiveNew: View {
     /// Narrow snapshot of the favorite/played state `BroadcastRow` needs, sourced from the
     /// shared `FavoritePlayedStore` (no per-view `@State` or `.onChange` duplication).
 
-    /// Memo-Cache für die Tages-Gruppierung. Wird nur neu berechnet, wenn sich die gefilterten
-    /// Items ändern — nicht bei jedem `body`-Durchlauf. Schützt davor, dass unabhängige
-    /// `APIClient`-Updates (z. B. der Hörverlauf-Poll während der Wiedergabe) die Liste neu gruppieren.
-    ///
-    /// `StoredArchiveItem` ist eine SwiftData-`@Model`-Klasse (nicht `Equatable`), daher basiert die
-    /// Signatur auf genau den Feldern, die für Gruppierung/Sortierung relevant sind.
-    @State private var daySectionsCache: (signature: DaySectionsSignature, sections: [(dayStart: Date, header: String, items: [StoredArchiveItem])])?
-
-    private struct DaySectionsSignature: Equatable {
-        struct Row: Equatable {
-            let terminID: Int
-            let startTime: String
-            let day: TimeInterval
-        }
-        let rows: [Row]
-
-        init(_ items: [StoredArchiveItem]) {
-            let cal = Calendar.current
-            self.rows = items.map {
-                Row(terminID: $0.terminID, startTime: $0.startTime, day: cal.startOfDay(for: $0.broadcastDate).timeIntervalSince1970)
-            }
-        }
-    }
+    /// Deep sectioning module: owns both memo-caches and collation rules.
+    @State private var sectioner = ArchiveSectioner()
 
     private var filteredItems: [StoredArchiveItem] {
         var items = storedItems
@@ -61,32 +40,14 @@ struct ArchiveNew: View {
         return items
     }
 
-    /// Befüllt `daySectionsCache` außerhalb von `body` (in `.task`/`.onChange`), damit kein
+    /// Befüllt den `sectioner`-Cache außerhalb von `body` (in `.task`/`.onChange`), damit kein
     /// State während des View-Updates mutiert wird.
     private func refreshDaySections() {
-        let items = filteredItems
-        let signature = DaySectionsSignature(items)
-        if daySectionsCache?.signature != signature {
-            daySectionsCache = (signature, computeDaySections(from: items))
-        }
+        // sectioner.sectionByDay(_:) hat seinen eigenen internen Cache;
+        // dieser Aufruf wärmt den Cache auf, damit der `body`-Zugriff nur "cached hit" sieht.
+        _ = sectioner.sectionByDay(filteredItems)
     }
 
-    private func computeDaySections(from items: [StoredArchiveItem]) -> [(dayStart: Date, header: String, items: [StoredArchiveItem])] {
-        let cal = Calendar.current
-        let byDay = Dictionary(grouping: items) { cal.startOfDay(for: $0.broadcastDate) }
-        let days = byDay.keys.sorted(by: >)
-        return days.map { day in
-            let rowItems = (byDay[day] ?? []).sorted { lhs, rhs in
-                if lhs.startTime != rhs.startTime {
-                    return lhs.startTime > rhs.startTime
-                }
-                return lhs.terminID > rhs.terminID
-            }
-            let header = ArchiveSectionHelpers.newArchiveDaySectionHeader(for: day)
-            return (dayStart: day, header: header, items: rowItems)
-        }
-    }
-    
     private var emptyFilterUnavailable: (title: String, systemImage: String, description: String) {
         if hidePlayed && favoritesOnly {
             let anyFavoriteInList = storedItems.contains { apiClient.isFavorite(slug: $0.sendungSlug, title: $0.sendungTitel) }
@@ -122,10 +83,8 @@ struct ArchiveNew: View {
     
     var body: some View {
         let filtered = filteredItems
-        // Rein lesend: Cache nutzen, sonst einmalig rein berechnen (KEIN State-Write in `body`).
-        let sections = daySectionsCache?.signature == DaySectionsSignature(filtered)
-            ? daySectionsCache!.sections
-            : computeDaySections(from: filtered)
+        // Rein lesend: Cache des Sectioners nutzt eigenes Signatur-Memo; KEIN State-Write in `body`.
+        let sections = sectioner.sectionByDay(filtered)
         ZStack {
             ScrollViewReader { proxy in
                 List {
