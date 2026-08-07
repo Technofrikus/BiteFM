@@ -51,12 +51,6 @@ Other frequent, usually harmless logs during playback: `nw_connection` / Happy E
 
 Archive URLs: use `ArchivAudioURL.make(from:)` in `Sources/BiteFMCore/Utils/ArchivAudioURL.swift` (player + downloads), not raw string concatenation to `https://archiv.bytefm.com/`.
 
-## Commit Attribution
-AI commits MUST include:
-```
-Co-Authored-By: Gemini 3.1 Flash <noreply@moinboards.com>
-```
-
 ## File-Scoped Commands
 | Task | Command |
 |------|---------|
