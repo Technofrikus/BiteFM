@@ -8,6 +8,7 @@ struct DownloadsView: View {
     @EnvironmentObject private var downloadManager: IOSDownloadManager
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @EnvironmentObject private var apiClient: APIClient
+    @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
 
     @Query(sort: [
         SortDescriptor(\StoredDownloadedEpisode.broadcastDate, order: .reverse),
@@ -85,7 +86,7 @@ struct DownloadsView: View {
                             makeBroadcastRow(
                                 item: item,
                                 metaLineSizeSuffix: downloadSizeLabel(for: row),
-                                favoritePlayed: .init(favoriteSlugs: [], favoriteShowIDs: [], listenedShowIDs: []),
+                                favoritePlayed: favoritePlayedStore.state,
                                 selectedItemForDetail: $selectedForDetail,
                                 isInspectorPresented: $isInspectorPresented
                             )

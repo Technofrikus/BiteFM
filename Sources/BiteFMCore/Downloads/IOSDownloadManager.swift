@@ -500,7 +500,7 @@ public final class IOSDownloadManager: ObservableObject {
     ) {
         Task { @MainActor in
             defer { Self.removeStagedDownloadTempFileIfNeeded(at: localURL) }
-            defer { Task { @MainActor [weak self] in await self?.processDownloadQueue() } }
+            defer { Task { @MainActor in await self.processDownloadQueue() } }
             let remoteSourceURL = taskToRemoteURL.removeValue(forKey: taskIdentifier)
             guard let terminID = taskToTerminID.removeValue(forKey: taskIdentifier) else { return }
             terminIDToTask.removeValue(forKey: terminID)
