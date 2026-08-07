@@ -46,6 +46,7 @@ struct BiteFMiOSApp: App {
                 .environmentObject(FavoritePlayedStore.shared)
                 .environmentObject(PlaybackProgressStore.shared)
                 .environmentObject(IOSDownloadManager.shared)
+                .environmentObject(NowPlayingDetailStore.shared)
                 .environmentObject(AppRestorationStore.shared)
         }
         .modelContainer(container)

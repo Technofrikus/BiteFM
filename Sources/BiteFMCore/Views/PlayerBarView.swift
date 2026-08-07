@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerBarView: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isCompact: Bool { horizontalSizeClass == .compact }
@@ -46,6 +47,10 @@ struct PlayerBarView: View {
 
                 Spacer(minLength: 40)
 
+                if playerManager.currentItem != nil {
+                    detailInfoButton
+                }
+
                 PlaybackTransportButtons(useKeyboardShortcut: true)
             }
 
@@ -56,6 +61,32 @@ struct PlayerBarView: View {
         .background(Material.bar)
         .overlay(alignment: .bottom) {
             PlaybackProgressLine()
+        }
+    }
+
+    /// Info button matching the list rows' `info.circle` affordance: opens the currently
+    /// playing item's details in the shared inspector/sheet, wherever the user currently is.
+    private var detailInfoButton: some View {
+        let isSelected = nowPlayingDetail.isPresented && nowPlayingDetail.item?.id == playerManager.currentItem?.id
+        return Button(action: toggleDetailPresentation) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 18))
+                .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                .frame(width: 28, height: 28)
+                .background(isSelected ? Color.accentColor : Color.clear)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isSelected ? "Details schließen" : "Details")
+        .help(isSelected ? "Details schließen" : "Details anzeigen")
+    }
+
+    private func toggleDetailPresentation() {
+        guard let item = playerManager.currentItem else { return }
+        if nowPlayingDetail.isPresented, nowPlayingDetail.item?.id == item.id {
+            nowPlayingDetail.dismiss()
+        } else {
+            nowPlayingDetail.present(item)
         }
     }
 }
