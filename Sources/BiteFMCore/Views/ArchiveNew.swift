@@ -5,6 +5,7 @@ struct ArchiveNew: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
     @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     @Environment(\.modelContext) private var modelContext
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
@@ -16,8 +17,6 @@ struct ArchiveNew: View {
     ]) 
     private var storedItems: [StoredArchiveItem]
     
-    @State private var selectedItemForDetail: ArchiveItem?
-    @State private var isInspectorPresented = false
     @State private var hidePlayed = false
     @State private var favoritesOnly = false
     /// Narrow snapshot of the favorite/played state `BroadcastRow` needs, sourced from the
@@ -104,9 +103,7 @@ struct ArchiveNew: View {
                                 makeBroadcastRow(
                                     item: item,
                                     onFavoriteTap: favoriteAction,
-                                    favoritePlayed: favoritePlayedStore.state,
-                                    selectedItemForDetail: $selectedItemForDetail,
-                                    isInspectorPresented: $isInspectorPresented
+                                    favoritePlayed: favoritePlayedStore.state
                                 )
                                 // Erste/letzte echte Row schaffen die Section-Luft; keine extra
                                 // Spacer-Zeile, da `List` sonst eine Mindesthöhe erzwingt.
@@ -153,7 +150,7 @@ struct ArchiveNew: View {
                 }
             }
         }
-        .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
+        .broadcastInspector(isPresented: nowPlayingDetail.isPresentedBinding, selectedItem: nowPlayingDetail.itemBinding)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -172,8 +169,8 @@ struct ArchiveNew: View {
                     }
 
                     #if os(macOS)
-                    Button(action: { isInspectorPresented.toggle() }) {
-                        Label(isInspectorPresented ? "Details ausblenden" : "Details anzeigen", systemImage: "sidebar.right")
+                    Button(action: { nowPlayingDetail.toggle() }) {
+                        Label(nowPlayingDetail.isPresented ? "Details ausblenden" : "Details anzeigen", systemImage: "sidebar.right")
                     }
                     #endif
                 } label: {

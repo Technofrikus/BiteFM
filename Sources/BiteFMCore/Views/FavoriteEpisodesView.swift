@@ -16,13 +16,12 @@ struct FavoriteEpisodesView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
     #endif
     @State private var sortMode: SortMode = .episodeDate
-    @State private var selectedItemForDetail: ArchiveItem?
-    @State private var isInspectorPresented = false
     /// Narrow snapshot of the favorite/played state `BroadcastRow` needs, sourced from the
     /// shared `FavoritePlayedStore` (no per-view `@State` or `.onChange` duplication).
     
@@ -82,9 +81,7 @@ struct FavoriteEpisodesView: View {
                                 onFavoriteTap: apiClient.isLoggedIn
                                     ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
                                     : nil,
-                                favoritePlayed: favoritePlayedStore.state,
-                                selectedItemForDetail: $selectedItemForDetail,
-                                isInspectorPresented: $isInspectorPresented
+                                favoritePlayed: favoritePlayedStore.state
                             )
                             .id(entry.id)
                         }
@@ -132,7 +129,7 @@ struct FavoriteEpisodesView: View {
             #if os(macOS)
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    isInspectorPresented.toggle()
+                    nowPlayingDetail.toggle()
                 } label: {
                     Label("Details anzeigen", systemImage: "sidebar.right")
                 }
@@ -140,9 +137,9 @@ struct FavoriteEpisodesView: View {
             }
             #endif
         }
-        .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
+        .broadcastInspector(isPresented: nowPlayingDetail.isPresentedBinding, selectedItem: nowPlayingDetail.itemBinding)
         .refreshable {
-            guard !isInspectorPresented else { return }
+            guard !nowPlayingDetail.isPresented else { return }
             await apiClient.fetchFavorites()
         }
     }

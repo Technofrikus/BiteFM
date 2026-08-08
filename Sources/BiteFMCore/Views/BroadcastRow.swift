@@ -31,9 +31,7 @@ func makeBroadcastRow(
     metaLineSizeSuffix: String? = nil,
     showTimeInDateLine: Bool = true,
     showDownloadSpeed: Bool = false,
-    favoritePlayed: FavoritePlayedState,
-    selectedItemForDetail: Binding<ArchiveItem?>,
-    isInspectorPresented: Binding<Bool>
+    favoritePlayed: FavoritePlayedState
 ) -> BroadcastRow {
     BroadcastRow(
         item: item,
@@ -43,9 +41,7 @@ func makeBroadcastRow(
         metaLineSizeSuffix: metaLineSizeSuffix,
         showTimeInDateLine: showTimeInDateLine,
         showDownloadSpeed: showDownloadSpeed,
-        favoritePlayed: favoritePlayed,
-        selectedItemForDetail: selectedItemForDetail,
-        isInspectorPresented: isInspectorPresented
+        favoritePlayed: favoritePlayed
     )
 }
 
@@ -77,9 +73,7 @@ struct BroadcastRow: View {
     @State private var downloadSnap: EpisodeDownloadUISnapshot
     #endif
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
-    @Binding var selectedItemForDetail: ArchiveItem?
-    @Binding var isInspectorPresented: Bool
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
 
     init(
         item: ArchiveItem,
@@ -89,9 +83,7 @@ struct BroadcastRow: View {
         metaLineSizeSuffix: String? = nil,
         showTimeInDateLine: Bool = true,
         showDownloadSpeed: Bool = false,
-        favoritePlayed: FavoritePlayedState,
-        selectedItemForDetail: Binding<ArchiveItem?>,
-        isInspectorPresented: Binding<Bool>
+        favoritePlayed: FavoritePlayedState
     ) {
         self.item = item
         self.showShowTitle = showShowTitle
@@ -101,8 +93,6 @@ struct BroadcastRow: View {
         self.showTimeInDateLine = showTimeInDateLine
         self.showDownloadSpeed = showDownloadSpeed
         self.favoritePlayed = favoritePlayed
-        self._selectedItemForDetail = selectedItemForDetail
-        self._isInspectorPresented = isInspectorPresented
         #if os(iOS)
         // Seed the local snapshot from the manager's current value so the row shows correct
         // state before the first publisher emission. The `onReceive` below keeps it in sync.
@@ -363,7 +353,7 @@ struct BroadcastRow: View {
     }
 
     private var detailInfoButton: some View {
-        let isSelected = selectedItemForDetail?.id == item.id && isInspectorPresented
+        let isSelected = nowPlayingDetail.isPresented && nowPlayingDetail.item?.id == item.id
         return Button(action: toggleDetailPresentation) {
             Image(systemName: "info.circle")
                 .font(.system(size: 18))
@@ -420,19 +410,17 @@ struct BroadcastRow: View {
     }
 
     private func toggleDetailPresentation() {
-        if isInspectorPresented, selectedItemForDetail?.id == item.id {
-            selectedItemForDetail = nil
-            isInspectorPresented = false
+        if nowPlayingDetail.isPresented, nowPlayingDetail.item?.id == item.id {
+            nowPlayingDetail.dismiss()
         } else {
-            selectedItemForDetail = item
-            isInspectorPresented = true
+            nowPlayingDetail.present(item)
         }
     }
 
     private func playAndRevealIfNeeded() {
         AudioPlayerManager.shared.play(item: item)
-        if isInspectorPresented {
-            selectedItemForDetail = item
+        if nowPlayingDetail.isPresented {
+            nowPlayingDetail.present(item)
         }
     }
 

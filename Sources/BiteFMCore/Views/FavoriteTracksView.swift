@@ -10,6 +10,7 @@ import SwiftUI
 struct FavoriteTracksView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     /// Während Archiv-URL / Detail geladen wird (wie bei leerem `audioFile1` im Player).
@@ -66,6 +67,7 @@ struct FavoriteTracksView: View {
         .refreshable {
             await apiClient.fetchFavorites()
         }
+        .broadcastInspector(isPresented: nowPlayingDetail.isPresentedBinding, selectedItem: nowPlayingDetail.itemBinding)
     }
     
     @ViewBuilder

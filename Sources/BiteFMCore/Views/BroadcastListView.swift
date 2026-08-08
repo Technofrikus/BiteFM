@@ -5,6 +5,7 @@ struct BroadcastListView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
     @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     #if os(iOS)
     @EnvironmentObject private var downloadManager: IOSDownloadManager
     #endif
@@ -16,8 +17,6 @@ struct BroadcastListView: View {
     @State private var searchText = ""
     /// Narrow snapshot of the favorite/played state `BroadcastRow` needs, sourced from
     /// the shared `FavoritePlayedStore` (no per-view `@State` or `.onChange` duplication).
-    @State private var selectedItemForDetail: ArchiveItem?
-    @State private var isInspectorPresented = false
     
     var filteredBroadcasts: [BroadcastSummary] {
         if hidePlayed {
@@ -110,7 +109,7 @@ struct BroadcastListView: View {
         }
         .searchable(text: $searchText, prompt: "Ausgabe suchen…")
         .navigationTitle(apiClient.isFavorite(show: show) ? "❤️ \(show.titel)" : show.titel)
-        .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedItemForDetail)
+        .broadcastInspector(isPresented: nowPlayingDetail.isPresentedBinding, selectedItem: nowPlayingDetail.itemBinding)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -137,8 +136,8 @@ struct BroadcastListView: View {
                     }
 
                     #if os(macOS)
-                    Button(action: { isInspectorPresented.toggle() }) {
-                        Label(isInspectorPresented ? "Details ausblenden" : "Details anzeigen", systemImage: "sidebar.right")
+                    Button(action: { nowPlayingDetail.toggle() }) {
+                        Label(nowPlayingDetail.isPresented ? "Details ausblenden" : "Details anzeigen", systemImage: "sidebar.right")
                     }
                     #endif
                 } label: {
@@ -182,9 +181,7 @@ struct BroadcastListView: View {
             onFavoriteTap: apiClient.isLoggedIn
                 ? { Task { await apiClient.toggleFavoriteEpisode(showID: item.terminID) } }
                 : nil,
-            favoritePlayed: favoritePlayedStore.state,
-            selectedItemForDetail: $selectedItemForDetail,
-            isInspectorPresented: $isInspectorPresented
+            favoritePlayed: favoritePlayedStore.state
         )
         .listRowInsets(EdgeInsets(top: top, leading: 10, bottom: bottom, trailing: 12))
         .onAppear {

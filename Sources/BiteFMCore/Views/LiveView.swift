@@ -7,6 +7,7 @@ struct LiveView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var liveMetadataStore: LiveMetadataStore
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedStream: StreamType = .web
 
@@ -147,6 +148,7 @@ struct LiveView: View {
         } message: {
             Text(playerManager.userFacingPlaybackError ?? "")
         }
+        .broadcastInspector(isPresented: nowPlayingDetail.isPresentedBinding, selectedItem: nowPlayingDetail.itemBinding)
     }
     
     private var fallbackCoverIcon: some View {

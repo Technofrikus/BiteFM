@@ -9,6 +9,7 @@ struct DownloadsView: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var favoritePlayedStore: FavoritePlayedStore
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
 
     @Query(sort: [
         SortDescriptor(\StoredDownloadedEpisode.broadcastDate, order: .reverse),
@@ -16,8 +17,6 @@ struct DownloadsView: View {
     ])
     private var allEpisodes: [StoredDownloadedEpisode]
 
-    @State private var selectedForDetail: ArchiveItem?
-    @State private var isInspectorPresented = false
     @State private var showSettings = false
     @State private var showDeleteAllConfirm = false
     @State private var editMode: EditMode = .inactive
@@ -88,9 +87,7 @@ struct DownloadsView: View {
                                 metaLineSizeSuffix: downloadSizeLabel(for: row),
                                 showTimeInDateLine: false,
                                 showDownloadSpeed: true,
-                                favoritePlayed: favoritePlayedStore.state,
-                                selectedItemForDetail: $selectedForDetail,
-                                isInspectorPresented: $isInspectorPresented
+                                favoritePlayed: favoritePlayedStore.state
                             )
                             .tag(row.terminID)
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -173,7 +170,7 @@ struct DownloadsView: View {
                 }
             }
         }
-        .broadcastInspector(isPresented: $isInspectorPresented, selectedItem: $selectedForDetail)
+        .broadcastInspector(isPresented: nowPlayingDetail.isPresentedBinding, selectedItem: nowPlayingDetail.itemBinding)
         .sheet(isPresented: $showSettings) {
             DownloadsSettingsView()
                 .environmentObject(downloadManager)

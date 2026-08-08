@@ -106,9 +106,6 @@ private struct LoggedInRootView: View {
     @State private var isNowPlayingExpanded: Bool = false
     @State private var didApplyRestoredRoot: Bool = false
     @State private var didRestorePlaybackSnapshot: Bool = false
-    /// Now-Playing-Detail (Info-Button in der Player-Leiste): geteilter Zustand, damit die
-    /// Sidebar/Sheet unabhängig von der aktuell sichtbaren Liste geöffnet werden kann.
-    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     /// Eine Sidebar-`show(...)`-Wiederherstellung kann beim ersten `task` noch nicht greifen, wenn `apiClient.shows`
     /// gerade nachgeladen wird. Wir versuchen es einmalig, sobald die Sendungsliste gefüllt ist.
     @State private var pendingShowRestoreSlug: String?
@@ -630,16 +627,6 @@ private struct LoggedInRootView: View {
                             .navigationTitle("Live")
                     }
                 }
-                .broadcastInspector(
-                    isPresented: Binding(
-                        get: { nowPlayingDetail.isPresented },
-                        set: { if !$0 { nowPlayingDetail.dismiss() } }
-                    ),
-                    selectedItem: Binding(
-                        get: { nowPlayingDetail.item },
-                        set: { if $0 == nil { nowPlayingDetail.dismiss() } }
-                    )
-                )
             }
         }
     }

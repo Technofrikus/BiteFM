@@ -66,6 +66,8 @@ struct PlayerBarView: View {
 
     /// Info button matching the list rows' `info.circle` affordance: opens the currently
     /// playing item's details in the shared inspector/sheet, wherever the user currently is.
+    /// Greift auf denselben `NowPlayingDetailStore` zu wie `BroadcastRow` — kein zweiter
+    /// Inspector-Pfad mehr.
     private var detailInfoButton: some View {
         let isSelected = nowPlayingDetail.isPresented && nowPlayingDetail.item?.id == playerManager.currentItem?.id
         return Button(action: toggleDetailPresentation) {

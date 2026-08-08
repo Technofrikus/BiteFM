@@ -7,6 +7,7 @@ import AppKit
 struct ArchiveView: View {
     @EnvironmentObject private var apiClient: APIClient
     @EnvironmentObject private var activePlayback: ActivePlaybackStore
+    @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -132,6 +133,7 @@ struct ArchiveView: View {
                 .refreshable {
                     await apiClient.fetchShows()
                 }
+                .broadcastInspector(isPresented: nowPlayingDetail.isPresentedBinding, selectedItem: nowPlayingDetail.itemBinding)
             }
         }
     }
