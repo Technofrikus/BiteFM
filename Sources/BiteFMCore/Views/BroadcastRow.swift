@@ -29,6 +29,8 @@ func makeBroadcastRow(
     showHeart: Bool = true,
     onFavoriteTap: (() -> Void)? = nil,
     metaLineSizeSuffix: String? = nil,
+    showTimeInDateLine: Bool = true,
+    showDownloadSpeed: Bool = false,
     favoritePlayed: FavoritePlayedState,
     selectedItemForDetail: Binding<ArchiveItem?>,
     isInspectorPresented: Binding<Bool>
@@ -39,6 +41,8 @@ func makeBroadcastRow(
         showHeart: showHeart,
         onFavoriteTap: onFavoriteTap,
         metaLineSizeSuffix: metaLineSizeSuffix,
+        showTimeInDateLine: showTimeInDateLine,
+        showDownloadSpeed: showDownloadSpeed,
         favoritePlayed: favoritePlayed,
         selectedItemForDetail: selectedItemForDetail,
         isInspectorPresented: isInspectorPresented
@@ -53,6 +57,11 @@ struct BroadcastRow: View {
     var onFavoriteTap: (() -> Void)? = nil
     /// Rechts in der Datumszeile (vor dem Info-Button), z. B. feste MB aus dem Download-Tab.
     var metaLineSizeSuffix: String? = nil
+    /// Zeigt die Uhrzeit (Start–Ende) in der Datumszeile an. Im Downloads-Tab deaktiviert,
+    /// um Platz für die Downloadgeschwindigkeit zu schaffen.
+    var showTimeInDateLine: Bool = true
+    /// Zeigt die aktuelle Downloadgeschwindigkeit in der Datumszeile an (nur während des Downloads).
+    var showDownloadSpeed: Bool = false
     /// Narrow snapshot of the favorite/played state this row needs. Replaces observing the
     /// whole `APIClient` (which re-rendered every row on the 60 s `liveMetadata` poll).
     let favoritePlayed: FavoritePlayedState
@@ -78,6 +87,8 @@ struct BroadcastRow: View {
         showHeart: Bool = true,
         onFavoriteTap: (() -> Void)? = nil,
         metaLineSizeSuffix: String? = nil,
+        showTimeInDateLine: Bool = true,
+        showDownloadSpeed: Bool = false,
         favoritePlayed: FavoritePlayedState,
         selectedItemForDetail: Binding<ArchiveItem?>,
         isInspectorPresented: Binding<Bool>
@@ -87,6 +98,8 @@ struct BroadcastRow: View {
         self.showHeart = showHeart
         self.onFavoriteTap = onFavoriteTap
         self.metaLineSizeSuffix = metaLineSizeSuffix
+        self.showTimeInDateLine = showTimeInDateLine
+        self.showDownloadSpeed = showDownloadSpeed
         self.favoritePlayed = favoritePlayed
         self._selectedItemForDetail = selectedItemForDetail
         self._isInspectorPresented = isInspectorPresented
@@ -178,13 +191,12 @@ struct BroadcastRow: View {
         Button(action: playAndRevealIfNeeded) {
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 2) {
-                    // Zeile 1: Datum & Meta
+                    // Zeile 1: Datum & Meta (mit Mittelpunkt getrennt). Ein einzelner Text mit
+                    // monospacedDigit + minimumScaleFactor skaliert die GESAMTE Zeile einheitlich,
+                    // statt nur einzelne Elemente zu quetschen.
                     HStack(spacing: 6) {
                         Text(dateLineString)
                             .multilineTextAlignment(.leading)
-                        if let extra = resolvedMetaLineSizeSuffix {
-                            Text(extra)
-                        }
                         if rowPlaybackState == .preparing {
                             Text("lädt …")
                                 .font(.caption)
@@ -194,7 +206,8 @@ struct BroadcastRow: View {
                     .font(.caption)
                     .foregroundColor(isRowHighlighted ? .accentColor.opacity(0.75) : .secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.5)
+                    .monospacedDigit()
 
                     // Zeile 2: Titel
                     Text((showShowTitle ? item.sendungTitel : item.subtitle).bitefm_sanitizedDisplayLine)
@@ -257,10 +270,72 @@ struct BroadcastRow: View {
         .frame(height: rowAccessoryHitBox, alignment: .center)
     }
 
+    /// Datumszeile als ein String, mit Mittelpunkt („·“) getrennt. Enthält Datum, optional
+    /// Uhrzeit, Größe und – während eines Downloads – Geschwindigkeit und kompakte ETA.
     private var dateLineString: String {
-        let timePart = item.startTime.isEmpty ? "" : "| \(item.startTime) - \(item.endTime)"
-        let s = "\(item.datumDe) \(timePart)"
-        return s.trimmingCharacters(in: .whitespaces)
+        var parts: [String] = []
+        parts.append(item.datumDe)
+        if showTimeInDateLine, !item.startTime.isEmpty {
+            parts.append("\(item.startTime) - \(item.endTime)")
+        }
+        if let extra = resolvedMetaLineSizeSuffix {
+            parts.append(extra)
+        }
+        if showDownloadSpeed, let speed = resolvedDownloadSpeed {
+            parts.append(speed)
+        }
+        if showDownloadSpeed, let eta = resolvedDownloadETA {
+            parts.append(eta)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    #if os(iOS)
+    /// Kurze Downloadgeschwindigkeit (z. B. „3,2 MB/s“), nur während eines aktiven Downloads.
+    private var resolvedDownloadSpeed: String? {
+        guard showDownloadSpeed, downloadSnap.status == .downloading else { return nil }
+        let bytesPerSec = downloadSnap.speedBytesPerSecond
+        guard bytesPerSec > 0 else { return nil }
+        if bytesPerSec >= 1024 * 1024 {
+            return String(format: "%.1f MB/s", bytesPerSec / (1024 * 1024))
+        }
+        if bytesPerSec >= 1024 {
+            return String(format: "%.0f KB/s", bytesPerSec / 1024)
+        }
+        return String(format: "%.0f B/s", bytesPerSec)
+    }
+    #else
+    private var resolvedDownloadSpeed: String? { nil }
+    #endif
+
+    #if os(iOS)
+    /// Kompakte voraussichtliche Restdauer (z. B. „10s“, „2m“, „1h 5m“), nur während eines
+    /// aktiven Downloads und nur wenn Größe und Geschwindigkeit bekannt sind.
+    private var resolvedDownloadETA: String? {
+        guard showDownloadSpeed, downloadSnap.status == .downloading else { return nil }
+        let speed = downloadSnap.speedBytesPerSecond
+        let expected = downloadSnap.expectedSizeBytes
+        guard speed > 0, expected > 0 else { return nil }
+        let remaining = Double(expected) * (1 - downloadSnap.progress)
+        guard remaining > 0 else { return nil }
+        let seconds = remaining / speed
+        guard seconds.isFinite, seconds > 0 else { return nil }
+        return Self.formatDuration(seconds)
+    }
+    #else
+    private var resolvedDownloadETA: String? { nil }
+    #endif
+
+    /// Formatiert eine Dauer kompakt („10s“, „2m“, „1h 5m“), ohne Worte vor/nach der Zeit.
+    private static func formatDuration(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded())
+        if total < 60 { return "\(max(total, 1))s" }
+        let minutes = total / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        let remMin = minutes % 60
+        if remMin > 0 { return "\(hours)h \(remMin)m" }
+        return "\(hours)h"
     }
 
     #if os(iOS)

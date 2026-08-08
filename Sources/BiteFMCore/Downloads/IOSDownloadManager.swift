@@ -15,12 +15,15 @@ public struct EpisodeDownloadUISnapshot: Equatable, Sendable {
     /// "download" button for episodes that were never downloaded, vs. a cancel button once a
     /// download actually exists (queued/active/failed/downloaded).
     public var exists: Bool
+    /// Aktuelle Downloadgeschwindigkeit in Bytes/s (0 wenn unbekannt/nicht aktiv).
+    public var speedBytesPerSecond: Double
 
-    public init(status: EpisodeDownloadStatus, progress: Double, expectedSizeBytes: Int64 = 0, exists: Bool = true) {
+    public init(status: EpisodeDownloadStatus, progress: Double, expectedSizeBytes: Int64 = 0, exists: Bool = true, speedBytesPerSecond: Double = 0) {
         self.status = status
         self.progress = progress
         self.expectedSizeBytes = expectedSizeBytes
         self.exists = exists
+        self.speedBytesPerSecond = speedBytesPerSecond
     }
 }
 
@@ -625,7 +628,8 @@ public final class IOSDownloadManager: ObservableObject {
     fileprivate func downloadDidProgress(
         taskIdentifier: Int,
         totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
+        totalBytesExpectedToWrite: Int64,
+        speedBytesPerSecond: Double
     ) {
         guard let terminID = taskToTerminID[taskIdentifier] else { return }
         let p: Double
@@ -643,7 +647,8 @@ public final class IOSDownloadManager: ObservableObject {
         let newSnap = EpisodeDownloadUISnapshot(
             status: .downloading,
             progress: p,
-            expectedSizeBytes: expectedSnap
+            expectedSizeBytes: expectedSnap,
+            speedBytesPerSecond: speedBytesPerSecond
         )
         // Skip the update when nothing the UI shows has changed.
         if snapshotByTerminID[terminID] != newSnap {
@@ -1168,11 +1173,24 @@ private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate 
     /// Throttle progress forwarding to the main actor. `didWriteData` can fire
     /// hundreds of times per second on a fast link; forwarding every tick would
     /// spawn a storm of MainActor tasks, SwiftData saves, and SwiftUI re-renders
-    /// (the >150% CPU / scroll stutter seen during downloads). We coalesce to ~10 Hz.
+    /// (the >150% CPU / scroll stutter seen during downloads). We coalesce to 1 Hz,
+    /// damit sich Geschwindigkeit und ETA nur einmal pro Sekunde ändern.
     private var lastForwardedAt: Date = .distantPast
-    private let minForwardInterval: TimeInterval = 0.1
+    private let minForwardInterval: TimeInterval = 1.0
     /// Latest progress seen since the last forward, so a slow final tick still lands.
     private var pendingProgress: (taskIdentifier: Int, written: Int64, expected: Int64)?
+
+    /// Geschwindigkeitsmessung: letzter Stand (Bytes + Zeitstempel) pro Task, um
+    /// Task-Wechsel zu erkennen und das Messfenster zurückzusetzen.
+    private var lastSample: (taskIdentifier: Int, written: Int64, at: Date)?
+    /// Gleitendes Fenster der letzten Samples (Bytes + Zeitstempel) zur Ratenberechnung.
+    /// Ein Fenster von ~1,5 s glättet TCP-Bursts, sodass die Anzeige die nachhaltige
+    /// Durchsatzrate zeigt statt unrealistischer Spitzenwerte aus Sub-Millisekunden-Fenstern.
+    private var speedWindow: [(written: Int64, at: Date)] = []
+    private let speedWindowDuration: TimeInterval = 1.5
+    /// Exponentiell geglättete Rate (Bytes/s), damit die Anzeige nicht zwischen 0 und
+    /// Spitzenwerten springt.
+    private var smoothedSpeed: Double = 0
 
     init(manager: IOSDownloadManager) {
         self.manager = manager
@@ -1202,18 +1220,43 @@ private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate 
         totalBytesExpectedToWrite: Int64
     ) {
         let tid = downloadTask.taskIdentifier
-        pendingProgress = (tid, totalBytesWritten, totalBytesExpectedToWrite)
         let now = Date()
+        // Task-Wechsel (oder erster Sample): Messfenster zurücksetzen.
+        if lastSample?.taskIdentifier != tid {
+            speedWindow.removeAll(keepingCapacity: true)
+        }
+        lastSample = (tid, totalBytesWritten, now)
+        // Sample ans Fenster anhängen und Samples außerhalb des Zeitfensters entfernen.
+        speedWindow.append((written: totalBytesWritten, at: now))
+        speedWindow.removeAll { now.timeIntervalSince($0.at) > speedWindowDuration }
+
+        pendingProgress = (tid, totalBytesWritten, totalBytesExpectedToWrite)
         guard now.timeIntervalSince(lastForwardedAt) >= minForwardInterval else { return }
         lastForwardedAt = now
         let snapshot = pendingProgress
         pendingProgress = nil
         guard let snap = snapshot else { return }
+        // Rate über das Fenster berechnen und stark glätten (EMA α=0,2), damit
+        // Geschwindigkeit und ETA ruhig bleiben statt zu springen.
+        var speed: Double = 0
+        if let first = speedWindow.first, speedWindow.count >= 2 {
+            let dt = now.timeIntervalSince(first.at)
+            if dt > 0 {
+                let rate = Double(totalBytesWritten - first.written) / dt
+                if smoothedSpeed == 0 {
+                    smoothedSpeed = rate
+                } else {
+                    smoothedSpeed = smoothedSpeed * 0.8 + rate * 0.2
+                }
+                speed = smoothedSpeed
+            }
+        }
         Task { @MainActor in
             manager?.downloadDidProgress(
                 taskIdentifier: snap.taskIdentifier,
                 totalBytesWritten: snap.written,
-                totalBytesExpectedToWrite: snap.expected
+                totalBytesExpectedToWrite: snap.expected,
+                speedBytesPerSecond: speed
             )
         }
     }

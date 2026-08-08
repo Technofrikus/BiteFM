@@ -86,6 +86,8 @@ struct DownloadsView: View {
                             makeBroadcastRow(
                                 item: item,
                                 metaLineSizeSuffix: downloadSizeLabel(for: row),
+                                showTimeInDateLine: false,
+                                showDownloadSpeed: true,
                                 favoritePlayed: favoritePlayedStore.state,
                                 selectedItemForDetail: $selectedForDetail,
                                 isInspectorPresented: $isInspectorPresented
