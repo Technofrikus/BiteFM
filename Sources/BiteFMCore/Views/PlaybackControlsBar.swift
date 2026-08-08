@@ -194,7 +194,7 @@ struct PlaybackProgressLine: View {
         if progress.duration > 0 {
             GeometryReader { geometry in
                 Rectangle()
-                    .fill(Color.white)
+                    .fill(.quaternary)
                     .frame(width: geometry.size.width * min(1, max(0, progress.currentTime / progress.duration)))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
