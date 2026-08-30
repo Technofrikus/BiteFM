@@ -276,16 +276,14 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     
     private func setupAudioSession() {
         #if os(iOS)
-        // Configure the session on a background context: AVAudioSession.setActive(_:) is the only
-        // activation API available on iOS (the async activate() is macOS-only), and calling it on
-        // the main thread triggers an Apple runtime warning about UI unresponsiveness. The
-        // @MainActor interrupt-observer registration is done separately, on the main thread.
+        // Configuring the category does not claim the audio session. In particular, do not activate
+        // it while the app starts: activation of the .playback category interrupts audio from other
+        // apps even if BiteFM has not started playback yet.
         Task.detached {
             do {
                 let session = AVAudioSession.sharedInstance()
                 try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])
-                try session.setActive(true)
-                LogManager.shared.log("AudioSession configured successfully", type: .info)
+                LogManager.shared.log("AudioSession category configured successfully", type: .info)
             } catch {
                 LogManager.shared.log("Failed to setup AVAudioSession: \(error)", type: .error)
             }
@@ -295,6 +293,25 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     }
 
     #if os(iOS)
+    /// Activates the session only for an explicit playback action. This is intentionally not part
+    /// of app startup because `.playback` activation pauses audio owned by another app.
+    private func activateAudioSessionThenStartPlayback() {
+        Task.detached { [weak self] in
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+                await MainActor.run { self?.startPlayerPlayback() }
+            } catch {
+                LogManager.shared.log("Failed to activate AVAudioSession for playback: \(error)", type: .error)
+                await MainActor.run {
+                    guard let self else { return }
+                    self.userFacingPlaybackError = "Wiedergabe konnte nicht gestartet werden."
+                    self.isPlaying = false
+                    self.clearPreparingPlayback()
+                }
+            }
+        }
+    }
+
     private func registerAudioInterruptionObserver() {
         guard audioInterruptionObserver == nil else { return }
         audioInterruptionObserver = NotificationCenter.default.addObserver(
@@ -325,18 +342,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             }()
             if wasPlayingBeforeInterruption && shouldResume {
                 wasPlayingBeforeInterruption = false
-                // setActive(_:) must not run on the main thread (iOS-only sync API; see setupAudioSession).
-                Task.detached {
-                    do {
-                        try AVAudioSession.sharedInstance().setActive(true)
-                    } catch {
-                        LogManager.shared.log("Failed to reactivate AVAudioSession: \(error)", type: .error)
-                    }
-                    await MainActor.run {
-                        self.player?.play()
-                        self.updatePlaybackRate(1.0)
-                    }
-                }
+                activateAudioSessionThenStartPlayback()
             } else {
                 wasPlayingBeforeInterruption = false
             }
@@ -867,6 +873,28 @@ public class AudioPlayerManager: NSObject, ObservableObject {
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
+
+    /// Starts or resumes the player only after iOS has claimed the audio session for this
+    /// user-initiated playback action. macOS does not use `AVAudioSession`.
+    private func startPlayback() {
+        #if os(iOS)
+        activateAudioSessionThenStartPlayback()
+        #else
+        startPlayerPlayback()
+        #endif
+    }
+
+    private func startPlayerPlayback() {
+        player?.play()
+        isPlaying = true
+        isStalled = false
+        updatePlaybackRate(1.0)
+
+        // App-weiten Wiedergabe-Snapshot anlegen, sobald eine archivierte Ausgabe gespielt wird (Live wird ausgespart).
+        if !isLive, currentItem != nil {
+            persistRestorationSession(wasPlaying: true)
+        }
+    }
     
     private func play(url: URL, startAt: Double = 0) {
         userFacingPlaybackError = nil
@@ -915,14 +943,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         NotificationCenter.default.addObserver(self, selector: #selector(handlePlaybackEnded), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
         
         setupTimeObserver()
-        player?.play()
-        isPlaying = true
-        isStalled = false
-
-        // App-weiten Wiedergabe-Snapshot anlegen, sobald eine archivierte Ausgabe gespielt wird (Live wird ausgespart).
-        if !isLive, currentItem != nil {
-            persistRestorationSession(wasPlaying: true)
-        }
+        startPlayback()
     }
 
     @objc private func handlePlaybackError(notification: Notification) {
@@ -991,12 +1012,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 play(item: item, initialPosition: resumeAt)
                 return
             }
-            player?.play()
-            isPlaying = true
-            updatePlaybackRate(1.0)
-            if !isLive, currentItem != nil {
-                persistRestorationSession(wasPlaying: true)
-            }
+            startPlayback()
         }
     }
 
@@ -1026,12 +1042,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                     self.play(item: item, initialPosition: resumeAt)
                     return
                 }
-                self.player?.play()
-                self.isPlaying = true
-                self.updatePlaybackRate(1.0)
-                if !self.isLive, self.currentItem != nil {
-                    self.persistRestorationSession(wasPlaying: true)
-                }
+                self.startPlayback()
             }
             return .success
         }
@@ -1126,4 +1137,3 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         #endif
     }
 }
-
