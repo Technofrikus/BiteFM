@@ -274,7 +274,7 @@ private struct BroadcastDetailDownloadGlyphColumn: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Download abbrechen")
-                case .queued, .preparing:
+                case .queued, .preparing, .awaitingBudgetDecision:
                     Button {
                         IOSDownloadManager.shared.removeDownload(for: item.terminID)
                     } label: {
@@ -357,7 +357,7 @@ private struct BroadcastDetailDownloadBar: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Download abbrechen")
-                case .queued, .preparing:
+                case .queued, .preparing, .awaitingBudgetDecision:
                     Button {
                         IOSDownloadManager.shared.removeDownload(for: item.terminID)
                     } label: {

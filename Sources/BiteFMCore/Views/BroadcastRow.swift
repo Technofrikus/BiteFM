@@ -333,7 +333,7 @@ struct BroadcastRow: View {
         if let metaLineSizeSuffix, !metaLineSizeSuffix.isEmpty { return metaLineSizeSuffix }
         guard downloadSnap.exists, downloadSnap.expectedSizeBytes > 0 else { return nil }
         switch downloadSnap.status {
-        case .preparing, .queued, .downloading:
+        case .preparing, .queued, .awaitingBudgetDecision, .downloading:
             return Self.formatMegabytes(downloadSnap.expectedSizeBytes, tildePrefix: true)
         default:
             return nil
@@ -453,7 +453,7 @@ struct BroadcastRow: View {
                     .buttonStyle(.plain)
                     .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                     .accessibilityLabel("Download abbrechen")
-                case .queued, .preparing:
+                case .queued, .preparing, .awaitingBudgetDecision:
                     Button {
                         downloadManager.removeDownload(for: item.terminID)
                     } label: {

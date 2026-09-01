@@ -184,16 +184,37 @@ private struct LoggedInRootView: View {
         #if os(iOS)
         .alert("Download-Speicher", isPresented: Binding(
             get: { downloadManager.budgetPrompt != nil },
-            set: { if !$0 { downloadManager.clearBudgetPromptBannerOnly() } }
+            // Ein Alert schreibt beim Schließen noch einmal `false`. Die Aktionen selbst
+            // verwalten den Zustand; sonst kann dieser späte Rückruf einen direkt danach
+            // gesetzten Folge-Dialog wieder löschen und die Download-Queue erneut auslösen.
+            set: { _ in }
         )) {
-            Button("Älteste löschen") {
-                Task { await downloadManager.confirmDeleteOldestForBudgetAndRetry() }
+            if let deletionCount = downloadManager.budgetPrompt?.deletionCount,
+               deletionCount > 0 {
+                Button(deletionCount == 1 ? "Ältesten Download löschen" : "\(deletionCount) älteste Downloads löschen") {
+                    Task { await downloadManager.confirmDeleteOldestForBudgetAndRetry() }
+                }
+            }
+            if let nextLimit = downloadManager.budgetPrompt?.nextStorageLimitLabel {
+                Button("Limit auf \(nextLimit) erhöhen") {
+                    Task { await downloadManager.increaseStorageLimitAndRetry() }
+                }
+                .disabled(downloadManager.budgetPrompt?.canIncreaseStorageLimit != true)
             }
             Button("Abbrechen", role: .cancel) {
                 downloadManager.dismissBudgetPrompt()
             }
         } message: {
-            Text(downloadManager.budgetPrompt?.message ?? "")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(downloadManager.budgetPrompt?.message ?? "")
+                if let nextLimit = downloadManager.budgetPrompt?.nextStorageLimitLabel {
+                    if downloadManager.budgetPrompt?.canIncreaseStorageLimit == true {
+                        Text("Alternativ: Limit auf \(nextLimit) erhöhen.")
+                    } else {
+                        Text("Für \(nextLimit) ist auf dem iPhone nicht genug freier Speicher verfügbar.")
+                    }
+                }
+            }
         }
         .alert("Speicher", isPresented: Binding(
             get: { downloadManager.deviceSpaceError != nil },

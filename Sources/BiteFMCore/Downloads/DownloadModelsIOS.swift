@@ -8,6 +8,7 @@ struct DownloadQueueCoordinator {
     private(set) var preparingTerminIDs: Set<Int> = []
     private var isProcessingQueue = false
     private var queueProcessingRequested = false
+    private(set) var isBudgetDecisionPending = false
 
     init(maxConcurrentDownloads: Int) {
         precondition(maxConcurrentDownloads > 0)
@@ -41,6 +42,10 @@ struct DownloadQueueCoordinator {
     }
 
     mutating func beginQueueProcessing() -> Bool {
+        // A budget prompt is a user decision, not another queue retry. In particular, do not
+        // set `queueProcessingRequested` while paused, otherwise finishing the current pass
+        // immediately schedules the same budget-blocked row again.
+        guard !isBudgetDecisionPending else { return false }
         guard !isProcessingQueue else {
             queueProcessingRequested = true
             return false
@@ -57,6 +62,76 @@ struct DownloadQueueCoordinator {
         queueProcessingRequested = false
         return shouldRunAgain
     }
+
+    mutating func beginBudgetDecision() -> Bool {
+        guard !isBudgetDecisionPending else { return false }
+        isBudgetDecisionPending = true
+        return true
+    }
+
+    mutating func finishBudgetDecision() {
+        isBudgetDecisionPending = false
+    }
+}
+
+struct DownloadBudgetDeletionCandidate: Equatable {
+    var terminID: Int
+    var bytes: Int64
+}
+
+enum DownloadBudgetDeletionPlan: Equatable {
+    case fitsWithoutDeletion
+    case delete(terminIDs: [Int])
+    case impossible
+}
+
+enum DownloadBudgetPolicy {
+    static func queuedTerminIDsExceedingBudget(
+        baseReservedBytes: Int64,
+        limitBytes: Int64,
+        oldestFirstCandidates: [DownloadBudgetDeletionCandidate]
+    ) -> [Int] {
+        var admittedBytes = baseReservedBytes
+        var rejected: [Int] = []
+        for candidate in oldestFirstCandidates {
+            let bytes = max(0, candidate.bytes)
+            if admittedBytes + bytes <= limitBytes {
+                admittedBytes += bytes
+            } else {
+                rejected.append(candidate.terminID)
+            }
+        }
+        return rejected
+    }
+
+    static func deletionPlan(
+        currentReservedBytes: Int64,
+        additionalBytes: Int64,
+        limitBytes: Int64,
+        oldestFirstCandidates: [DownloadBudgetDeletionCandidate]
+    ) -> DownloadBudgetDeletionPlan {
+        let requiredToFree = currentReservedBytes + additionalBytes - limitBytes
+        guard requiredToFree > 0 else { return .fitsWithoutDeletion }
+
+        var freed: Int64 = 0
+        var victims: [Int] = []
+        for candidate in oldestFirstCandidates where candidate.bytes > 0 {
+            freed += candidate.bytes
+            victims.append(candidate.terminID)
+            if freed >= requiredToFree {
+                return .delete(terminIDs: victims)
+            }
+        }
+        return .impossible
+    }
+
+    static func smallestLimitOption(
+        after currentLimit: Int64,
+        fitting requiredBytes: Int64,
+        options: [(label: String, bytes: Int64)]
+    ) -> (label: String, bytes: Int64)? {
+        options.first { $0.bytes > currentLimit && $0.bytes >= requiredBytes }
+    }
 }
 
 #if os(iOS)
@@ -67,6 +142,7 @@ import SwiftData
 public enum EpisodeDownloadStatus: String, CaseIterable, Sendable {
     case queued
     case preparing
+    case awaitingBudgetDecision
     case downloading
     case downloaded
     case failed
@@ -295,6 +371,19 @@ final class StoredOfflineBroadcastDetail {
 
 @Model
 final class StoredDownloadSettings {
+    /// Auswahlwerte für das Download-Limit. Zentral definiert, damit Einstellungen und
+    /// der Speicher-Dialog immer dieselben Stufen verwenden.
+    static let storageLimitOptions: [(label: String, bytes: Int64)] = [
+        ("1 GB", 1024 * 1024 * 1024),
+        ("2 GB", 2 * 1024 * 1024 * 1024),
+        ("3 GB", 3 * 1024 * 1024 * 1024),
+        ("5 GB", 5 * 1024 * 1024 * 1024),
+        ("8 GB", 8 * 1024 * 1024 * 1024),
+        ("12 GB", Int64(12) * 1024 * 1024 * 1024),
+        ("16 GB", 16 * 1024 * 1024 * 1024),
+        ("20 GB", 20 * 1024 * 1024 * 1024)
+    ]
+
     /// Always 0 — single row.
     @Attribute(.unique) var singletonKey: Int
 

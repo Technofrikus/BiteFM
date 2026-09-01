@@ -53,7 +53,7 @@ struct DownloadsView: View {
     /// Downloading/queued first, then failed, then completed (still date order within groups).
     private func rowRank(_ row: StoredDownloadedEpisode) -> Int {
         switch row.status {
-        case .downloading, .queued, .preparing: return 0
+        case .downloading, .queued, .preparing, .awaitingBudgetDecision: return 0
         case .failed: return 1
         case .downloaded: return 2
         }
@@ -234,17 +234,7 @@ private struct DownloadsSettingsView: View {
     @State private var maxPickIndex: Int = 2
     @State private var retentionWeeks: Int = 0
 
-    /// Ab 1 GB in wachsenden Schritten bis 20 GB (Ausgaben ~100–200 MB).
-    private let maxOptions: [(label: String, bytes: Int64)] = [
-        ("1 GB", 1024 * 1024 * 1024),
-        ("2 GB", 2 * 1024 * 1024 * 1024),
-        ("3 GB", 3 * 1024 * 1024 * 1024),
-        ("5 GB", 5 * 1024 * 1024 * 1024),
-        ("8 GB", 8 * 1024 * 1024 * 1024),
-        ("12 GB", Int64(12) * 1024 * 1024 * 1024),
-        ("16 GB", 16 * 1024 * 1024 * 1024),
-        ("20 GB", 20 * 1024 * 1024 * 1024)
-    ]
+    private let maxOptions = StoredDownloadSettings.storageLimitOptions
 
     var body: some View {
         NavigationStack {

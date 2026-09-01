@@ -149,6 +149,13 @@ public final class IOSDownloadManager: ObservableObject {
 
     private var pendingRetry: (item: ArchiveItem, detail: BroadcastDetail?)?
     private var pendingExpectedBytes: Int64 = 0
+    private var pendingDeletionTerminIDs: [Int] = []
+
+    private struct BudgetResolution {
+        var requiredBudgetBytes: Int64
+        /// `nil` means deleting every eligible candidate would still not make the target fit.
+        var deletionTerminIDs: [Int]?
+    }
 
     nonisolated(unsafe) private static var backgroundCompletionHandler: (() -> Void)?
 
@@ -258,7 +265,6 @@ public final class IOSDownloadManager: ObservableObject {
     public func startDownload(for item: ArchiveItem, preloadedDetail: BroadcastDetail? = nil) async {
         lastErrorMessage = nil
         deviceSpaceError = nil
-        budgetPrompt = nil
 
         guard let container = modelContainer else {
             lastErrorMessage = "Downloads nicht initialisiert."
@@ -269,6 +275,11 @@ public final class IOSDownloadManager: ObservableObject {
             await refreshSnapshotFromStore()
             return
         }
+
+        // Keep the single visible decision and its advertised deletion count stable. New manual
+        // requests are ignored until that decision reaches a terminal action; the queue itself is
+        // paused by `DownloadQueueCoordinator` as well.
+        guard !queueCoordinator.isBudgetDecisionPending else { return }
 
         let context = ModelContext(container)
         let row = try? fetchOrCreateRow(for: item, context: context)
@@ -401,13 +412,59 @@ public final class IOSDownloadManager: ObservableObject {
         )
 
         if !budgetOK {
+            let resolution = budgetResolution(
+                context: context,
+                settings: settings,
+                additionalBytes: budgetBytes,
+                excludingTerminID: item.terminID
+            )
+            let nextLimit = Self.nextStorageLimit(
+                after: settings.maxDownloadStorageBytes,
+                fitting: resolution.requiredBudgetBytes
+            )
+            let canIncreaseLimit = nextLimit != nil
+                && Self.hasDeviceFreeSpace(atLeast: Self.deviceReserveBytes(for: budgetBytes))
+
+            if resolution.deletionTerminIDs == nil, nextLimit == nil {
+                let message = "Diese Folge passt auch nach dem Löschen aller geeigneten Downloads nicht in das eingestellte Speicherlimit."
+                markDownloadFailedForBudget(terminID: item.terminID, context: context, message: message)
+                await refreshSnapshotFromStore()
+                lastErrorMessage = message
+                deviceSpaceError = message
+                return
+            }
+
+            guard queueCoordinator.beginBudgetDecision() else {
+                row.status = .queued
+                row.progress = 0
+                try? context.save()
+                await refreshSnapshotFromStore()
+                return
+            }
             pendingRetry = (item, detail)
             pendingExpectedBytes = budgetBytes
+            pendingDeletionTerminIDs = resolution.deletionTerminIDs ?? []
+            let deletionCount = pendingDeletionTerminIDs.count
+            let message: String
+            if deletionCount > 0, nextLimit != nil {
+                message = deletionCount == 1
+                    ? "Ein älterer Download muss gelöscht werden. Alternativ kannst du das Speicherlimit erhöhen."
+                    : "\(deletionCount) ältere Downloads müssen gelöscht werden. Alternativ kannst du das Speicherlimit erhöhen."
+            } else if deletionCount > 0 {
+                message = deletionCount == 1
+                    ? "Ein älterer Download muss gelöscht werden, damit diese Folge geladen werden kann."
+                    : "\(deletionCount) ältere Downloads müssen gelöscht werden, damit diese Folge geladen werden kann."
+            } else {
+                message = "Diese Folge passt nicht in das aktuelle Speicherlimit."
+            }
             budgetPrompt = DownloadBudgetPrompt(
-                message: "Das Download-Speicherlimit ist erreicht (laufende und wartende Downloads zählen mit). Es werden nacheinander die ältesten fertigen Downloads gelöscht, bis wieder Platz ist — das können eine oder mehrere Sendungen sein. Fortfahren?",
-                terminIDToDownload: item.terminID
+                message: message,
+                terminIDToDownload: item.terminID,
+                deletionCount: deletionCount,
+                nextStorageLimitLabel: nextLimit?.label,
+                canIncreaseStorageLimit: canIncreaseLimit
             )
-            row.status = .queued
+            row.status = .awaitingBudgetDecision
             row.progress = 0
             try? context.save()
             await refreshSnapshotFromStore()
@@ -420,6 +477,9 @@ public final class IOSDownloadManager: ObservableObject {
     /// Bricht einen laufenden/wartenden Download ab und entfernt die Zeile vollständig (inkl. Dateien & Offline-Detail).
     /// Für `.downloaded`-Zeilen wirkt sie wie ein normales Löschen — gleiche Semantik wie `deleteDownloadedEpisode`.
     public func removeDownload(for terminID: Int) {
+        if pendingRetry?.item.terminID == terminID {
+            clearBudgetDecision()
+        }
         if let tid = terminIDToTask[terminID] {
             urlSession?.getAllTasks { tasks in
                 tasks.filter { $0.taskIdentifier == tid }.forEach { $0.cancel() }
@@ -442,22 +502,58 @@ public final class IOSDownloadManager: ObservableObject {
     /// User confirmed: delete oldest downloaded episode(s) until budget fits, then retry pending download.
     public func confirmDeleteOldestForBudgetAndRetry() async {
         guard let pending = pendingRetry, let container = modelContainer else {
-            budgetPrompt = nil
+            clearBudgetDecision()
             return
         }
         // `mainContext` wie die SwiftUI-`@Query`/Umgebung — gleicher Kontext vermeidet Stände, in denen Löschen in einem Ephemeral-Context nicht sichtbar wird.
         let context = container.mainContext
         guard let settings = try? StoredDownloadSettings.fetchOrCreate(context: context) else {
-            budgetPrompt = nil
+            clearBudgetDecision()
             return
         }
 
-        await deleteOldestDownloadedEpisodesUntilBudgetFits(
+        let resolution = budgetResolution(
             context: context,
             settings: settings,
             additionalBytes: pendingExpectedBytes,
             excludingTerminID: pending.item.terminID
         )
+        guard let deletionTerminIDs = resolution.deletionTerminIDs else {
+            let message = "Diese Folge passt nicht in das Speicherlimit, ohne weitere geeignete Downloads zu löschen. Es wurde nichts gelöscht."
+            markDownloadFailedForBudget(terminID: pending.item.terminID, context: context, message: message)
+            clearBudgetDecision()
+            await refreshSnapshotFromStore()
+            lastErrorMessage = message
+            deviceSpaceError = message
+            return
+        }
+
+        let advertisedIDs = Set(pendingDeletionTerminIDs)
+        guard Set(deletionTerminIDs).isSubset(of: advertisedIDs) else {
+            let message = "Die Speicherbelegung hat sich seit dem Dialog geändert. Es wurde nichts gelöscht; bitte starte den Download erneut."
+            markDownloadFailedForBudget(terminID: pending.item.terminID, context: context, message: message)
+            clearBudgetDecision()
+            await refreshSnapshotFromStore()
+            lastErrorMessage = message
+            deviceSpaceError = message
+            return
+        }
+
+        if !deletionTerminIDs.isEmpty {
+            let didDelete = await deleteDownloadedEpisodes(
+                terminIDs: deletionTerminIDs,
+                context: context
+            )
+            guard didDelete else {
+                let message = "Die ausgewählten Downloads konnten nicht zuverlässig gelöscht werden. Der neue Download wurde nicht gestartet."
+                markDownloadFailedForBudget(terminID: pending.item.terminID, context: context, message: message)
+                clearBudgetDecision()
+                await refreshSnapshotFromStore()
+                lastErrorMessage = message
+                deviceSpaceError = message
+                return
+            }
+        }
 
         let ok = await ensureUnderAppBudget(
             context: context,
@@ -465,21 +561,71 @@ public final class IOSDownloadManager: ObservableObject {
             additionalBytes: pendingExpectedBytes,
             excludingTerminID: pending.item.terminID
         )
-        budgetPrompt = nil
-        pendingRetry = nil
-        pendingExpectedBytes = 0
+        clearBudgetDecision()
 
         if ok {
             await startDownload(for: pending.item, preloadedDetail: pending.detail)
             await processDownloadQueue()
         } else {
-            lastErrorMessage = "Nicht genug Platz im Download-Speicher. Keine weiteren Downloads zum Entfernen oder Limit zu niedrig."
+            let message = "Der Speicherbedarf hat sich geändert; der Download passt weiterhin nicht in das Limit."
+            markDownloadFailedForBudget(terminID: pending.item.terminID, context: context, message: message)
+            await refreshSnapshotFromStore()
+            lastErrorMessage = message
+            deviceSpaceError = message
         }
     }
 
-    /// Nur die sichtbare Alert-Flagge löschen (SwiftUI schließt das Sheet). **Wichtig:** `pendingRetry` bleibt erhalten, bis die Bestätigung verarbeitet ist — sonst würde `dismissBudgetPrompt()` das Pending vor `confirmDeleteOldestForBudgetAndRetry` zerstören.
-    public func clearBudgetPromptBannerOnly() {
-        budgetPrompt = nil
+    /// Erhöht auf die kleinste angebotene Stufe, in die alle Reservierungen einschließlich des
+    /// wartenden Downloads passen, und versucht ihn erneut. Der konkrete Downloadbedarf wird
+    /// vorher noch einmal gegen den freien Gerätespeicher geprüft.
+    public func increaseStorageLimitAndRetry() async {
+        guard let pending = pendingRetry, let container = modelContainer else {
+            clearBudgetDecision()
+            return
+        }
+        let context = container.mainContext
+        guard let settings = try? StoredDownloadSettings.fetchOrCreate(context: context) else {
+            clearBudgetDecision()
+            return
+        }
+        let resolution = budgetResolution(
+            context: context,
+            settings: settings,
+            additionalBytes: pendingExpectedBytes,
+            excludingTerminID: pending.item.terminID
+        )
+        guard let nextLimit = Self.nextStorageLimit(
+            after: settings.maxDownloadStorageBytes,
+            fitting: resolution.requiredBudgetBytes
+        ) else {
+            let message = "Keine angebotene Speicherstufe ist groß genug für diesen Download."
+            markDownloadFailedForBudget(terminID: pending.item.terminID, context: context, message: message)
+            clearBudgetDecision()
+            await refreshSnapshotFromStore()
+            lastErrorMessage = message
+            deviceSpaceError = message
+            return
+        }
+        guard Self.hasDeviceFreeSpace(atLeast: Self.deviceReserveBytes(for: pendingExpectedBytes)) else {
+            budgetPrompt?.canIncreaseStorageLimit = false
+            return
+        }
+
+        settings.maxDownloadStorageBytes = nextLimit.bytes
+        do {
+            try context.save()
+        } catch {
+            let message = "Das neue Download-Speicherlimit konnte nicht gespeichert werden."
+            markDownloadFailedForBudget(terminID: pending.item.terminID, context: context, message: message)
+            clearBudgetDecision()
+            await refreshSnapshotFromStore()
+            lastErrorMessage = message
+            deviceSpaceError = message
+            return
+        }
+        clearBudgetDecision()
+        await startDownload(for: pending.item, preloadedDetail: pending.detail)
+        await processDownloadQueue()
     }
 
     public func dismissBudgetPrompt() {
@@ -489,18 +635,26 @@ public final class IOSDownloadManager: ObservableObject {
             let fd = FetchDescriptor<StoredDownloadedEpisode>(
                 predicate: #Predicate<StoredDownloadedEpisode> { $0.terminID == tid }
             )
-            if let row = try? ctx.fetch(fd).first, row.status == .queued {
+            if let row = try? ctx.fetch(fd).first,
+               row.status == .queued || row.status == .awaitingBudgetDecision {
                 row.status = .failed
                 row.errorMessage = "Download abgebrochen (Speicherlimit)."
                 try? ctx.save()
             }
         }
+        clearBudgetDecision()
+        Task {
+            await refreshSnapshotFromStore()
+            await processDownloadQueue()
+        }
+    }
+
+    private func clearBudgetDecision() {
         budgetPrompt = nil
         pendingRetry = nil
         pendingExpectedBytes = 0
-        Task {
-            await refreshSnapshotFromStore()
-        }
+        pendingDeletionTerminIDs = []
+        queueCoordinator.finishBudgetDecision()
     }
 
     private static func downloadErrorDescription(_ error: Error, response: URLResponse?) -> String {
@@ -757,6 +911,7 @@ public final class IOSDownloadManager: ObservableObject {
     /// Startet wartende `.queued`-Zeilen, solange noch Download-Slots frei sind (FIFO nach `createdAt`).
     private func processDownloadQueue() async {
         guard let container = modelContainer else { return }
+        guard !queueCoordinator.isBudgetDecisionPending else { return }
         guard queueCoordinator.beginQueueProcessing() else { return }
         defer {
             if queueCoordinator.finishQueueProcessing() {
@@ -776,6 +931,9 @@ public final class IOSDownloadManager: ObservableObject {
             for row in rows {
                 let before = terminIDToTask.count
                 await startDownload(for: row.toArchiveItem(), preloadedDetail: nil)
+                if queueCoordinator.isBudgetDecisionPending {
+                    break
+                }
                 if terminIDToTask.count > before {
                     anyStarted = true
                     break
@@ -863,7 +1021,7 @@ public final class IOSDownloadManager: ObservableObject {
         switch row.status {
         case .downloaded:
             return effectiveDownloadedAudioBytes(for: row)
-        case .downloading, .queued, .preparing:
+        case .downloading, .queued, .preparing, .awaitingBudgetDecision:
             if row.expectedSizeBytes > 0 { return row.expectedSizeBytes }
             return fallbackBudgetBytesPerEpisode
         case .failed:
@@ -878,48 +1036,86 @@ public final class IOSDownloadManager: ObservableObject {
         excludingTerminID: Int
     ) async -> Bool {
         let fd = FetchDescriptor<StoredDownloadedEpisode>()
-        guard let rows = try? context.fetch(fd) else { return true }
+        guard let rows = try? context.fetch(fd) else { return false }
         let sum = rows
             .filter { $0.terminID != excludingTerminID }
             .reduce(Int64(0)) { $0 + Self.budgetReservedBytes(for: $1) }
         return sum + additionalBytes <= settings.maxDownloadStorageBytes
     }
 
-    private func deleteOldestDownloadedEpisodesUntilBudgetFits(
+    private func budgetResolution(
         context: ModelContext,
         settings: StoredDownloadSettings,
         additionalBytes: Int64,
         excludingTerminID: Int
-    ) async {
-        let limit = settings.maxDownloadStorageBytes
-        while true {
-            let fd = FetchDescriptor<StoredDownloadedEpisode>()
-            guard let all = try? context.fetch(fd) else { break }
-            let sumReserved = all
-                .filter { $0.terminID != excludingTerminID }
-                .reduce(Int64(0)) { $0 + Self.budgetReservedBytes(for: $1) }
-            if sumReserved + additionalBytes <= limit { break }
-            // Ältester **Download** (Zeitpunkt des Ladens), nicht Ausstrahlungsdatum der Sendung.
-            let candidates = all.filter { $0.terminID != excludingTerminID && $0.status == .downloaded }
-                .sorted { lhs, rhs in
-                    let l = lhs.downloadedAt ?? lhs.createdAt
-                    let r = rhs.downloadedAt ?? rhs.createdAt
-                    if l != r { return l < r }
-                    return lhs.terminID < rhs.terminID
-                }
-            guard let victim = candidates.first else { break }
-            Self.deleteEpisodeFiles(victim, context: context)
-            let tid = victim.terminID
-            context.delete(victim)
-            // Avoid `Predicate` capturing `terminID` from SwiftData model (`StoredDownloadedEpisode`) — breaks macro type inference.
-            if let allOd = try? context.fetch(FetchDescriptor<StoredOfflineBroadcastDetail>()),
-               let o = allOd.first(where: { $0.terminID == tid }) {
-                context.delete(o)
-            }
-            try? context.save()
+    ) -> BudgetResolution {
+        guard let all = try? context.fetch(FetchDescriptor<StoredDownloadedEpisode>()) else {
+            return BudgetResolution(requiredBudgetBytes: Int64.max, deletionTerminIDs: nil)
         }
-        try? context.save()
+        let relevant = all.filter { $0.terminID != excludingTerminID }
+        let currentReserved = relevant.reduce(Int64(0)) { $0 + Self.budgetReservedBytes(for: $1) }
+        let requiredBudget = currentReserved + additionalBytes
+        let nowPlayingID = AudioPlayerManager.shared.currentItem?.terminID
+        let candidates = relevant
+            .filter { $0.terminID != nowPlayingID && $0.status == .downloaded }
+            .sorted { lhs, rhs in
+                let l = lhs.downloadedAt ?? lhs.createdAt
+                let r = rhs.downloadedAt ?? rhs.createdAt
+                if l != r { return l < r }
+                return lhs.terminID < rhs.terminID
+            }
+            .map {
+                DownloadBudgetDeletionCandidate(
+                    terminID: $0.terminID,
+                    bytes: Self.effectiveDownloadedAudioBytes(for: $0)
+                )
+            }
+        let plan = DownloadBudgetPolicy.deletionPlan(
+            currentReservedBytes: currentReserved,
+            additionalBytes: additionalBytes,
+            limitBytes: settings.maxDownloadStorageBytes,
+            oldestFirstCandidates: candidates
+        )
+        switch plan {
+        case .fitsWithoutDeletion:
+            return BudgetResolution(requiredBudgetBytes: requiredBudget, deletionTerminIDs: [])
+        case .delete(let terminIDs):
+            return BudgetResolution(requiredBudgetBytes: requiredBudget, deletionTerminIDs: terminIDs)
+        case .impossible:
+            return BudgetResolution(requiredBudgetBytes: requiredBudget, deletionTerminIDs: nil)
+        }
+    }
+
+    private func deleteDownloadedEpisodes(terminIDs: [Int], context: ModelContext) async -> Bool {
+        let idSet = Set(terminIDs)
+        guard let rows = try? context.fetch(FetchDescriptor<StoredDownloadedEpisode>()) else { return false }
+        let details = (try? context.fetch(FetchDescriptor<StoredOfflineBroadcastDetail>())) ?? []
+        for row in rows where idSet.contains(row.terminID) && row.status == .downloaded {
+            Self.deleteEpisodeFiles(row, context: context)
+            let tid = row.terminID
+            context.delete(row)
+            if let detail = details.first(where: { $0.terminID == tid }) {
+                context.delete(detail)
+            }
+        }
+        do {
+            try context.save()
+        } catch {
+            await refreshSnapshotFromStore()
+            return false
+        }
         await refreshSnapshotFromStore()
+        return true
+    }
+
+    private func markDownloadFailedForBudget(terminID: Int, context: ModelContext, message: String) {
+        let fd = FetchDescriptor<StoredDownloadedEpisode>(
+            predicate: #Predicate<StoredDownloadedEpisode> { $0.terminID == terminID }
+        )
+        guard let row = try? context.fetch(fd).first else { return }
+        row.status = .failed
+        row.errorMessage = message
+        try? context.save()
     }
 
     /// Delete downloaded episode + offline detail + file on disk.
@@ -965,6 +1161,46 @@ public final class IOSDownloadManager: ObservableObject {
         let fd = FetchDescriptor<StoredDownloadedEpisode>()
         guard let rows = try? ctx.fetch(fd) else { return }
         var changed = false
+
+        if !queueCoordinator.isBudgetDecisionPending,
+           let settings = try? StoredDownloadSettings.fetchOrCreate(context: ctx) {
+            // An in-memory prompt cannot survive process termination. Persisted waiting rows
+            // therefore become retryable failures instead of reopening a stale dialog forever.
+            for row in rows where row.status == .awaitingBudgetDecision {
+                row.status = .failed
+                row.errorMessage = "Downloadentscheidung nach App-Neustart abgebrochen."
+                changed = true
+            }
+
+            // Migration for rows written by older builds, which persisted budget-blocked work as
+            // ordinary `.queued`. Admit queued rows oldest-first only while the configured budget
+            // still covers all reservations; excess rows become visible retry failures.
+            let admittedBytes = rows
+                .filter { $0.status != .queued && $0.status != .failed && $0.status != .awaitingBudgetDecision }
+                .reduce(Int64(0)) { $0 + Self.budgetReservedBytes(for: $1) }
+            let queued = rows
+                .filter { $0.status == .queued }
+                .sorted { lhs, rhs in
+                    if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+                    return lhs.terminID < rhs.terminID
+                }
+            let rejectedIDs = Set(DownloadBudgetPolicy.queuedTerminIDsExceedingBudget(
+                baseReservedBytes: admittedBytes,
+                limitBytes: settings.maxDownloadStorageBytes,
+                oldestFirstCandidates: queued.map {
+                    DownloadBudgetDeletionCandidate(
+                        terminID: $0.terminID,
+                        bytes: Self.budgetReservedBytes(for: $0)
+                    )
+                }
+            ))
+            for row in queued where rejectedIDs.contains(row.terminID) {
+                row.status = .failed
+                row.errorMessage = "Download nach App-Neustart abgebrochen (Speicherlimit)."
+                changed = true
+            }
+        }
+
         for row in rows where row.status == .downloaded {
             guard let url = row.resolvedLocalAudioURL() else {
                 row.status = .failed
@@ -1152,6 +1388,31 @@ public final class IOSDownloadManager: ObservableObject {
         }
     }
 
+    private static func hasDeviceFreeSpace(atLeast bytes: Int64) -> Bool {
+        guard bytes > 0 else { return true }
+        do {
+            try ensureDeviceHasFreeSpace(forBytes: UInt64(bytes))
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private static func deviceReserveBytes(for downloadBytes: Int64) -> Int64 {
+        downloadBytes + 32 * 1024 * 1024
+    }
+
+    private static func nextStorageLimit(
+        after currentLimit: Int64,
+        fitting requiredBytes: Int64
+    ) -> (label: String, bytes: Int64)? {
+        DownloadBudgetPolicy.smallestLimitOption(
+            after: currentLimit,
+            fitting: requiredBytes,
+            options: StoredDownloadSettings.storageLimitOptions
+        )
+    }
+
     public static func totalDownloadedBytes(context: ModelContext) throws -> Int64 {
         let fd = FetchDescriptor<StoredDownloadedEpisode>()
         let rows = try context.fetch(fd)
@@ -1192,10 +1453,22 @@ public struct DownloadBudgetPrompt: Identifiable, Equatable {
     public let id = UUID()
     public var message: String
     public var terminIDToDownload: Int
+    public var deletionCount: Int
+    public var nextStorageLimitLabel: String?
+    public var canIncreaseStorageLimit: Bool
 
-    public init(message: String, terminIDToDownload: Int) {
+    public init(
+        message: String,
+        terminIDToDownload: Int,
+        deletionCount: Int = 0,
+        nextStorageLimitLabel: String? = nil,
+        canIncreaseStorageLimit: Bool = false
+    ) {
         self.message = message
         self.terminIDToDownload = terminIDToDownload
+        self.deletionCount = deletionCount
+        self.nextStorageLimitLabel = nextStorageLimitLabel
+        self.canIncreaseStorageLimit = canIncreaseStorageLimit
     }
 }
 
