@@ -135,8 +135,8 @@ public final class IOSDownloadManager: ObservableObject {
         }
     }
 
-    /// Gleichzeitig laufende Downloads (Bandbreite); weitere bleiben `.queued`.
-    private let maxConcurrentDownloads = 2
+    /// Gleichzeitig laufende oder vorbereitete Downloads; weitere bleiben `.queued`.
+    private var queueCoordinator = DownloadQueueCoordinator(maxConcurrentDownloads: 2)
     /// Für App-Speicher-Budget, wenn `Content-Length` per HEAD nicht ermittelt werden kann (~Ausgaben 100–200 MB).
     private static let fallbackBudgetBytesPerEpisode: Int64 = 200 * 1024 * 1024
 
@@ -270,11 +270,6 @@ public final class IOSDownloadManager: ObservableObject {
             return
         }
 
-        setSnapshot(
-            EpisodeDownloadUISnapshot(status: .preparing, progress: 0, expectedSizeBytes: 0),
-            for: item.terminID
-        )
-
         let context = ModelContext(container)
         let row = try? fetchOrCreateRow(for: item, context: context)
         guard let row else {
@@ -283,9 +278,37 @@ public final class IOSDownloadManager: ObservableObject {
             await refreshSnapshotFromStore()
             return
         }
-        if row.status == .downloading || row.status == .queued || row.status == .preparing {
-            if terminIDToTask[item.terminID] != nil { return }
+        let itemTerminID = item.terminID
+        let activeTerminIDs = Set(terminIDToTask.keys)
+        if activeTerminIDs.contains(itemTerminID) || queueCoordinator.isPreparing(itemTerminID) {
+            return
         }
+        guard queueCoordinator.reservePreparation(for: itemTerminID, activeTerminIDs: activeTerminIDs) else {
+            row.status = .queued
+            row.progress = 0
+            row.errorMessage = nil
+            row.applyArchiveMetadata(from: item)
+            try? context.save()
+            setSnapshot(
+                EpisodeDownloadUISnapshot(
+                    status: .queued,
+                    progress: 0,
+                    expectedSizeBytes: row.expectedSizeBytes
+                ),
+                for: itemTerminID
+            )
+            return
+        }
+        defer {
+            if queueCoordinator.releasePreparation(for: itemTerminID) {
+                Task { @MainActor in await self.processDownloadQueue() }
+            }
+        }
+
+        setSnapshot(
+            EpisodeDownloadUISnapshot(status: .preparing, progress: 0, expectedSizeBytes: 0),
+            for: itemTerminID
+        )
 
         row.status = .preparing
         row.progress = 0
@@ -683,7 +706,10 @@ public final class IOSDownloadManager: ObservableObject {
             await refreshSnapshotFromStore()
             return
         }
-        if terminIDToTask.count >= maxConcurrentDownloads {
+        let activeTerminIDs = Set(terminIDToTask.keys)
+        guard queueCoordinator.canCreateTask(for: itemTerminID, activeTerminIDs: activeTerminIDs) else {
+            // Ein anderer reentrenter Aufruf kann die Folge inzwischen gestartet haben.
+            if activeTerminIDs.contains(itemTerminID) { return }
             row.status = .queued
             row.progress = 0
             row.applyArchiveMetadata(from: item)
@@ -703,6 +729,8 @@ public final class IOSDownloadManager: ObservableObject {
         taskToTerminID[task.taskIdentifier] = item.terminID
         terminIDToTask[item.terminID] = task.taskIdentifier
         taskToRemoteURL[task.taskIdentifier] = remoteURL
+        // Atomarer Übergang von „vorbereitend“ zu „aktiv“ vor dem nächsten `await`.
+        queueCoordinator.releasePreparation(for: itemTerminID)
         LogManager.shared.log(
             "Starting download task \(task.taskIdentifier) for terminID \(item.terminID) @ \(remoteURL.absoluteString)",
             type: .info
@@ -729,7 +757,13 @@ public final class IOSDownloadManager: ObservableObject {
     /// Startet wartende `.queued`-Zeilen, solange noch Download-Slots frei sind (FIFO nach `createdAt`).
     private func processDownloadQueue() async {
         guard let container = modelContainer else { return }
-        while terminIDToTask.count < maxConcurrentDownloads {
+        guard queueCoordinator.beginQueueProcessing() else { return }
+        defer {
+            if queueCoordinator.finishQueueProcessing() {
+                Task { @MainActor in await self.processDownloadQueue() }
+            }
+        }
+        while terminIDToTask.count + queueCoordinator.preparingTerminIDs.count < queueCoordinator.maxConcurrentDownloads {
             let ctx = ModelContext(container)
             let fd = FetchDescriptor<StoredDownloadedEpisode>(
                 // SwiftData `#Predicate` kann Enum-Cases manchmal als „KeyPath auf Enum-Case“ interpretieren.

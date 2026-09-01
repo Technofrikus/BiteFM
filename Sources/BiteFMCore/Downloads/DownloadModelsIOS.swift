@@ -1,5 +1,65 @@
-#if os(iOS)
 import Foundation
+
+/// Serialisiert die Zulassung zur Download-Vorbereitung und koalesziert überlappende
+/// Queue-Läufe. Plattformneutral, damit die Race-Condition ohne echte URLSession testbar ist.
+struct DownloadQueueCoordinator {
+    let maxConcurrentDownloads: Int
+
+    private(set) var preparingTerminIDs: Set<Int> = []
+    private var isProcessingQueue = false
+    private var queueProcessingRequested = false
+
+    init(maxConcurrentDownloads: Int) {
+        precondition(maxConcurrentDownloads > 0)
+        self.maxConcurrentDownloads = maxConcurrentDownloads
+    }
+
+    func isPreparing(_ terminID: Int) -> Bool {
+        preparingTerminIDs.contains(terminID)
+    }
+
+    mutating func reservePreparation(for terminID: Int, activeTerminIDs: Set<Int>) -> Bool {
+        guard !activeTerminIDs.contains(terminID), !preparingTerminIDs.contains(terminID) else {
+            return false
+        }
+        guard activeTerminIDs.count + preparingTerminIDs.count < maxConcurrentDownloads else {
+            return false
+        }
+        preparingTerminIDs.insert(terminID)
+        return true
+    }
+
+    @discardableResult
+    mutating func releasePreparation(for terminID: Int) -> Bool {
+        preparingTerminIDs.remove(terminID) != nil
+    }
+
+    func canCreateTask(for terminID: Int, activeTerminIDs: Set<Int>) -> Bool {
+        preparingTerminIDs.contains(terminID)
+            && !activeTerminIDs.contains(terminID)
+            && activeTerminIDs.count < maxConcurrentDownloads
+    }
+
+    mutating func beginQueueProcessing() -> Bool {
+        guard !isProcessingQueue else {
+            queueProcessingRequested = true
+            return false
+        }
+        isProcessingQueue = true
+        return true
+    }
+
+    /// Gibt an, ob während des aktuellen Laufs mindestens ein weiterer Queue-Lauf angefordert wurde.
+    mutating func finishQueueProcessing() -> Bool {
+        guard isProcessingQueue else { return false }
+        isProcessingQueue = false
+        let shouldRunAgain = queueProcessingRequested
+        queueProcessingRequested = false
+        return shouldRunAgain
+    }
+}
+
+#if os(iOS)
 import SwiftData
 
 // MARK: - Download status (persisted as String)
