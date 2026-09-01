@@ -1170,27 +1170,26 @@ public struct DownloadBudgetPrompt: Identifiable, Equatable {
 private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate {
     weak var manager: IOSDownloadManager?
 
+    /// Progress sampling is deliberately isolated per download task. `URLSession` interleaves
+    /// delegate callbacks for concurrent downloads, so shared rate state would make one row show
+    /// another row's speed (and suppress every other row's UI update).
+    private struct ProgressSamplingState {
+        var lastForwardedAt: Date = .distantPast
+        var speedWindow: [(written: Int64, at: Date)] = []
+        var smoothedSpeed: Double = 0
+    }
+
     /// Throttle progress forwarding to the main actor. `didWriteData` can fire
     /// hundreds of times per second on a fast link; forwarding every tick would
     /// spawn a storm of MainActor tasks, SwiftData saves, and SwiftUI re-renders
-    /// (the >150% CPU / scroll stutter seen during downloads). We coalesce to 1 Hz,
-    /// damit sich Geschwindigkeit und ETA nur einmal pro Sekunde ändern.
-    private var lastForwardedAt: Date = .distantPast
+    /// (the >150% CPU / scroll stutter seen during downloads). Each active task is
+    /// coalesced to 1 Hz, so both concurrent rows remain current independently.
     private let minForwardInterval: TimeInterval = 1.0
-    /// Latest progress seen since the last forward, so a slow final tick still lands.
-    private var pendingProgress: (taskIdentifier: Int, written: Int64, expected: Int64)?
-
-    /// Geschwindigkeitsmessung: letzter Stand (Bytes + Zeitstempel) pro Task, um
-    /// Task-Wechsel zu erkennen und das Messfenster zurückzusetzen.
-    private var lastSample: (taskIdentifier: Int, written: Int64, at: Date)?
-    /// Gleitendes Fenster der letzten Samples (Bytes + Zeitstempel) zur Ratenberechnung.
-    /// Ein Fenster von ~1,5 s glättet TCP-Bursts, sodass die Anzeige die nachhaltige
-    /// Durchsatzrate zeigt statt unrealistischer Spitzenwerte aus Sub-Millisekunden-Fenstern.
-    private var speedWindow: [(written: Int64, at: Date)] = []
+    /// Gleitendes Fenster der letzten Samples pro Task. Ein Fenster von ~1,5 s glättet
+    /// TCP-Bursts, sodass die Anzeige die nachhaltige Durchsatzrate zeigt statt
+    /// unrealistischer Spitzenwerte aus Sub-Millisekunden-Fenstern.
     private let speedWindowDuration: TimeInterval = 1.5
-    /// Exponentiell geglättete Rate (Bytes/s), damit die Anzeige nicht zwischen 0 und
-    /// Spitzenwerten springt.
-    private var smoothedSpeed: Double = 0
+    private var samplingStateByTaskIdentifier: [Int: ProgressSamplingState] = [:]
 
     init(manager: IOSDownloadManager) {
         self.manager = manager
@@ -1221,41 +1220,36 @@ private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate 
     ) {
         let tid = downloadTask.taskIdentifier
         let now = Date()
-        // Task-Wechsel (oder erster Sample): Messfenster zurücksetzen.
-        if lastSample?.taskIdentifier != tid {
-            speedWindow.removeAll(keepingCapacity: true)
-        }
-        lastSample = (tid, totalBytesWritten, now)
-        // Sample ans Fenster anhängen und Samples außerhalb des Zeitfensters entfernen.
-        speedWindow.append((written: totalBytesWritten, at: now))
-        speedWindow.removeAll { now.timeIntervalSince($0.at) > speedWindowDuration }
+        var state = samplingStateByTaskIdentifier[tid] ?? ProgressSamplingState()
+        state.speedWindow.append((written: totalBytesWritten, at: now))
+        state.speedWindow.removeAll { now.timeIntervalSince($0.at) > speedWindowDuration }
 
-        pendingProgress = (tid, totalBytesWritten, totalBytesExpectedToWrite)
-        guard now.timeIntervalSince(lastForwardedAt) >= minForwardInterval else { return }
-        lastForwardedAt = now
-        let snapshot = pendingProgress
-        pendingProgress = nil
-        guard let snap = snapshot else { return }
+        guard now.timeIntervalSince(state.lastForwardedAt) >= minForwardInterval else {
+            samplingStateByTaskIdentifier[tid] = state
+            return
+        }
+        state.lastForwardedAt = now
         // Rate über das Fenster berechnen und stark glätten (EMA α=0,2), damit
         // Geschwindigkeit und ETA ruhig bleiben statt zu springen.
         var speed: Double = 0
-        if let first = speedWindow.first, speedWindow.count >= 2 {
+        if let first = state.speedWindow.first, state.speedWindow.count >= 2 {
             let dt = now.timeIntervalSince(first.at)
             if dt > 0 {
                 let rate = Double(totalBytesWritten - first.written) / dt
-                if smoothedSpeed == 0 {
-                    smoothedSpeed = rate
+                if state.smoothedSpeed == 0 {
+                    state.smoothedSpeed = rate
                 } else {
-                    smoothedSpeed = smoothedSpeed * 0.8 + rate * 0.2
+                    state.smoothedSpeed = state.smoothedSpeed * 0.8 + rate * 0.2
                 }
-                speed = smoothedSpeed
+                speed = state.smoothedSpeed
             }
         }
+        samplingStateByTaskIdentifier[tid] = state
         Task { @MainActor in
             manager?.downloadDidProgress(
-                taskIdentifier: snap.taskIdentifier,
-                totalBytesWritten: snap.written,
-                totalBytesExpectedToWrite: snap.expected,
+                taskIdentifier: tid,
+                totalBytesWritten: totalBytesWritten,
+                totalBytesExpectedToWrite: totalBytesExpectedToWrite,
                 speedBytesPerSecond: speed
             )
         }
@@ -1267,6 +1261,7 @@ private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate 
         didFinishDownloadingTo location: URL
     ) {
         let tid = downloadTask.taskIdentifier
+        samplingStateByTaskIdentifier.removeValue(forKey: tid)
         let resp = downloadTask.response
         let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
         LogManager.shared.log(
@@ -1320,6 +1315,7 @@ private final class DownloadSessionBridge: NSObject, URLSessionDownloadDelegate 
         guard let error else { return }
         guard task is URLSessionDownloadTask else { return }
         let tid = task.taskIdentifier
+        samplingStateByTaskIdentifier.removeValue(forKey: tid)
         let resp = task.response
         let ns = error as NSError
         let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
