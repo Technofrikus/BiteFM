@@ -19,6 +19,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     private var previousTrackCommandToken: Any?
     #if os(iOS)
     private var audioInterruptionObserver: NSObjectProtocol?
+    private var mediaServicesResetObserver: NSObjectProtocol?
     private var wasPlayingBeforeInterruption = false
     #endif
     @Published public var isPlaying = false {
@@ -287,7 +288,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             } catch {
                 LogManager.shared.log("Failed to setup AVAudioSession: \(error)", type: .error)
             }
-            await MainActor.run { self.registerAudioInterruptionObserver() }
+            await MainActor.run { self.registerAudioSessionObservers() }
         }
         #endif
     }
@@ -296,33 +297,64 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     /// Activates the session only for an explicit playback action. This is intentionally not part
     /// of app startup because `.playback` activation pauses audio owned by another app.
     private func activateAudioSessionThenStartPlayback() {
-        Task.detached { [weak self] in
-            do {
-                try AVAudioSession.sharedInstance().setActive(true)
-                await MainActor.run { self?.startPlayerPlayback() }
-            } catch {
-                LogManager.shared.log("Failed to activate AVAudioSession for playback: \(error)", type: .error)
-                await MainActor.run {
-                    guard let self else { return }
-                    self.userFacingPlaybackError = "Wiedergabe konnte nicht gestartet werden."
-                    self.isPlaying = false
-                    self.clearPreparingPlayback()
+        Task { @MainActor [weak self] in
+            let activationError = await Task.detached { () -> String? in
+                do {
+                    try AVAudioSession.sharedInstance().setActive(true)
+                    return nil
+                } catch {
+                    return error.localizedDescription
+                }
+            }.value
+
+            guard let self else { return }
+            if let activationError {
+                LogManager.shared.log("Failed to activate AVAudioSession for playback: \(activationError)", type: .error)
+                self.userFacingPlaybackError = "Wiedergabe konnte nicht gestartet werden."
+                self.isPlaying = false
+                self.clearPreparingPlayback()
+            } else {
+                self.startPlayerPlayback()
+            }
+        }
+    }
+
+    private func registerAudioSessionObservers() {
+        if audioInterruptionObserver == nil {
+            audioInterruptionObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.interruptionNotification,
+                object: AVAudioSession.sharedInstance(),
+                queue: .main
+            ) { [weak self] notification in
+                Task { @MainActor in
+                    self?.handleAudioSessionInterruption(notification)
+                }
+            }
+        }
+
+        if mediaServicesResetObserver == nil {
+            mediaServicesResetObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.mediaServicesWereResetNotification,
+                object: AVAudioSession.sharedInstance(),
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.handleMediaServicesReset()
                 }
             }
         }
     }
 
-    private func registerAudioInterruptionObserver() {
-        guard audioInterruptionObserver == nil else { return }
-        audioInterruptionObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { [weak self] notification in
-            Task { @MainActor in
-                self?.handleAudioSessionInterruption(notification)
-            }
-        }
+    /// A media-server restart leaves existing AVPlayer instances orphaned. Dispose the player and
+    /// restore only the session configuration; playback resumes on the next explicit user action.
+    private func handleMediaServicesReset() {
+        LogManager.shared.log("Audio media services reset; rebuilding playback state", type: .info)
+        tearDownPlayer()
+        isPlaying = false
+        isStalled = false
+        clearPreparingPlayback()
+        updatePlaybackRate(0.0)
+        setupAudioSession()
     }
 
     private func handleAudioSessionInterruption(_ notification: Notification) {
@@ -885,7 +917,14 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     }
 
     private func startPlayerPlayback() {
-        player?.play()
+        guard let player else {
+            isPlaying = false
+            clearPreparingPlayback()
+            updatePlaybackRate(0.0)
+            return
+        }
+
+        player.play()
         isPlaying = true
         isStalled = false
         updatePlaybackRate(1.0)
@@ -895,20 +934,36 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             persistRestorationSession(wasPlaying: true)
         }
     }
+
+    /// Removes all observations owned by the current player before it is discarded. Creating a
+    /// fresh AVPlayer for a new source also recovers from an orphaned player after a long suspend.
+    private func tearDownPlayer() {
+        guard let oldPlayer = player else {
+            timeObserver = nil
+            return
+        }
+
+        if let observer = timeObserver {
+            oldPlayer.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+
+        oldPlayer.removeObserver(self, forKeyPath: "timeControlStatus")
+        oldPlayer.removeObserver(self, forKeyPath: "status")
+        if let oldItem = oldPlayer.currentItem {
+            oldItem.removeObserver(self, forKeyPath: "status")
+            oldItem.removeObserver(self, forKeyPath: "duration")
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: oldItem)
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: oldItem)
+        }
+        oldPlayer.pause()
+        player = nil
+    }
     
     private func play(url: URL, startAt: Double = 0) {
         userFacingPlaybackError = nil
         currentPlaybackURL = url
-        if let oldPlayer = player {
-            oldPlayer.removeObserver(self, forKeyPath: "timeControlStatus")
-            oldPlayer.removeObserver(self, forKeyPath: "status")
-            oldPlayer.currentItem?.removeObserver(self, forKeyPath: "status")
-            oldPlayer.currentItem?.removeObserver(self, forKeyPath: "duration")
-            if let oldItem = oldPlayer.currentItem {
-                NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: oldItem)
-                NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: oldItem)
-            }
-        }
+        tearDownPlayer()
         
         duration = 0 // Reset duration for new item
         currentTime = startAt // Reset current time to startAt for new item
@@ -916,11 +971,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         syncProgress()
         
         let playerItem = AVPlayerItem(url: url)
-        if player == nil {
-            player = AVPlayer(playerItem: playerItem)
-        } else {
-            player?.replaceCurrentItem(with: playerItem)
-        }
+        player = AVPlayer(playerItem: playerItem)
 
         #if os(iOS)
         // Ensure Apple TV is treated as an audio route (not external video playback).
