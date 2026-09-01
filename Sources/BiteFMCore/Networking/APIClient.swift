@@ -103,6 +103,8 @@ public class APIClient: ObservableObject {
     private var sessionBasicAuth: (username: String, password: String)?
     /// Serialisiert `fetchListeningHistory`, damit nicht mehrere gleichzeitige Saves auf demselben Store laufen (vermeidet SwiftData „temporary identifier remapped“ / DefaultStore-Fehler).
     private var listeningHistoryFetchSerialTask: Task<Void, Never>?
+    /// Serialisiert lokalen Pending-Upload + anschließenden Serverabgleich als einen Vorgang.
+    private var listeningHistorySyncSerialTask: Task<Void, Never>?
     /// Serialisiert `fetchArchive`, damit nicht mehrere gleichzeitige Saves auf demselben Store laufen.
     private var archiveFetchSerialTask: Task<Void, Never>?
     
@@ -220,7 +222,7 @@ public class APIClient: ObservableObject {
             if isLoggedIn {
                 Task {
                     await fetchFavorites()
-                    await fetchListeningHistory()
+                    await syncListeningHistory()
                 }
             }
 
@@ -289,7 +291,7 @@ public class APIClient: ObservableObject {
         guard isLoggedIn else { return }
         Task {
             await fetchFavorites()
-            await fetchListeningHistory()
+            await syncListeningHistory()
             await fetchArchive()
         }
     }
@@ -311,12 +313,12 @@ public class APIClient: ObservableObject {
            now.timeIntervalSince(last) < listeningHistoryPlaybackStaleInterval {
             return
         }
-        await fetchListeningHistory()
+        await syncListeningHistory()
     }
     
     // Helper to call fetchListeningHistory with correct naming
     private func fetchHistory() async {
-        await fetchListeningHistory()
+        await syncListeningHistory()
     }
     
     func isFavorite(item: ArchiveItem) -> Bool {
@@ -359,7 +361,8 @@ public class APIClient: ObservableObject {
         return listenedShowIDs.contains(broadcastID)
     }
     
-    /// Server markiert „gehört“ via `GET /api/v1/broadcasts/.../` **ohne** `?listen=no`; danach Hörhistorie (`listeningHistoryEntries.php`) laden — `listenedShowIDs` spiegelt die API (`show_id` = Termin-ID).
+    /// Markiert eine Ausgabe zuerst lokal als gehört. Der Serverabgleich darf offline scheitern;
+    /// der persistierte Pending-Eintrag wird bei einem späteren Sync erneut übertragen.
     func markAsPlayed(item: ArchiveItem) async {
         pendingHistoryVerificationShowID = item.terminID
         // #region agent log
@@ -376,11 +379,116 @@ public class APIClient: ObservableObject {
             ]
         )
         // #endregion
-        LogManager.shared.log("Notify server + sync listening history after play: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
+        guard persistLocalPlayedState(item: item) else {
+            LogManager.shared.log("Could not persist local listening history for ID \(item.terminID)", type: .error)
+            return
+        }
 
-        _ = await fetchBroadcastDetail(for: item, markAsListened: true)
+        listenedShowIDs.insert(item.terminID)
+        FavoritePlayedStore.shared.refresh()
+        LogManager.shared.log("Marked as played locally; syncing when possible: \(item.sendungTitel) (ID: \(item.terminID))", type: .info)
 
-        await fetchListeningHistory()
+        await syncListeningHistory()
+    }
+
+    private func persistLocalPlayedState(item: ArchiveItem) -> Bool {
+        guard let container = modelContainer else { return false }
+        let context = ModelContext(container)
+        let showID = item.terminID
+        let descriptor = FetchDescriptor<StoredListeningHistoryEntry>(
+            predicate: #Predicate<StoredListeningHistoryEntry> { $0.showID == showID }
+        )
+        let playedAt = Date()
+
+        do {
+            let entry: StoredListeningHistoryEntry
+            if let existing = try context.fetch(descriptor).first {
+                entry = existing
+                entry.dateString = ISO8601DateFormatter().string(from: playedAt)
+                entry.addedAt = playedAt
+            } else {
+                entry = StoredListeningHistoryEntry(
+                    showID: showID,
+                    dateString: ISO8601DateFormatter().string(from: playedAt)
+                )
+                context.insert(entry)
+            }
+            entry.pendingSync = true
+            entry.syncShowSlug = restShowSlugForBroadcastDetailAPI(for: item)
+            entry.syncDateSegment = item.datumDe
+            entry.syncTerminSlug = item.terminSlug
+            try context.save()
+            return true
+        } catch {
+            LogManager.shared.log("Failed to save local played state for ID \(showID): \(error)", type: .error)
+            return false
+        }
+    }
+
+    private func syncListeningHistory() async {
+        let previous = listeningHistorySyncSerialTask
+        let task = Task { @MainActor in
+            await previous?.value
+            guard !Task.isCancelled else { return }
+            await self.uploadPendingListeningHistory()
+            guard !Task.isCancelled else { return }
+            await self.fetchListeningHistory()
+        }
+        listeningHistorySyncSerialTask = task
+        await task.value
+    }
+
+    private func uploadPendingListeningHistory() async {
+        guard isLoggedIn, let container = modelContainer else { return }
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<StoredListeningHistoryEntry>(
+            predicate: #Predicate<StoredListeningHistoryEntry> { $0.pendingSync == true },
+            sortBy: [SortDescriptor(\.addedAt)]
+        )
+        guard let entries = try? context.fetch(descriptor) else { return }
+
+        for entry in entries {
+            guard let showSlug = entry.syncShowSlug,
+                  let dateSegment = entry.syncDateSegment,
+                  !showSlug.isEmpty,
+                  !dateSegment.isEmpty else {
+                LogManager.shared.log("Pending played entry has incomplete route metadata: ID \(entry.showID)", type: .error)
+                continue
+            }
+            _ = await sendPlayedMarker(
+                showSlug: showSlug,
+                dateSegment: dateSegment,
+                terminSlug: entry.syncTerminSlug ?? ""
+            )
+        }
+    }
+
+    private func sendPlayedMarker(showSlug: String, dateSegment: String, terminSlug: String) async -> Bool {
+        let urls = BroadcastDetailEndpoint.urls(
+            showSegment: showSlug,
+            dateSegment: dateSegment,
+            terminSlug: terminSlug,
+            markAsListened: true
+        )
+
+        for url in urls {
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("BiteFM/5.0.23 (iPad; iOS 26.3; Scale/2.00)", forHTTPHeaderField: "User-Agent")
+            applyBasicAuthIfPossible(to: &request)
+
+            do {
+                let (_, response) = try await performRequest(for: request)
+                if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                    return true
+                }
+            } catch {
+                if !isBenignCancellation(error) {
+                    LogManager.shared.log("Pending played sync failed for \(url.absoluteString): \(error.localizedDescription)", type: .debug)
+                }
+            }
+        }
+        return false
     }
     
     /// Task or URLSession cancellation (e.g. polling task cancelled on scene changes) must not surface as a user-facing failure.
@@ -482,10 +590,24 @@ public class APIClient: ObservableObject {
                         do {
                             let historyResponse = try decoder.decode(ListeningHistoryResponse.self, from: data)
                             
-                            let ids = Set(historyResponse.data.map { $0.showID })
+                            let serverIDs = Set(historyResponse.data.map { $0.showID })
+                            let pendingIDs: Set<Int>
+                            if let container {
+                                let context = ModelContext(container)
+                                let descriptor = FetchDescriptor<StoredListeningHistoryEntry>(
+                                    predicate: #Predicate<StoredListeningHistoryEntry> { $0.pendingSync == true }
+                                )
+                                pendingIDs = Set((try? context.fetch(descriptor))?.map(\.showID) ?? [])
+                            } else {
+                                pendingIDs = []
+                            }
+                            let visibleIDs = ListeningHistoryStateLogic.visibleShowIDs(
+                                serverIDs: serverIDs,
+                                pendingIDs: pendingIDs
+                            )
                             
                             await MainActor.run {
-                                self.listenedShowIDs = ids
+                                self.listenedShowIDs = visibleIDs
                                 self.recordListeningHistoryFetchSuccess()
                                 LogManager.shared.log("Successfully decoded history: \(historyResponse.data.count) entries", type: .info)
                                 FavoritePlayedStore.shared.refresh()
@@ -547,13 +669,21 @@ public class APIClient: ObservableObject {
 
             let newItemIDs = Set(deduped.map { $0.showID })
 
-            for (id, entry) in existingMap where !newItemIDs.contains(id) {
+            for (id, entry) in existingMap where ListeningHistoryStateLogic.shouldDeleteLocalEntry(
+                showID: id,
+                pendingSync: entry.pendingSync,
+                serverIDs: newItemIDs
+            ) {
                 context.delete(entry)
             }
 
             for item in deduped {
                 if let existing = existingMap[item.showID] {
                     existing.dateString = item.date
+                    existing.pendingSync = false
+                    existing.syncShowSlug = nil
+                    existing.syncDateSegment = nil
+                    existing.syncTerminSlug = nil
                 } else {
                     context.insert(StoredListeningHistoryEntry(showID: item.showID, dateString: item.date))
                 }
@@ -892,7 +1022,7 @@ public class APIClient: ObservableObject {
                 // Refresh authenticated data in the background so the UI can appear immediately.
                 Task {
                     await self.fetchFavorites()
-                    await self.fetchListeningHistory()
+                    await self.syncListeningHistory()
                 }
 
                 // Fetch shows if empty
@@ -934,6 +1064,10 @@ public class APIClient: ObservableObject {
         favoritesPollingTask = nil
         historyPollingTask?.cancel()
         historyPollingTask = nil
+        listeningHistorySyncSerialTask?.cancel()
+        listeningHistorySyncSerialTask = nil
+        listeningHistoryFetchSerialTask?.cancel()
+        listeningHistoryFetchSerialTask = nil
         // Clear favorites and history
         favoriteSlugs.removeAll()
         favoriteShowIDs.removeAll()

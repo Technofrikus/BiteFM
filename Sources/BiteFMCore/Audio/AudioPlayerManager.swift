@@ -60,11 +60,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     public private(set) var duration: Double = 0
 
     // MARK: - Listening-time based “heard” tracking (conservative)
-    // Counts actual playback time only while `isPlaying == true`, and only updates every ~5s.
-    private var listenedAccumulatedSeconds: Double = 0
-    private var lastObservedPosSeconds: Double?
-    private var lastObservedWallTime: Date?
-    private var lastListenAccumulatorUpdateAt: Date?
+    private var listeningProgressTracker = ListeningProgressTracker()
     
     var modelContainer: ModelContainer?
     /// Wird beim Bootstrap injiziert, damit der Player den letzten App-State (zuletzt aktive Ausgabe) selbst pflegen kann.
@@ -548,33 +544,13 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                 if !self.isLive, let item = self.currentItem, !self.hasMarkedCurrentItemAsPlayed {
                     let now = Date()
 
-                    if self.lastObservedPosSeconds == nil || self.lastObservedWallTime == nil {
-                        self.lastObservedPosSeconds = pos
-                        self.lastObservedWallTime = now
-                    } else if self.isPlaying {
-                        let lastPos = self.lastObservedPosSeconds ?? pos
-                        let lastWall = self.lastObservedWallTime ?? now
+                    self.listeningProgressTracker.observe(
+                        position: pos,
+                        wallTime: now.timeIntervalSince1970,
+                        isPlaying: self.isPlaying
+                    )
 
-                        let deltaPos = pos - lastPos
-                        let deltaWall = now.timeIntervalSince(lastWall)
-
-                        let shouldAccumulate: Bool = {
-                            if let lastUpdate = self.lastListenAccumulatorUpdateAt {
-                                return now.timeIntervalSince(lastUpdate) >= 5.0
-                            }
-                            return true
-                        }()
-
-                        if shouldAccumulate {
-                            // Treat large jumps (seek/skip) as non-listening time.
-                            let looksLikeSeek = deltaPos < 0 || deltaPos > 6 || deltaWall < 0 || deltaWall > 10
-                            if !looksLikeSeek {
-                                let increment = min(max(0, deltaPos), max(0, deltaWall))
-                                self.listenedAccumulatedSeconds += increment
-                                self.lastListenAccumulatorUpdateAt = now
-                            }
-                        }
-
+                    if self.isPlaying {
                         let dur: Double = {
                             if self.duration > 0 { return self.duration }
                             if let d = self.player?.currentItem?.duration.seconds, d.isFinite, d > 0 { return d }
@@ -586,7 +562,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                             return threshold
                         }()
 
-                        if self.listenedAccumulatedSeconds >= requiredListenSeconds {
+                        if self.listeningProgressTracker.accumulatedSeconds >= requiredListenSeconds {
                             self.hasMarkedCurrentItemAsPlayed = true
                             self.lastMarkedTerminID = item.terminID
                             Task {
@@ -595,9 +571,6 @@ public class AudioPlayerManager: NSObject, ObservableObject {
                         }
                     }
 
-                    // Always update observation markers so we can detect seeks reliably.
-                    self.lastObservedPosSeconds = pos
-                    self.lastObservedWallTime = now
                 }
                 
                 // Detect current playlist song change (drives Now Playing + player-bar metadata).
@@ -1068,10 +1041,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     }
 
     private func resetListeningProgressTracking() {
-        listenedAccumulatedSeconds = 0
-        lastObservedPosSeconds = nil
-        lastObservedWallTime = nil
-        lastListenAccumulatorUpdateAt = nil
+        listeningProgressTracker = ListeningProgressTracker()
     }
     
     private func setupRemoteTransportControls() {
