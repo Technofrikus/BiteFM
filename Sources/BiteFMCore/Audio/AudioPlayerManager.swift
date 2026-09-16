@@ -4,6 +4,7 @@ import MediaPlayer
 import SwiftData
 #if os(iOS)
 import UIKit
+import Intents
 #endif
 
 @MainActor
@@ -104,6 +105,87 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         if let artwork = brandNowPlayingArtwork {
             info[MPMediaItemPropertyArtwork] = artwork
         }
+    }
+
+    /// Donation-Identifier für die Siri „Zuletzt gehört“-Vorschläge (Lock Screen / Kopfhörer-Verbinden).
+    /// Stabil pro Ausgabe, damit ein erneutes Donate die vorhandene Vorschlags-Instanz aktualisiert statt eine
+    /// zweite anzulegen.
+    private static func nowPlayingIntentIdentifier(for terminID: Int) -> String {
+        "ausgabe-\(terminID)"
+    }
+
+    /// Meldet eine Ausgabe an Siri, damit sie z. B. beim Verbinden von Kopfhörern als Vorschlag erscheint.
+    /// `resumable` unterscheidet zwei Fälle: `true` für eine gerade gestartete/fortgesetzte Ausgabe (die App
+    /// selbst hält die tatsächliche Wiedergabeposition, siehe `AppRestorationState.PlaybackSession` — der
+    /// Intent signalisiert Siri nur „fortsetzbar“); `false` für eine frisch vorgeschlagene nächste Ausgabe,
+    /// die noch gar nicht angespielt wurde.
+    private func donateNowPlayingIntent(item: ArchiveItem, resumable: Bool) {
+        let episode = INMediaItem(
+            identifier: Self.nowPlayingIntentIdentifier(for: item.terminID),
+            title: item.sendungTitel,
+            type: .podcastEpisode,
+            artwork: nil
+        )
+        let show = INMediaItem(
+            identifier: item.sendungSlug,
+            title: item.sendungTitel,
+            type: .podcastShow,
+            artwork: nil
+        )
+
+        let intent = INPlayMediaIntent(
+            mediaItems: [episode],
+            mediaContainer: show,
+            playShuffled: false,
+            playbackRepeatMode: .none,
+            resumePlayback: resumable,
+            playbackQueueLocation: .now,
+            playbackSpeed: 1,
+            mediaSearch: nil
+        )
+
+        let interaction = INInteraction(intent: intent, response: nil)
+        interaction.identifier = Self.nowPlayingIntentIdentifier(for: item.terminID)
+        interaction.donate { error in
+            if let error {
+                LogManager.shared.log("Siri Now-Playing-Donation fehlgeschlagen: \(error.localizedDescription)", type: .error)
+            }
+        }
+    }
+
+    /// Löscht eine frühere Donation, damit eine fertig gehörte Ausgabe nicht mehr als „Fortsetzen“-Vorschlag
+    /// beim Kopfhörer-Verbinden auftaucht.
+    private func invalidateNowPlayingIntent(terminID: Int) {
+        INInteraction.delete(with: [Self.nowPlayingIntentIdentifier(for: terminID)]) { error in
+            if let error {
+                LogManager.shared.log("Siri Now-Playing-Donation konnte nicht gelöscht werden: \(error.localizedDescription)", type: .error)
+            }
+        }
+    }
+
+    /// Sucht die nächste ungehörte Ausgabe derselben Sendung, rein lokal aus dem SwiftData-Archiv-Cache
+    /// (kein Netzwerk-Request). Bevorzugt die chronologisch nächstneuere ungehörte Ausgabe; existiert keine,
+    /// wird stattdessen die nächstältere ungehörte Ausgabe genommen (näher an `item` statt der ältesten überhaupt).
+    private func nextUnplayedEpisode(after item: ArchiveItem) -> ArchiveItem? {
+        guard let container = modelContainer, let sendungID = item.sendungID else { return nil }
+        let context = ModelContext(container)
+        let currentBroadcastDate = StoredArchiveItem.parseDate(item.datum)
+        let currentTerminID = item.terminID
+
+        let descriptor = FetchDescriptor<StoredArchiveItem>(
+            predicate: #Predicate<StoredArchiveItem> { $0.sendungID == sendungID },
+            sortBy: [SortDescriptor(\.broadcastDate, order: .forward)]
+        )
+
+        guard let candidates = try? context.fetch(descriptor) else { return nil }
+        let unplayed = candidates.filter {
+            $0.terminID != currentTerminID && !APIClient.shared.listenedShowIDs.contains($0.terminID)
+        }
+
+        if let nextNewer = unplayed.first(where: { $0.broadcastDate > currentBroadcastDate }) {
+            return nextNewer.toArchiveItem()
+        }
+        return unplayed.last(where: { $0.broadcastDate < currentBroadcastDate })?.toArchiveItem()
     }
     #endif
 
@@ -903,8 +985,11 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         updatePlaybackRate(1.0)
 
         // App-weiten Wiedergabe-Snapshot anlegen, sobald eine archivierte Ausgabe gespielt wird (Live wird ausgespart).
-        if !isLive, currentItem != nil {
+        if !isLive, let item = currentItem {
             persistRestorationSession(wasPlaying: true)
+            #if os(iOS)
+            donateNowPlayingIntent(item: item, resumable: true)
+            #endif
         }
     }
 
@@ -992,6 +1077,14 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             self.clearRestorationSessionIfMatches(terminID: item.terminID)
             self.hasMarkedCurrentItemAsPlayed = true
             self.lastMarkedTerminID = item.terminID
+            #if os(iOS)
+            // Fertig gehörte Ausgabe soll iOS nicht mehr als „Fortsetzen“-Vorschlag anbieten — stattdessen,
+            // falls vorhanden, die nächste ungehörte Ausgabe derselben Sendung vorschlagen (wie bei Podcasts).
+            self.invalidateNowPlayingIntent(terminID: item.terminID)
+            if let next = self.nextUnplayedEpisode(after: item) {
+                self.donateNowPlayingIntent(item: next, resumable: false)
+            }
+            #endif
             // Hörhistorie vom Server laden — UI aktualisiert sich über `listenedShowIDs`.
             await APIClient.shared.markAsPlayed(item: item)
         }
