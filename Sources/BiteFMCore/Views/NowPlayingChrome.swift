@@ -23,7 +23,8 @@ struct MiniPlayerBarView: View {
         switch chrome {
         case .tabAccessory:
             miniRow
-                .padding(.horizontal, 16)
+                .padding(.leading, 18)
+                .padding(.trailing, 6)
                 .padding(.vertical, 10)
                 .background {
                     NowPlayingMatchedSurfaceBackground(
@@ -35,7 +36,8 @@ struct MiniPlayerBarView: View {
             VStack(spacing: 0) {
                 Divider()
                 miniRow
-                    .padding(.horizontal, 12)
+                    .padding(.leading, 18)
+                    .padding(.trailing, 6)
                     .padding(.vertical, 10)
                     .background {
                         NowPlayingMatchedSurfaceBackground(

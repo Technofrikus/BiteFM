@@ -19,6 +19,7 @@ struct DownloadsView: View {
 
     @State private var showSettings = false
     @State private var showDeleteAllConfirm = false
+    @State private var showDeletePlayedConfirm = false
     @State private var editMode: EditMode = .inactive
     @State private var selection = Set<Int>()
 
@@ -156,6 +157,12 @@ struct DownloadsView: View {
                         }
                     }
                     Button {
+                        showDeletePlayedConfirm = true
+                    } label: {
+                        Label("Gehörte löschen", systemImage: "checkmark.circle")
+                    }
+                    .disabled(!hasPlayedDownloads)
+                    Button {
                         showDeleteAllConfirm = true
                     } label: {
                         Label("Alle löschen", systemImage: "trash")
@@ -183,6 +190,14 @@ struct DownloadsView: View {
         } message: {
             Text("Alle heruntergeladenen Sendungen und zugehörigen Dateien werden von diesem Gerät entfernt.")
         }
+        .alert("Gehörte Downloads löschen?", isPresented: $showDeletePlayedConfirm) {
+            Button("Gehörte löschen", role: .destructive) {
+                deletePlayedDownloads()
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: {
+            Text("Alle bereits abgespielten heruntergeladenen Sendungen und zugehörigen Dateien werden von diesem Gerät entfernt.")
+        }
         .task {
             await downloadManager.runForegroundMaintenance()
             refreshCaches()
@@ -196,6 +211,18 @@ struct DownloadsView: View {
         let ids = rows.map(\.terminID)
         for id in ids {
             downloadManager.removeDownload(for: id)
+        }
+    }
+
+    private var hasPlayedDownloads: Bool {
+        listRows.contains { apiClient.isPlayed(broadcastID: $0.terminID) }
+    }
+
+    private func deletePlayedDownloads() {
+        let fd = FetchDescriptor<StoredDownloadedEpisode>()
+        guard let rows = try? modelContext.fetch(fd) else { return }
+        for row in rows where apiClient.isPlayed(broadcastID: row.terminID) {
+            downloadManager.removeDownload(for: row.terminID)
         }
     }
 
