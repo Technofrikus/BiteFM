@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import Intents
 import BiteFMCore
 
-/// Relays background `URLSession` events so downloads can finish after the app was suspended.
+/// Relays background `URLSession` events so downloads can finish after the app was suspended,
+/// and routes Siri media intents into the app.
 final class BiteFMiOSAppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
@@ -15,6 +17,11 @@ final class BiteFMiOSAppDelegate: NSObject, UIApplicationDelegate {
         } else {
             completionHandler()
         }
+    }
+
+    /// In-App Intent Handling: Antippen eines Siri-Vorschlags (siehe `NowPlayingIntentHandler`).
+    func application(_ application: UIApplication, handlerFor intent: INIntent) -> Any? {
+        intent is INPlayMediaIntent ? NowPlayingIntentHandler() : nil
     }
 }
 

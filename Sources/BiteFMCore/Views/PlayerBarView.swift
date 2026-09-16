@@ -23,10 +23,16 @@ struct PlayerBarView: View {
 
     private var compactBody: some View {
         VStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                PlayerBarMetadataBlock()
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    PlayerBarMetadataBlock()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if playerManager.currentItem != nil {
+                    PlaybackQueueBarButton()
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             PlaybackControlsStack(compactTimeline: true, keyboardShortcut: false, spacing: 10)
         }
@@ -48,6 +54,7 @@ struct PlayerBarView: View {
                 Spacer(minLength: 40)
 
                 if playerManager.currentItem != nil {
+                    PlaybackQueueBarButton()
                     detailInfoButton
                 }
 

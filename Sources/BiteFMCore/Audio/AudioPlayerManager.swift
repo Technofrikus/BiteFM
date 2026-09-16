@@ -65,7 +65,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     
     var modelContainer: ModelContainer?
     /// Wird beim Bootstrap injiziert, damit der Player den letzten App-State (zuletzt aktive Ausgabe) selbst pflegen kann.
-    private var restorationStore: AppRestorationStore?
+    var restorationStore: AppRestorationStore?
 
     /// Marker für „letzter Cold-Launch-Snapshot wurde gerade visuell wiederhergestellt“ — verhindert Auto-Save mit
     /// position 0, bevor der Nutzer überhaupt einen Play-Tap getätigt hat.
@@ -110,8 +110,14 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     /// Donation-Identifier für die Siri „Zuletzt gehört“-Vorschläge (Lock Screen / Kopfhörer-Verbinden).
     /// Stabil pro Ausgabe, damit ein erneutes Donate die vorhandene Vorschlags-Instanz aktualisiert statt eine
     /// zweite anzulegen.
-    private static func nowPlayingIntentIdentifier(for terminID: Int) -> String {
+    static func nowPlayingIntentIdentifier(for terminID: Int) -> String {
         "ausgabe-\(terminID)"
+    }
+
+    /// Umkehrung von `nowPlayingIntentIdentifier(for:)`.
+    static func terminID(fromNowPlayingIntentIdentifier identifier: String) -> Int? {
+        guard identifier.hasPrefix("ausgabe-") else { return nil }
+        return Int(identifier.dropFirst("ausgabe-".count))
     }
 
     /// Meldet eine Ausgabe an Siri, damit sie z. B. beim Verbinden von Kopfhörern als Vorschlag erscheint.
@@ -470,6 +476,9 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             return
         }
 
+        // Eine gestartete Ausgabe ist nicht mehr „als Nächstes“ dran.
+        PlaybackQueueStore.shared.remove(terminID: item.terminID)
+
         isLive = false
         currentStreamType = nil
         lastUpdatedSongId = nil
@@ -820,13 +829,35 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         }
     }
 
+    /// Springt zum nächsten Titel der Ausgabe; gibt es keinen mehr, zur nächsten Ausgabe der Warteschlange.
     public func skipNext() {
-        guard let player = player, let playlist = currentPlaylist else { return }
-        let currentTime = player.currentTime().seconds
-        
-        if let nextSong = playlist.first(where: { Double($0.time) > currentTime + 1 }) {
-            seek(to: Double(nextSong.time))
+        if let player = player, let playlist = currentPlaylist {
+            let currentTime = player.currentTime().seconds
+            if let nextSong = playlist.first(where: { Double($0.time) > currentTime + 1 }) {
+                seek(to: Double(nextSong.time))
+                return
+            }
         }
+        playNextFromQueue()
+    }
+
+    /// Ob ⏭ etwas bewirken kann (Titelsprung oder nächste Ausgabe aus der Warteschlange).
+    public var canSkipNext: Bool {
+        guard !isLive, currentItem != nil else { return false }
+        return currentPlaylist != nil || !PlaybackQueueStore.shared.isEmpty
+    }
+
+    /// Startet die nächste Ausgabe aus der Warteschlange. Gibt `false` zurück, wenn sie leer ist.
+    @discardableResult
+    public func playNextFromQueue() -> Bool {
+        guard !isLive, let next = PlaybackQueueStore.shared.popNext() else { return false }
+        #if os(iOS)
+        // Sofort als Siri-Vorschlag melden, auch falls der Start scheitert (z. B. offline im Hintergrund).
+        // Sobald die Wiedergabe tatsächlich läuft, ersetzt die „fortsetzbar“-Donation (gleicher Identifier) diese.
+        donateNowPlayingIntent(item: next, resumable: false)
+        #endif
+        play(item: next)
+        return true
     }
 
     public func skipPrevious() {
@@ -1078,13 +1109,19 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             self.hasMarkedCurrentItemAsPlayed = true
             self.lastMarkedTerminID = item.terminID
             #if os(iOS)
-            // Fertig gehörte Ausgabe soll iOS nicht mehr als „Fortsetzen“-Vorschlag anbieten — stattdessen,
-            // falls vorhanden, die nächste ungehörte Ausgabe derselben Sendung vorschlagen (wie bei Podcasts).
+            // Fertig gehörte Ausgabe soll iOS nicht mehr als „Fortsetzen“-Vorschlag anbieten.
             self.invalidateNowPlayingIntent(terminID: item.terminID)
-            if let next = self.nextUnplayedEpisode(after: item) {
-                self.donateNowPlayingIntent(item: next, resumable: false)
-            }
             #endif
+            // Warteschlange: nächste Ausgabe direkt starten, bevor der Netzwerk-Call unten wartet.
+            // `playNextFromQueue()` meldet sie auch als Siri-Vorschlag.
+            if !self.playNextFromQueue() {
+                #if os(iOS)
+                // Ohne Warteschlange die nächste ungehörte Ausgabe derselben Sendung vorschlagen (wie bei Podcasts).
+                if let next = self.nextUnplayedEpisode(after: item) {
+                    self.donateNowPlayingIntent(item: next, resumable: false)
+                }
+                #endif
+            }
             // Hörhistorie vom Server laden — UI aktualisiert sich über `listenedShowIDs`.
             await APIClient.shared.markAsPlayed(item: item)
         }

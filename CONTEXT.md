@@ -36,5 +36,10 @@ for build/test commands and `docs/adr/` (none yet) for recorded decisions.
   `AudioPlayerManager`, so the 1 Hz progress tick doesn't re-render every row.
 - **`AudioPlayerManager`** — `AVPlayer` wrapper: playback, seeking, live stream,
   Now Playing, session restore.
+- **`PlaybackQueueStore`** — *Warteschlange* / "Als Nächstes": only the upcoming
+  broadcasts (never the current one), unique by `terminID`, persisted as JSON in
+  `UserDefaults` (no expiry, unlike `AppRestorationStore`). `AudioPlayerManager`
+  pops the next entry on natural end and when ⏭ runs past the last track; starting
+  a broadcast removes it from the queue. Local only, no sync.
 - **`ArchiveSectioner`** (candidate) — grouping/sort logic for archive tabs is
   currently duplicated in `ArchiveView` / `ArchiveNew`; proposed to extract.

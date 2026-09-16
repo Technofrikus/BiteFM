@@ -21,6 +21,7 @@
 		75F687D7EF97C48BEFCEB34E /* DownloadsVerificationMatrix.md in Resources */ = {isa = PBXBuildFile; fileRef = 2C7DF603677A94103378198C /* DownloadsVerificationMatrix.md */; };
 		803209D437C6EA4FC9DC5784 /* BiteFM.sdef in Resources */ = {isa = PBXBuildFile; fileRef = 763CBFAC634C316DC89BAE92 /* BiteFM.sdef */; };
 		82F22C8A7413B75D18C74DDF /* BiteFMCore in Frameworks */ = {isa = PBXBuildFile; productRef = AED80C76F7243BD65351B3A7 /* BiteFMCore */; };
+		83C0DF9865DC3537BA7BF560 /* PlaybackQueueStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693E411911621EAB813385EE /* PlaybackQueueStoreTests.swift */; };
 		93D106F7122F0E0619EF7590 /* BroadcastDetailTrackMatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD60CE03C82DFE778492395 /* BroadcastDetailTrackMatchTests.swift */; };
 		A6FF5198227D231A05AE5AED /* MacAppleScriptSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 067D51551452BA8A5742A7FC /* MacAppleScriptSupport.swift */; };
 		A8EE734D40CCD9A067E04481 /* BroadcastDetailLRUCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD9D2417277891487077C2D /* BroadcastDetailLRUCacheTests.swift */; };
@@ -55,6 +56,7 @@
 		46CFB083CC9810A34A671A7B /* BroadcastDetailEndpointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastDetailEndpointTests.swift; sourceTree = "<group>"; };
 		503D9FCBCA83186DBB1ED606 /* ListeningProgressTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningProgressTrackerTests.swift; sourceTree = "<group>"; };
 		530772E642BED6FE0502FF10 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		693E411911621EAB813385EE /* PlaybackQueueStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackQueueStoreTests.swift; sourceTree = "<group>"; };
 		6D2DE03226D581FD499D0937 /* ArchiveSectionerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSectionerTests.swift; sourceTree = "<group>"; };
 		6FD4885D96A1A79C3D8D9CEF /* BiteFMiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BiteFMiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		763CBFAC634C316DC89BAE92 /* BiteFM.sdef */ = {isa = PBXFileReference; path = BiteFM.sdef; sourceTree = "<group>"; };
@@ -125,6 +127,7 @@
 				B8FF8FF840232410B5084D40 /* FavoriteTrackItemDecodingTests.swift */,
 				06C68A9C55BE53C56E27F88A /* ListeningHistoryStateLogicTests.swift */,
 				503D9FCBCA83186DBB1ED606 /* ListeningProgressTrackerTests.swift */,
+				693E411911621EAB813385EE /* PlaybackQueueStoreTests.swift */,
 			);
 			name = BiteFMTests;
 			path = Tests/BiteFMTests;
@@ -338,6 +341,7 @@
 				C67EE98BF63EFC8F9C4C13DC /* FavoriteTrackItemDecodingTests.swift in Sources */,
 				CD750F82FA8F5A7AC2E0F127 /* ListeningHistoryStateLogicTests.swift in Sources */,
 				02EAAE074A2368702CC707E8 /* ListeningProgressTrackerTests.swift in Sources */,
+				83C0DF9865DC3537BA7BF560 /* PlaybackQueueStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -467,7 +471,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 76;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -595,7 +599,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 76;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

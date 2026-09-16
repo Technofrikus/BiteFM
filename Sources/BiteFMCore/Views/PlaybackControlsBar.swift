@@ -17,6 +17,7 @@ enum PlaybackTimeFormatting {
 
 struct PlaybackTransportButtons: View {
     @EnvironmentObject private var playerManager: AudioPlayerManager
+    @ObservedObject private var queue = PlaybackQueueStore.shared
     var useKeyboardShortcut: Bool = false
     /// 1.0 = Standard (z. B. Player-Leiste); >1 für „Wiedergabe“-Sheet.
     var iconScale: CGFloat = 1
@@ -47,7 +48,7 @@ struct PlaybackTransportButtons: View {
                     iconSide: 18 * s,
                     hitSide: 44 * s
                 ) { playerManager.skipNext() }
-                .disabled(playerManager.currentPlaylist == nil)
+                .disabled(!canSkipNext)
             }
         }
         #else
@@ -94,10 +95,15 @@ struct PlaybackTransportButtons: View {
                         .symbolRenderingMode(.monochrome)
                 }
                 .buttonStyle(.plain)
-                .disabled(playerManager.currentPlaylist == nil)
+                .disabled(!canSkipNext)
             }
         }
         #endif
+    }
+
+    /// Titelsprung oder — am Ende der Titelliste — nächste Ausgabe aus der Warteschlange.
+    private var canSkipNext: Bool {
+        playerManager.currentPlaylist != nil || !queue.isEmpty
     }
 
     private var playPauseSystemName: String {

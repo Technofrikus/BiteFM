@@ -60,6 +60,8 @@ struct MiniPlayerBarView: View {
             .accessibilityLabel("Wiedergabe öffnen")
             .accessibilityHint("Zeigt die aktuelle Wiedergabe mit Details und Steuerung.")
 
+            PlaybackQueueMiniButton()
+
             Button(action: {
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
@@ -290,7 +292,7 @@ struct ExpandedNowPlayingView: View {
 
     /// Live: undurchsichtiger Hintergrund bis in die untere Safe Area — vermeidet den schmalen grauen Rand um die Blur-Leiste bei nur einem Stop-Button.
     private func expandedControlsChrome(live: Bool) -> some View {
-        Group {
+        VStack(spacing: 10) {
             #if os(iOS)
             PlaybackControlsStack(
                 compactTimeline: true,
@@ -307,6 +309,9 @@ struct ExpandedNowPlayingView: View {
                 transportIconScale: Self.expandedTransportIconScale
             )
             #endif
+            if !live {
+                PlaybackQueueUpNextRow()
+            }
         }
         .padding(.horizontal)
         .padding(.top, 10)

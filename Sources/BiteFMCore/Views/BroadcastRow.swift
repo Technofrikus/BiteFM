@@ -72,6 +72,8 @@ struct BroadcastRow: View {
     /// This row's download UI snapshot, kept in sync from the manager's per-terminID publisher.
     @State private var downloadSnap: EpisodeDownloadUISnapshot
     #endif
+    /// Ob die Ausgabe in der Warteschlange steht — per `onReceive` gespiegelt, damit nur betroffene Zeilen neu rendern.
+    @State private var isQueued: Bool
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @EnvironmentObject private var nowPlayingDetail: NowPlayingDetailStore
 
@@ -93,6 +95,7 @@ struct BroadcastRow: View {
         self.showTimeInDateLine = showTimeInDateLine
         self.showDownloadSpeed = showDownloadSpeed
         self.favoritePlayed = favoritePlayed
+        _isQueued = State(wrappedValue: PlaybackQueueStore.shared.queuedTerminIDs.contains(item.terminID))
         #if os(iOS)
         // Seed the local snapshot from the manager's current value so the row shows correct
         // state before the first publisher emission. The `onReceive` below keeps it in sync.
@@ -166,6 +169,37 @@ struct BroadcastRow: View {
             .padding(.horizontal, 8)
         }
         .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 12))
+        .onReceive(PlaybackQueueStore.shared.$queuedTerminIDs) { ids in
+            let queued = ids.contains(item.terminID)
+            if queued != isQueued { isQueued = queued }
+        }
+        .contextMenu {
+            if activePlayback.activeTerminID != item.id {
+                PlaybackQueueMenuItems(item: item, isQueued: isQueued)
+            }
+        }
+        #if os(iOS)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if activePlayback.activeTerminID != item.id {
+                if isQueued {
+                    Button {
+                        PlaybackQueueStore.shared.remove(item)
+                    } label: {
+                        Label("Entfernen", systemImage: "minus.circle")
+                    }
+                    .tint(.gray)
+                } else {
+                    Button {
+                        PlaybackQueueStore.shared.enqueue(item)
+                        PlaybackQueueFeedback.added()
+                    } label: {
+                        Label("Warteschlange", systemImage: "text.line.last.and.arrowtriangle.forward")
+                    }
+                    .tint(.accentColor)
+                }
+            }
+        }
+        #endif
         #if os(iOS)
         // Subscribe to THIS terminID's publisher only. Progress ticks for other downloads do
         // not touch this row. This is the reliable alternative to per-row `@StateObject`, which
@@ -243,6 +277,14 @@ struct BroadcastRow: View {
                     .frame(width: rowAccessoryBox, height: rowAccessoryBox)
                     .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
                     .accessibilityLabel("Wird abgespielt")
+            }
+            if isQueued, rowPlaybackState == .idle {
+                Image(systemName: "text.line.last.and.arrowtriangle.forward")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .frame(width: rowAccessoryBox, height: rowAccessoryBox)
+                    .frame(width: rowAccessoryHitBox, height: rowAccessoryHitBox)
+                    .accessibilityLabel("In der Warteschlange")
             }
             if favoritePlayed.listenedShowIDs.contains(item.terminID) {
                 Image(systemName: "checkmark.circle.fill")

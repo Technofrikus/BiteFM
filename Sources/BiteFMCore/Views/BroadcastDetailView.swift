@@ -61,6 +61,9 @@ struct BroadcastDetailView: View {
                                         BroadcastDetailDownloadGlyphColumn(item: item, detail: detail)
                                             .environmentObject(playerManager)
                                         playCapsuleButton(detail: detail)
+                                        if playerManager.currentItem?.id != item.id {
+                                            PlaybackQueueDetailMenuButton(item: item)
+                                        }
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -71,22 +74,28 @@ struct BroadcastDetailView: View {
                                 }
                                 #else
                                 if showsPrimaryPlayAction {
-                                    Button(action: {
-                                        if playerManager.currentItem?.id == item.id {
-                                            playerManager.togglePlayPause()
-                                        } else {
-                                            playerManager.play(item: item, playlist: detail.recordings.first?.playlist)
+                                    HStack(spacing: 10) {
+                                        Button(action: {
+                                            if playerManager.currentItem?.id == item.id {
+                                                playerManager.togglePlayPause()
+                                            } else {
+                                                playerManager.play(item: item, playlist: detail.recordings.first?.playlist)
+                                            }
+                                        }) {
+                                            HStack {
+                                                Image(systemName: primaryPlayIconName)
+                                                    .contentTransition(.identity)
+                                                Text(primaryPlayLabel)
+                                            }
                                         }
-                                    }) {
-                                        HStack {
-                                            Image(systemName: primaryPlayIconName)
-                                                .contentTransition(.identity)
-                                            Text(primaryPlayLabel)
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(.accentColor)
+                                        .controlSize(.large)
+
+                                        if playerManager.currentItem?.id != item.id {
+                                            PlaybackQueueDetailMenuButton(item: item)
                                         }
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(.accentColor)
-                                    .controlSize(.large)
 
                                     Divider()
                                 }
