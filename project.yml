@@ -15,10 +15,10 @@ settings:
       ENABLE_DEBUG_DYLIB: NO
   base:
     MARKETING_VERSION: "0.4.2"
-    CURRENT_PROJECT_VERSION: "76"
+    CURRENT_PROJECT_VERSION: "77"
 
 schemes:
-  BiteFMMac:
+  BiteFMMac (App):
     build:
       targets:
         BiteFMMac: [run, test, profile, analyze, archive]

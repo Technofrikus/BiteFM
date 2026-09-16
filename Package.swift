@@ -9,7 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "BiteFMCore", targets: ["BiteFMCore"]),
-        .executable(name: "BiteFMMac", targets: ["BiteFMMac"])
+        .executable(name: "BiteFMMacSPM", targets: ["BiteFMMacSPM"])
     ],
     dependencies: [],
     targets: [
@@ -23,7 +23,7 @@ let package = Package(
             resources: [.process("Assets.xcassets")]
         ),
         .executableTarget(
-            name: "BiteFMMac",
+            name: "BiteFMMacSPM",
             dependencies: ["BiteFMCore"],
             path: "Sources/BiteFMMac"
         ),

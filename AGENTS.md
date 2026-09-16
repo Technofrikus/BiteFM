@@ -6,7 +6,7 @@ BiteFM is a native radio client for ByteFM, built for macOS and iOS using SwiftU
 - **Generate Xcode Project**: `xcodegen generate`
 - **Build (SPM)**: `swift build`
 - **Run Tests (SPM)**: `swift test`
-- **Build Specific Target**: `swift build --product [BiteFMCore|BiteFMMac]`
+- **Build Specific Target**: `swift build --product [BiteFMCore|BiteFMMacSPM]`
 - **Bump Patch Version**: `swift Tools/bump-version.swift patch`
 
 ### Agent build notes (non-interactive terminal)
