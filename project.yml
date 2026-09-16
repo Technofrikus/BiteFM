@@ -15,7 +15,7 @@ settings:
       ENABLE_DEBUG_DYLIB: NO
   base:
     MARKETING_VERSION: "0.4.2"
-    CURRENT_PROJECT_VERSION: "74"
+    CURRENT_PROJECT_VERSION: "75"
 
 schemes:
   BiteFMMac:
@@ -104,6 +104,7 @@ targets:
         DEVELOPMENT_TEAM: C24WCN78VM
         PRODUCT_NAME: BiteFM
         TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: BiteFMiOS.entitlements
     info:
       path: Info-iOS.plist
       properties:
@@ -111,6 +112,8 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleDisplayName: "BiteFM"
         LSRequiresIPhoneOS: true
+        # Siri Media Intents Donation (Now-Playing-Vorschlag beim Kopfhörer-Verbinden), siehe AudioPlayerManager.
+        NSSiriUsageDescription: "BiteFM meldet begonnene Ausgaben an Siri, damit sie z. B. beim Verbinden von Kopfhörern als Vorschlag zum Fortsetzen erscheinen."
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UIBackgroundModes:
