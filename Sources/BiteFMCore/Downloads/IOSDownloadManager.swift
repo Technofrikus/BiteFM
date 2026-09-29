@@ -1388,6 +1388,14 @@ public final class IOSDownloadManager: ObservableObject {
         }
     }
 
+    /// Freier Speicher auf dem Gerät (für „wichtige“ Nutzung, wie beim Download-Check); `nil` wenn nicht ermittelbar.
+    static func deviceFreeBytes() -> Int64? {
+        guard let doc = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
+              let vals = try? doc.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+              let avail = vals.volumeAvailableCapacityForImportantUsage else { return nil }
+        return avail
+    }
+
     private static func hasDeviceFreeSpace(atLeast bytes: Int64) -> Bool {
         guard bytes > 0 else { return true }
         do {

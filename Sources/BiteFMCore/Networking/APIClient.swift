@@ -1333,6 +1333,15 @@ public class APIClient: ObservableObject {
             return cached
         }
 
+        #if os(iOS)
+        // Ohne Netz sofort die gespeicherten Sendungsinfos nutzen, statt auf Timeouts zu warten.
+        if !markAsListened, !(await NetworkPathProbe.isPathSatisfied()),
+           let offline = offlineBroadcastDetailFromStore(terminID: item.terminID) {
+            broadcastDetailsCache.set(item.id, detail: offline)
+            return offline
+        }
+        #endif
+
         let urls = makeBroadcastDetailURLs(for: item, markAsListened: markAsListened)
         guard !urls.isEmpty else {
             LogManager.shared.log(

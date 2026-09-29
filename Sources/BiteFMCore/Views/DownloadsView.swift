@@ -32,6 +32,9 @@ struct DownloadsView: View {
     /// Memoiziert über `totalDownloadedBytesCache`, da es über alle Reihen iteriert.
     @State private var totalDownloadedBytesCache: Int64 = 0
 
+    /// Freier Gerätespeicher; wird in `refreshCaches()` aktualisiert.
+    @State private var deviceFreeBytesCache: Int64?
+
     private var listRows: [StoredDownloadedEpisode] {
         listRowsCache ?? allEpisodes
     }
@@ -46,6 +49,7 @@ struct DownloadsView: View {
             return lhs.terminID > rhs.terminID
         }
         listRowsCache = sorted
+        deviceFreeBytesCache = IOSDownloadManager.deviceFreeBytes()
         totalDownloadedBytesCache = sorted
             .filter { $0.status == .downloaded }
             .reduce(Int64(0)) { $0 + IOSDownloadManager.effectiveDownloadedAudioBytes(for: $1) }
@@ -101,18 +105,29 @@ struct DownloadsView: View {
                             }
                         }
                     } footer: {
-                        if totalDownloadedAudioBytes > 0 {
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text("Heruntergeladen insgesamt")
-                                Spacer(minLength: 8)
-                                Text(Self.formatStorageBytes(totalDownloadedAudioBytes))
-                                    .fontWeight(.medium)
-                                    .monospacedDigit()
+                        VStack(spacing: 4) {
+                            if totalDownloadedAudioBytes > 0 {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text("Belegter Speicher")
+                                    Spacer(minLength: 8)
+                                    Text(Self.formatStorageBytes(totalDownloadedAudioBytes))
+                                        .fontWeight(.medium)
+                                        .monospacedDigit()
+                                }
                             }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textCase(nil)
+                            if let free = deviceFreeBytesCache {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text("Freier Speicher   ")
+                                    Spacer(minLength: 8)
+                                    Text(Self.formatStorageBytes(free))
+                                        .fontWeight(.medium)
+                                        .monospacedDigit()
+                                }
+                            }
                         }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
                     }
                 }
                 .listStyle(.insetGrouped)
@@ -327,7 +342,8 @@ private struct DownloadsSettingsView: View {
     private var storageBudgetFooterText: String {
         let used = (try? IOSDownloadManager.totalDownloadedBytes(context: modelContext)) ?? 0
         let usedStr = DownloadsView.formatStorageBytes(used)
-        return "Nur die heruntergeladenen Audiodateien. Aktuell belegt: \(usedStr). Wenn das Limit voll ist, kannst du älteste Sendungen löschen oder das Limit hier erhöhen."
+        let freeStr = IOSDownloadManager.deviceFreeBytes().map { DownloadsView.formatStorageBytes($0) } ?? "unbekannt"
+        return "Nur die heruntergeladenen Audiodateien. Aktuell belegt: \(usedStr). Frei auf dem Gerät: \(freeStr). Wenn das Limit voll ist, kannst du älteste Sendungen löschen oder das Limit hier erhöhen."
     }
 }
 
