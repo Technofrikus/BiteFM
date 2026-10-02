@@ -5,9 +5,10 @@ project.local.yml
 xcuserdata/
 *.xcuserstate
 DerivedData/
-/.DS_Store
-/.DS_Store
 
 # Release-Artefakte (Archiv der DMGs pro Version + Build-Ausgaben)
 Releases/
 build/
+
+# macOS
+.DS_Store
