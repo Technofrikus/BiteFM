@@ -70,6 +70,8 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     /// Marker für „letzter Cold-Launch-Snapshot wurde gerade visuell wiederhergestellt“ — verhindert Auto-Save mit
     /// position 0, bevor der Nutzer überhaupt einen Play-Tap getätigt hat.
     private var isRestoredPlaceholder = false
+    /// Dauer, die `play(url:)` statt 0 übernimmt (gleiche Ausgabe wird neu aufgebaut).
+    private var carriedDuration: Double = 0
 
     private var timeObserver: Any?
     private var lastUpdatedSongId: String?
@@ -475,6 +477,9 @@ public class AudioPlayerManager: NSObject, ObservableObject {
            isPlaying {
             return
         }
+
+        // Dieselbe Ausgabe (z. B. Play nach Restore): bekannte Dauer behalten, damit die Seekbar nicht kurz verschwindet.
+        carriedDuration = (!isLive && currentItem?.id == item.id) ? duration : 0
 
         // Eine gestartete Ausgabe ist nicht mehr „als Nächstes“ dran.
         PlaybackQueueStore.shared.remove(terminID: item.terminID)
@@ -891,6 +896,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         currentItem = nil
         currentPlaylist = nil
         duration = 0
+        carriedDuration = 0
         currentTime = 0
         currentStreamType = streamType
         isRestoredPlaceholder = false
@@ -1054,7 +1060,8 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         currentPlaybackURL = url
         tearDownPlayer()
         
-        duration = 0 // Reset duration for new item
+        duration = carriedDuration // Reset für neues Item; bei gleicher Ausgabe bekannte Dauer behalten
+        carriedDuration = 0
         currentTime = startAt // Reset current time to startAt for new item
         lastSavedPosition = startAt
         syncProgress()
