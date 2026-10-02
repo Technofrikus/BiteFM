@@ -20,6 +20,13 @@ BiteFM is a native radio client for ByteFM, built for macOS and iOS using SwiftU
 - **Marketing Version**: Manual in `project.yml` for Major/Minor, or via `swift Tools/bump-version.swift patch` for Patch updates.
 - **Source of Truth**: `project.yml`. Never change version in Xcode directly.
 
+## Release (macOS, Developer ID + notarized DMG + GitHub)
+- **Normale Commits lösen kein Release aus.** Der `pre-commit`-Hook erhöht nur die Build-Nummer.
+- **Release**: `Tools/release.sh [patch|minor|major]` (Default `patch`) – erhöht die Marketing-Version, baut/exportiert (Developer ID), notarisiert App und DMG, installiert nach `/Applications`, legt eine Kopie in `Releases/<version>/` ab (gitignored), committet `chore(release): vX.Y.Z`, taggt, pusht und erstellt das GitHub-Release mit Notes aus den `feat`/`fix`/`perf`-Commits seit dem letzten `v*`-Tag. Vorher muss der Arbeitsbaum sauber sein; Rückfrage vor Commit/Push (`-y` überspringt).
+- **Testlauf**: `Tools/release.sh --build-only` (ohne Version/Tag/GitHub) bzw. `--skip-notarize`; `--no-install` überspringt /Applications.
+- **Release Notes** kommen nur aus Conventional Commits (`feat(scope): …`, `fix: …`, `perf: …`) – bitte so committen.
+- **Einmalig**: `xcrun notarytool store-credentials "BiteFM-notary" --apple-id <AppleID> --team-id C24WCN78VM` (App-spezifisches Passwort). Nie Zugangsdaten ins Repo.
+
 ## Key Conventions
 - **Architecture**: Modular design with `BiteFMCore` (logic, models, views) and platform-specific targets (`BiteFMMac`, `BiteFMiOS`).
 - **Module layout** (`Sources/BiteFMCore/`):

@@ -26,6 +26,8 @@ func getGitCommitCount() -> Int {
 
 let arguments = CommandLine.arguments
 let isPatch = arguments.contains("patch")
+let isMinor = arguments.contains("minor")
+let isMajor = arguments.contains("major")
 let isPreCommit = arguments.contains("pre-commit")
 
 let projectFilePath = "project.yml"
@@ -52,34 +54,32 @@ for line in lines {
         updatedLine = line.replacingOccurrences(of: #":\s*".*"#, with: ": \"\(newBuildNumber)\"", options: .regularExpression)
     }
     
-    // Update MARKETING_VERSION if 'patch' is requested
-    if isPatch && line.contains("MARKETING_VERSION:") {
+    // Update MARKETING_VERSION if patch/minor/major is requested
+    if (isPatch || isMinor || isMajor) && line.contains("MARKETING_VERSION:") {
         let pattern = #":\s*"(.*)""#
         if let regex = try? NSRegularExpression(pattern: pattern, options: []),
            let match = regex.firstMatch(in: line, options: [], range: NSRange(location: 0, length: line.utf16.count)) {
-            
+
             let nsLine = line as NSString
-            let versionRange = match.range(at: 1)
-            let currentVersion = nsLine.substring(with: versionRange)
-            
-            var components = currentVersion.components(separatedBy: ".")
-            if components.count >= 3 {
-                if let patch = Int(components[2]) {
-                    components[2] = "\(patch + 1)"
-                    let newVersion = components.joined(separator: ".")
-                    updatedLine = line.replacingOccurrences(of: "\"\(currentVersion)\"", with: "\"\(newVersion)\"")
-                    print("Bumping Marketing Version: \(currentVersion) -> \(newVersion)")
-                }
-            } else if components.count == 2 {
-                // Handle 0.4 -> 0.4.1
-                components.append("1")
-                let newVersion = components.joined(separator: ".")
-                updatedLine = line.replacingOccurrences(of: "\"\(currentVersion)\"", with: "\"\(newVersion)\"")
-                print("Bumping Marketing Version: \(currentVersion) -> \(newVersion)")
+            let currentVersion = nsLine.substring(with: match.range(at: 1))
+
+            // Normalize to major.minor.patch (0.4 -> 0.4.0)
+            var parts = currentVersion.components(separatedBy: ".").compactMap { Int($0) }
+            while parts.count < 3 { parts.append(0) }
+
+            if isMajor {
+                parts = [parts[0] + 1, 0, 0]
+            } else if isMinor {
+                parts = [parts[0], parts[1] + 1, 0]
+            } else {
+                parts[2] += 1
             }
+            let newVersion = parts.prefix(3).map(String.init).joined(separator: ".")
+            updatedLine = line.replacingOccurrences(of: "\"\(currentVersion)\"", with: "\"\(newVersion)\"")
+            print("Bumping Marketing Version: \(currentVersion) -> \(newVersion)")
         }
     }
-    
+
     updatedLines.append(updatedLine)
 }
 
