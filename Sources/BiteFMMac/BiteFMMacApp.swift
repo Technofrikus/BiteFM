@@ -80,6 +80,14 @@ struct BiteFMMacApp: App {
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command])
                 .disabled(AudioPlayerManager.shared.currentPlaylist == nil)
+
+                Divider()
+
+                Button("Nächste Ausgabe") {
+                    AudioPlayerManager.shared.playNextFromQueue()
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .disabled(AudioPlayerManager.shared.isLive || PlaybackQueueStore.shared.isEmpty)
             }
         }
     }

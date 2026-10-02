@@ -25,7 +25,7 @@ struct PlaybackTransportButtons: View {
     var body: some View {
         let s = iconScale
         #if os(iOS)
-        HStack(spacing: 18 * s) {
+        HStack(spacing: 10 * s) {
             if playerManager.currentItem != nil {
                 NowPlayingTransportButton(
                     systemName: "backward.fill",
@@ -49,6 +49,15 @@ struct PlaybackTransportButtons: View {
                     hitSide: 44 * s
                 ) { playerManager.skipNext() }
                 .disabled(!canSkipNext)
+            }
+
+            if showNextEditionButton {
+                NowPlayingTransportButton(
+                    systemName: "forward.end.fill",
+                    iconSide: 18 * s,
+                    hitSide: 44 * s
+                ) { playerManager.playNextFromQueue() }
+                .accessibilityLabel("Nächste Ausgabe")
             }
         }
         #else
@@ -97,6 +106,19 @@ struct PlaybackTransportButtons: View {
                 .buttonStyle(.plain)
                 .disabled(!canSkipNext)
             }
+
+            if showNextEditionButton {
+                Button(action: { playerManager.playNextFromQueue() }) {
+                    Image(systemName: "forward.end.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18 * s, height: 12 * s)
+                        .foregroundColor(.accentColor)
+                        .symbolRenderingMode(.monochrome)
+                }
+                .buttonStyle(.plain)
+                .help(queue.nextItem.map { "Nächste Ausgabe: \($0.sendungTitel) (⌥⌘→)" } ?? "Nächste Ausgabe")
+            }
         }
         #endif
     }
@@ -104,6 +126,11 @@ struct PlaybackTransportButtons: View {
     /// Titelsprung oder — am Ende der Titelliste — nächste Ausgabe aus der Warteschlange.
     private var canSkipNext: Bool {
         playerManager.currentPlaylist != nil || !queue.isEmpty
+    }
+
+    /// Eigener Sprung zur nächsten Ausgabe der Warteschlange — nur sichtbar, wenn eine ansteht.
+    private var showNextEditionButton: Bool {
+        playerManager.currentItem != nil && !playerManager.isLive && !queue.isEmpty
     }
 
     private var playPauseSystemName: String {
@@ -229,20 +256,17 @@ struct PlaybackControlsStack: View {
         VStack(spacing: spacing) {
             #if os(iOS)
             if showsAirPlayRoutePicker {
-                ZStack {
-                    HStack {
-                        Spacer(minLength: 0)
-                        PlaybackTransportButtons(
-                            useKeyboardShortcut: keyboardShortcut,
-                            iconScale: transportIconScale
-                        )
-                        Spacer(minLength: 0)
-                    }
-                    HStack {
-                        Spacer(minLength: 0)
-                        AirPlayRoutePickerRepresentable()
-                            .frame(width: 36 * transportIconScale, height: 36 * transportIconScale)
-                    }
+                // Transport und Route-Picker nebeneinander (nicht überlagert): bei bis zu vier
+                // Buttons (inkl. „Nächste Ausgabe“) wäre sonst die Mitte zu breit für den Picker.
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    PlaybackTransportButtons(
+                        useKeyboardShortcut: keyboardShortcut,
+                        iconScale: transportIconScale
+                    )
+                    Spacer(minLength: 0)
+                    AirPlayRoutePickerRepresentable()
+                        .frame(width: 36 * transportIconScale, height: 36 * transportIconScale)
                 }
             } else {
                 PlaybackTransportButtons(
@@ -286,7 +310,7 @@ private struct NowPlayingTransportButton: View {
             Image(systemName: systemName)
                 .font(.system(size: iconSide, weight: .semibold, design: .default))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(isPrimary ? Color.primary : Color.secondary)
+                .foregroundStyle(isPrimary ? Color.primary : Color.primary.opacity(0.75))
                 .contentTransition(.identity)
                 .frame(width: hitSide, height: hitSide)
                 .contentShape(Circle())
