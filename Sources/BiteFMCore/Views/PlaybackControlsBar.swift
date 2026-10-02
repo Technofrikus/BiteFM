@@ -205,7 +205,9 @@ struct PlaybackProgressLine: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(height: 1)
-            .animation(.linear(duration: 0.9), value: progress.currentTime)
+            // Bewusst ohne `.animation`: eine 0,9-s-Linear-Animation bei 1-Hz-Ticks läuft quasi
+            // dauerhaft und hält den Display-Link aktiv (Layout des ganzen Fensters bei jedem Frame).
+            .transaction { $0.animation = nil }
             .transition(.identity)
         }
     }
