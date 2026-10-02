@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Run the version bump script
+swift Tools/bump-version.swift pre-commit
+
+# Add project.yml and all regenerated (tracked) xcodeproj files incl. schemes
+git add project.yml
+git add -u BiteFM.xcodeproj

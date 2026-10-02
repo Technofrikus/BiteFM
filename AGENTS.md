@@ -16,7 +16,8 @@ BiteFM is a native radio client for ByteFM, built for macOS and iOS using SwiftU
 - **SPM builds run on the host platform only.** `swift build` on macOS compiles the macOS path and **excludes `#if os(iOS)` code**. Changes inside iOS-only blocks (e.g. `AVAudioSession` setup in `AudioPlayerManager`) are NOT validated by `swift build` — verify those with an iOS build (`xcodebuild -scheme BiteFMiOS -sdk iphonesimulator build`, or build the BiteFMiOS scheme in Xcode).
 
 ## Versioning
-- **Build Number**: Automated via Git commit count in `pre-commit` hook.
+- **Git Hooks**: Versioniert in `Tools/hooks/`. Einmalig pro Clone aktivieren: `git config core.hooksPath Tools/hooks`.
+- **Build Number**: Automated via Git commit count in `pre-commit` hook (staged auch `project.yml` und alle regenerierten `BiteFM.xcodeproj`-Dateien inkl. Schemes).
 - **Marketing Version**: Manual in `project.yml` for Major/Minor, or via `swift Tools/bump-version.swift patch` for Patch updates.
 - **Source of Truth**: `project.yml`. Never change version in Xcode directly.
 
