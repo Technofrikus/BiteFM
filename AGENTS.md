@@ -24,7 +24,8 @@ BiteFM is a native radio client for ByteFM, built for macOS and iOS using SwiftU
 - **Normale Commits lösen kein Release aus.** Der `pre-commit`-Hook erhöht nur die Build-Nummer.
 - **Release**: `Tools/release.sh [patch|minor|major]` (Default `patch`) – erhöht die Marketing-Version, baut/exportiert (Developer ID), notarisiert App und DMG, installiert nach `/Applications`, legt eine Kopie in `Releases/<version>/` ab (gitignored), committet `chore(release): vX.Y.Z`, taggt, pusht und erstellt das GitHub-Release mit Notes aus den `feat`/`fix`/`perf`-Commits seit dem letzten `v*`-Tag. Vorher muss der Arbeitsbaum sauber sein; Rückfrage vor Commit/Push (`-y` überspringt).
 - **Testlauf**: `Tools/release.sh --build-only` (ohne Version/Tag/GitHub) bzw. `--skip-notarize`; `--no-install` überspringt /Applications.
-- **Release Notes** kommen nur aus Conventional Commits (`feat(scope): …`, `fix: …`, `perf: …`) – bitte so committen.
+- **Release Notes auf Deutsch**: App und Sender sind deutsch, daher müssen die GitHub-Release-Notes deutsch sein. Beim Release die `feat`/`fix`/`perf`-Commits seit dem letzten Tag (`git log vX.Y.Z..HEAD`) auf Deutsch zusammenfassen (nutzerverständlich, Abschnitte „Neu“, „Verbesserungen“, „Fehlerbehebungen“), nach `build/release/notes-de.md` schreiben und dann `Tools/release.sh minor` starten. Das Skript verlangt diese Datei (bricht sonst vor dem Build ab) und löscht sie nach dem Release. `--notes <Datei>` nimmt einen anderen Pfad, `--auto-notes` die englische Auto-Liste.
+- **Auto-Notes** (Fallback) kommen nur aus Conventional Commits (`feat(scope): …`, `fix: …`, `perf: …`) – bitte so committen.
 - **Einmalig**: `xcrun notarytool store-credentials "BiteFM-notary" --apple-id <AppleID> --team-id C24WCN78VM` (App-spezifisches Passwort). Nie Zugangsdaten ins Repo.
 
 ## Key Conventions

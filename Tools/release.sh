@@ -8,6 +8,8 @@
 #   --build-only      Nur bauen/notarisieren/DMG/installieren. Keine Versionserhöhung, kein Commit, kein Tag, kein GitHub-Release.
 #   --skip-notarize   Notarisierung überspringen (impliziert --build-only; nur zum Testen der Build-Kette).
 #   --no-install      Nicht nach /Applications kopieren.
+#   --notes <Datei>   Deutsche Release Notes aus anderer Datei (Standard: build/release/notes-de.md, muss vor dem Release existieren).
+#   --auto-notes      Stattdessen englische Auto-Liste aus den Commits verwenden (nicht Standard).
 #   -y, --yes         Keine Rückfrage vor Commit/Tag/Push/Release.
 #
 # Einmalige Voraussetzung (Notarisierung):
@@ -30,9 +32,15 @@ BUILD_ONLY=0
 SKIP_NOTARIZE=0
 INSTALL=1
 ASSUME_YES=0
+CUSTOM_NOTES="build/release/notes-de.md"
+AUTO_NOTES=0
+PREV_ARG=""
 
 for arg in "$@"; do
+    if [ "$PREV_ARG" = "--notes" ]; then CUSTOM_NOTES="$arg"; PREV_ARG=""; continue; fi
     case "$arg" in
+        --notes) PREV_ARG="--notes" ;;
+        --auto-notes) AUTO_NOTES=1 ;;
         patch|minor|major) BUMP="$arg" ;;
         --build-only) BUILD_ONLY=1 ;;
         --skip-notarize) SKIP_NOTARIZE=1; BUILD_ONLY=1 ;;
@@ -68,6 +76,10 @@ if [ "$BUILD_ONLY" -eq 0 ]; then
     [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || die "Release nur vom Branch 'main'"
     [ -z "$(git status --porcelain | grep -v '\.DS_Store' || true)" ] \
         || die "Uncommittete Änderungen vorhanden – erst committen."
+    if [ "$AUTO_NOTES" -eq 0 ]; then
+        [ -s "$CUSTOM_NOTES" ] || die "Deutsche Release Notes fehlen: $CUSTOM_NOTES
+  (vorher schreiben lassen, oder --auto-notes für die englische Auto-Liste)"
+    fi
     PREV_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
     if [ -n "$PREV_TAG" ] && [ -z "$(git log "$PREV_TAG..HEAD" --oneline)" ]; then
         die "Keine neuen Commits seit $PREV_TAG – nichts zu releasen."
@@ -93,6 +105,10 @@ if [ "$BUILD_ONLY" -eq 0 ]; then
         true
     } > "$NOTES_FILE"
     [ -s "$NOTES_FILE" ] || echo "Änderungen und Verbesserungen." > "$NOTES_FILE"
+    if [ "$AUTO_NOTES" -eq 0 ]; then
+        cp "$CUSTOM_NOTES" "$NOTES_FILE"
+        echo "(Deutsche Notes aus $CUSTOM_NOTES)"
+    fi
     cat "$NOTES_FILE"
 fi
 
@@ -212,5 +228,8 @@ gh release create "$TAG" "$DMG" \
     --verify-tag --latest \
     --title "BiteFM $VERSION" \
     --notes-file "$NOTES_FILE"
+
+# Notes-Datei gehört zu diesem Release; nicht für das nächste wiederverwenden
+if [ "$AUTO_NOTES" -eq 0 ] && [ "$CUSTOM_NOTES" = "build/release/notes-de.md" ]; then rm -f "$CUSTOM_NOTES"; fi
 
 step "Fertig: BiteFM $VERSION"
