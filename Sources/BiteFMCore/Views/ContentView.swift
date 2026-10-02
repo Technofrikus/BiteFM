@@ -166,7 +166,11 @@ private struct LoggedInRootView: View {
                 apiClient.logout()
             }
         } message: {
-            Text("Wenn Sie sich abmelden, werden alle Daten (gespeicherte Sendungen 'Neu im Archiv') gelöscht. Diese sind nicht wiederherzustellen.")
+            #if os(iOS)
+            Text("Beim Abmelden werden die Zugangsdaten und alle lokal gespeicherten Daten von diesem Gerät entfernt, auch heruntergeladene Sendungen. Favoriten und Hörverlauf bleiben bei ByteFM gespeichert und sind nach dem nächsten Login wieder da.")
+            #else
+            Text("Beim Abmelden werden die Zugangsdaten und alle lokal gespeicherten Daten von diesem Gerät entfernt. Favoriten und Hörverlauf bleiben bei ByteFM gespeichert und sind nach dem nächsten Login wieder da.")
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: APIClient.requestLogoutConfirmationNotification)) { _ in
             logoutAlertPresented = true

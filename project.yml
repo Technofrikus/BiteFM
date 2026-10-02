@@ -15,7 +15,7 @@ settings:
       ENABLE_DEBUG_DYLIB: NO
   base:
     MARKETING_VERSION: "0.5.0"
-    CURRENT_PROJECT_VERSION: "87"
+    CURRENT_PROJECT_VERSION: "88"
 
 schemes:
   BiteFMMac (App):

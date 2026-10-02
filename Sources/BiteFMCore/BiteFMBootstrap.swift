@@ -44,6 +44,7 @@ public enum BiteFMBootstrap {
     }
 
     public static func configureServices(modelContainer container: ModelContainer) {
+        KeychainHelper.migrateLegacyDefaultsPasswords()
         APIClient.shared.setup(modelContainer: container)
         AudioPlayerManager.shared.setup(modelContainer: container)
         AudioPlayerManager.shared.attachRestorationStore(AppRestorationStore.shared)

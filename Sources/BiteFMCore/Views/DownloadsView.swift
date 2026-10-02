@@ -304,6 +304,19 @@ private struct DownloadsSettingsView: View {
                 } footer: {
                     Text("Nur abgeschlossene Downloads; die aktuell laufende Wiedergabe wird nicht gelöscht.")
                 }
+
+                Section {
+                    Button("Abmelden", role: .destructive) {
+                        // Sheet zuerst schließen: Die Bestätigung hängt am Root (`ContentView`) und wäre sonst verdeckt.
+                        dismiss()
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                            APIClient.shared.requestLogoutConfirmation()
+                        }
+                    }
+                } header: {
+                    Text("Konto")
+                }
             }
             .navigationTitle("Download-Einstellungen")
             .navigationBarTitleDisplayMode(.inline)
